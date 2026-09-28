@@ -13,6 +13,7 @@
     .section-heading{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin:25px 0 9px}.section-heading h2{font:600 1rem ui-monospace,monospace;margin:0}.hint,.saved-status{font-size:.82rem;color:var(--muted)}
     .tabs{display:flex;gap:6px;overflow-x:auto;padding:0 0 10px;border-bottom:1px solid var(--border)}.tab{flex:0 0 auto;border:1px solid var(--border);border-radius:6px 6px 0 0;background:var(--panel);color:var(--muted);padding:8px 12px;font:13px ui-monospace,SFMono-Regular,Menlo,monospace;cursor:pointer}.tab:hover{color:var(--text);border-color:#6e7681}.tab[aria-selected="true"]{color:var(--text);background:var(--panel2);border-bottom-color:var(--blue);box-shadow:inset 0 -2px var(--blue)}
     .topic-panel{background:var(--panel);border:1px solid var(--border);border-top:0;border-radius:0 0 6px 6px;padding:18px}.topic-title{font:600 1.08rem ui-monospace,monospace;margin:0 0 16px}.columns{display:grid;grid-template-columns:1fr 1fr;gap:14px}.card{border:1px solid var(--border);border-radius:6px;overflow:hidden;background:#0d1117}.card h3{font:600 .83rem ui-monospace,monospace;margin:0;padding:9px 12px;background:var(--panel2);border-bottom:1px solid var(--border);color:var(--muted)}.card-content{padding:13px 14px;white-space:pre-wrap}.stance{border-left:3px solid var(--blue)}.vendor{border-left:3px solid var(--yellow)}.reply{border-left:3px solid var(--green)}.reply-head{display:flex;align-items:center;justify-content:space-between;gap:8px}.reply-head h3{flex:1}.reply-body{padding:13px 14px}.reply-text{white-space:pre-wrap}.button{border:1px solid var(--border);border-radius:5px;background:var(--panel2);color:var(--text);padding:5px 10px;font:12px ui-monospace,monospace;cursor:pointer}.button:hover{border-color:var(--blue);color:var(--blue)}.button.primary{background:#238636;border-color:#238636;color:white}.button.subtle{color:var(--muted)}.editor{width:100%;min-height:150px;resize:vertical;padding:11px;border:1px solid var(--border);border-radius:5px;background:#010409;color:var(--text);font:14px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.editor:focus{outline:1px solid var(--blue);border-color:var(--blue)}.editor-actions{display:flex;gap:8px;margin-top:9px}.saved-status{min-height:1.3em;margin-top:8px}.scripts{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:24px}.script{border:1px solid var(--border);background:var(--panel);border-radius:6px;overflow:hidden}.script h2{font:600 .9rem ui-monospace,monospace;padding:10px 13px;margin:0;background:var(--panel2);border-bottom:1px solid var(--border)}.script blockquote{margin:0;padding:14px 16px;border-left:3px solid var(--blue);white-space:pre-wrap;color:#c9d1d9}
+    .auth-box{display:flex;align-items:center;gap:9px;flex-wrap:wrap;border:1px solid var(--border);border-radius:6px;background:var(--panel);padding:12px;margin:0 0 20px}.auth-box input{width:min(100%,310px);padding:8px 10px;border:1px solid var(--border);border-radius:5px;background:#010409;color:var(--text);font:14px -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}.auth-box input::placeholder{color:var(--muted)}.auth-message{font-size:.84rem;color:var(--muted);flex-basis:100%}.auth-state{font:12px ui-monospace,monospace;color:var(--green);margin-left:auto}
     footer{max-width:1080px;margin:auto;padding:0 20px 28px;color:var(--muted);font-size:.83rem} [hidden]{display:none!important}
     @media(max-width:700px){main{padding:0 12px 40px}.columns,.scripts{grid-template-columns:1fr}.topic-panel{padding:12px}.section-heading{align-items:flex-start;flex-direction:column;gap:2px}.tab{padding:7px 10px}}
   </style>
@@ -26,6 +27,7 @@
   <main>
     <aside class="callout"><strong>公開網站提醒：</strong>此頁包含廠商談判策略、設備型號與數量，任何人都可能瀏覽。</aside>
     <section class="goal"><h2>唯一目標：退貨</h2><p>退回 10 件未拆封設備。不以共同驗證、繼續試用或重複測試作為後續方案；請廠商確認退貨流程、條件與時程。</p></section>
+    <section class="auth-box" aria-label="協作者登入"><strong>協作者</strong><input id="email" type="email" autocomplete="email" placeholder="受邀協作者 email" aria-label="受邀協作者 email"><button id="login" class="button" type="button">寄送登入連結</button><button id="logout" class="button subtle" type="button" hidden>登出</button><span id="auth-state" class="auth-state">公開檢視</span><div id="auth-message" class="auth-message" aria-live="polite">僅 Supabase 白名單中的受邀帳號可以修改。</div></section>
     <div class="section-heading"><h2>議題索引</h2><span class="hint">點選標籤查看該議題的說法與回應</span></div>
     <nav class="tabs" id="tabs" role="tablist" aria-label="會議議題"></nav>
     <section class="topic-panel" id="topic-panel" role="tabpanel" aria-live="polite"></section>
@@ -34,8 +36,9 @@
       <section class="script"><h2>若廠商拒絕退貨</h2><blockquote>請提供具體拒絕依據、適用條款及本案可行的處理方案，並確認負責窗口與明確回覆期限。我方希望以退回未拆封品作為結案方案。</blockquote></section>
     </div>
   </main>
-  <footer>本頁整理的是會議溝通策略，不構成法律意見。退貨權利仍須依採購條款、往來紀錄及適用規定判斷。修改回覆後的內容保存在目前瀏覽器，不會自動更新 GitHub 網站原始檔或同步到其他裝置。</footer>
-  <script>
+  <footer>本頁整理的是會議溝通策略，不構成法律意見。退貨權利仍須依採購條款、往來紀錄及適用規定判斷。回覆儲存於 Supabase，公開訪客可讀取；僅受邀且列入編輯白名單的帳號可修改。</footer>
+  <script type="module">
+    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
     const topics = [
       {id:"goal",label:"退貨目標",title:"本次會議目標",stance:"退回 10 件未拆封設備，不以共同驗證或繼續試用作為後續方案。",vendor:"「可以先測試或試用，再決定是否退貨。」",reply:"我方目前的決定是退貨，不希望再投入時間與人力試用。請直接確認退貨流程、條件與時程。"},
       {id:"stability",label:"穩定性",title:"核心理由：穩定性風險",stance:"目前使用結果顯示，設備在 T5377S 使用情境中的穩定性存在疑慮，尚無足夠依據確認符合需求。",vendor:"「新品沒有測試過，不能說新品不穩。」",reply:"我方不是主張這 10 件新品已逐件故障，而是目前無法確認新品在 T5377S 上能穩定符合需求。基於這項風險，我方決定不導入並要求退貨。"},
@@ -54,18 +57,45 @@
       {id:"spec",label:"規格／驗收",title:"沒有規格書或驗收條件",stance:"當初沒有完整書面規格或驗收條件，也沒有充分資料確認設備符合 T5377S 的穩定性需求。",vendor:"「當初沒有約定 T5377S 或相關穩定性標準。」",reply:"這正是我方目前無法確認適用性的原因之一。依目前使用結果，我方決定不導入，並希望就未拆封品協商退貨。"},
       {id:"return",label:"退貨流程",title:"退貨流程與時程",stance:"請廠商確認退貨文件、取回方式、退款或折讓流程及完成時程。",vendor:"「需要內部確認，或不符合一般退貨政策。」",reply:"請提供適用政策或採購條款，並提出本案可行的處理方式及明確回覆期限。我方希望以退回未拆封品作為結案方案。"}
     ];
-    const storageKey="return-analysis-replies-v1";
-    let savedReplies={};
-    try{savedReplies=JSON.parse(localStorage.getItem(storageKey)||"{}");}catch{savedReplies={};}
+    const supabase=createClient("https://ywazcutaodqrthhighod.supabase.co","sb_publishable_wu8mVnxG-ifzSDB8Zl4wlg_xCRjl9k3");
+    const fallbackTopics=topics.map((topic,sort_order)=>({...topic,sort_order}));
+    let currentUser=null;
     const tabs=document.getElementById("tabs"),panel=document.getElementById("topic-panel");
+    const emailInput=document.getElementById("email"),loginButton=document.getElementById("login"),logoutButton=document.getElementById("logout"),authMessage=document.getElementById("auth-message"),authState=document.getElementById("auth-state");
     let activeId=topics[0].id;
     function make(tag,cls,text){const el=document.createElement(tag);if(cls)el.className=cls;if(text!==undefined)el.textContent=text;return el;}
     function renderTabs(){
       tabs.replaceChildren(...topics.map((topic,index)=>{const b=make("button","tab",topic.label);b.type="button";b.id=`tab-${topic.id}`;b.setAttribute("role","tab");b.setAttribute("aria-controls","topic-panel");b.setAttribute("aria-selected",String(topic.id===activeId));b.tabIndex=topic.id===activeId?0:-1;b.addEventListener("click",()=>selectTopic(topic.id));b.addEventListener("keydown",event=>{if(event.key==="ArrowRight"||event.key==="ArrowLeft"){event.preventDefault();const next=(index+(event.key==="ArrowRight"?1:-1)+topics.length)%topics.length;selectTopic(topics[next].id);document.getElementById(`tab-${topics[next].id}`).focus();}});return b;}));
     }
     function selectTopic(id){activeId=id;renderTabs();renderTopic();}
+    function applyTopics(rows){
+      if(!rows?.length)return;
+      const byId=new Map(rows.map(row=>[row.id,row]));
+      topics.splice(0,topics.length,...topics.map((topic,index)=>({...topic,...(byId.get(topic.id)||{}),sort_order:index})));
+      if(!topics.some(topic=>topic.id===activeId))activeId=topics[0].id;
+      renderTabs();renderTopic();
+    }
+    async function loadTopics(){
+      const {data,error}=await supabase.from("return_topics").select("id,label,title,stance,vendor,reply,sort_order").order("sort_order");
+      if(error){authMessage.textContent=`無法讀取共用資料：${error.message}。請先在 Supabase 執行 supabase/setup.sql。`;return;}
+      if(data.length){applyTopics(data);return;}
+      if(currentUser){
+        const rows=fallbackTopics.map(({id,label,title,stance,vendor,reply,sort_order})=>({id,label,title,stance,vendor,reply,sort_order}));
+        const {error:seedError}=await supabase.from("return_topics").upsert(rows,{onConflict:"id"});
+        if(seedError){authMessage.textContent=`資料表目前是空的，初始化失敗：${seedError.message}。請確認你的 email 已列入 return_editors。`;return;}
+        authMessage.textContent="初始議題已寫入共用資料庫。";
+        const result=await supabase.from("return_topics").select("id,label,title,stance,vendor,reply,sort_order").order("sort_order");
+        if(!result.error)applyTopics(result.data);
+      }
+    }
+    function updateAuthUI(){
+      authState.textContent=currentUser?`已登入：${currentUser.email}`:"公開檢視";
+      loginButton.hidden=!!currentUser;emailInput.hidden=!!currentUser;logoutButton.hidden=!currentUser;
+      if(currentUser)authMessage.textContent="已登入。資料共用於 Supabase；資料庫白名單會限制編輯權限。";
+      renderTopic();
+    }
     function renderTopic(){
-      const topic=topics.find(item=>item.id===activeId);panel.setAttribute("aria-labelledby",`tab-${topic.id}`);panel.replaceChildren();
+      const topic=topics.find(item=>item.id===activeId);if(!topic)return;panel.setAttribute("aria-labelledby",`tab-${topic.id}`);panel.replaceChildren();
       panel.append(make("h2","topic-title",topic.title));
       const columns=make("div","columns");
       const stance=make("article","card stance");stance.append(make("h3","","我方立場／建議說法"),make("div","card-content",topic.stance));
@@ -73,17 +103,23 @@
       columns.append(stance,vendor);panel.append(columns);
       const reply=make("article","card reply");reply.style.marginTop="14px";
       const head=make("div","reply-head");head.append(make("h3","","我方回應"));
-      const edit=make("button","button", "修改回覆");edit.type="button";head.append(edit);reply.append(head);
-      const body=make("div","reply-body"),text=make("div","reply-text",savedReplies[topic.id]??topic.reply);body.append(text);
+      const edit=make("button","button","修改回覆");edit.type="button";edit.hidden=!currentUser;head.append(edit);reply.append(head);
+      const body=make("div","reply-body"),text=make("div","reply-text",topic.reply);body.append(text);
       const status=make("div","saved-status");status.setAttribute("aria-live","polite");body.append(status);reply.append(body);panel.append(reply);
       edit.addEventListener("click",()=>{
-        const editor=document.createElement("textarea");editor.className="editor";editor.setAttribute("aria-label","編輯我方回應");editor.value=savedReplies[topic.id]??topic.reply;
+        const editor=document.createElement("textarea");editor.className="editor";editor.setAttribute("aria-label","編輯我方回應");editor.value=topic.reply;
         const actions=make("div","editor-actions"),save=make("button","button primary","儲存回覆"),cancel=make("button","button subtle","取消");save.type=cancel.type="button";actions.append(save,cancel);body.replaceChildren(editor,actions,status);editor.focus();
         cancel.addEventListener("click",renderTopic);
-        save.addEventListener("click",()=>{const value=editor.value.trim();if(!value){status.textContent="回覆不可留白。";editor.focus();return;}savedReplies[topic.id]=value;try{localStorage.setItem(storageKey,JSON.stringify(savedReplies));renderTopic();const message=panel.querySelector(".saved-status");message.textContent="已儲存在此瀏覽器，下次開啟仍會保留。";}catch{status.textContent="瀏覽器未能儲存資料；請確認未停用網站儲存空間。";}});
+        save.addEventListener("click",async()=>{const value=editor.value.trim();if(!value){status.textContent="回覆不可留白。";editor.focus();return;}save.disabled=true;status.textContent="正在同步至 Supabase…";const {error}=await supabase.from("return_topics").update({reply:value}).eq("id",topic.id);save.disabled=false;if(error){status.textContent=`儲存失敗：${error.message}`;return;}topic.reply=value;renderTopic();const message=panel.querySelector(".saved-status");message.textContent="已同步至 Supabase，其他協作者重新整理後即可看到更新。";});
       });
     }
+    loginButton.addEventListener("click",async()=>{const email=emailInput.value.trim();if(!email){authMessage.textContent="請輸入受邀 email。";emailInput.focus();return;}loginButton.disabled=true;authMessage.textContent="正在寄送登入連結…";const {error}=await supabase.auth.signInWithOtp({email,options:{shouldCreateUser:false,emailRedirectTo:location.href}});loginButton.disabled=false;authMessage.textContent=error?`登入連結寄送失敗：${error.message}`:"若此 email 已受邀，請查看信箱並點擊登入連結。";});
+    logoutButton.addEventListener("click",async()=>{await supabase.auth.signOut();});
+    supabase.auth.onAuthStateChange((_event,session)=>{currentUser=session?.user||null;updateAuthUI();if(currentUser)loadTopics();});
+    supabase.channel("return-topics-live").on("postgres_changes",{event:"UPDATE",schema:"public",table:"return_topics"},payload=>applyTopics([payload.new])).subscribe();
     renderTabs();renderTopic();
+    loadTopics();
+    supabase.auth.getSession().then(({data})=>{currentUser=data.session?.user||null;updateAuthUI();if(currentUser)loadTopics();});
   </script>
 </body>
 </html>
