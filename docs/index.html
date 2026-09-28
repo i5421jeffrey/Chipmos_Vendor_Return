@@ -1,0 +1,69 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f4f6fb">
+  <title>文錦設備退貨會議｜策略整理</title>
+  <style>
+    :root{color-scheme:light;--ink:#172033;--muted:#58657a;--line:#dce3ef;--blue:#2457c5;--pale:#edf3ff;--gold:#fff4d6;--green:#e9f7ef;--paper:#fff;--bg:#f4f6fb}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.65 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    header{background:linear-gradient(120deg,#13274b,#2457c5);color:white;padding:42px max(22px,calc((100% - 1120px)/2)) 36px}
+    header .eyebrow{font-size:.82rem;letter-spacing:.08em;opacity:.8}h1{font-size:clamp(1.7rem,4vw,2.5rem);line-height:1.2;margin:.45rem 0}.subtitle{max-width:760px;color:#e2eaff;margin:0}
+    main{max-width:1120px;margin:24px auto;padding:0 20px 60px}.notice{background:var(--gold);border:1px solid #efd78e;border-radius:12px;padding:14px 17px;margin-bottom:18px}.notice strong{display:block}
+    .goal{background:var(--green);border:1px solid #b8e2c7;border-radius:12px;padding:18px 20px;margin-bottom:22px}.goal h2{margin:0 0 5px;font-size:1.12rem}.goal p{margin:0}
+    .toolbar{display:flex;gap:12px;align-items:center;justify-content:space-between;margin:18px 0}.toolbar p{color:var(--muted);margin:0;font-size:.92rem}input{width:min(100%,420px);padding:11px 13px;border:1px solid #bdc8d9;border-radius:9px;font:inherit;background:white}
+    .table-wrap{overflow:auto;border:1px solid var(--line);border-radius:12px;background:var(--paper);box-shadow:0 5px 22px #1e31500c}table{border-collapse:collapse;width:100%;min-width:900px}th,td{text-align:left;vertical-align:top;padding:15px 16px;border-bottom:1px solid var(--line)}th{background:#eaf0fa;color:#23385d;font-size:.88rem;position:sticky;top:0}tbody tr:last-child td{border-bottom:0}tbody tr:hover{background:#f8faff}td:first-child{font-weight:700;width:17%;color:#203b70}td:nth-child(2){width:30%}td:nth-child(3){width:23%}td:nth-child(4){width:30%}
+    .tag{display:inline-block;color:var(--blue);background:var(--pale);padding:2px 8px;border-radius:99px;font-size:.78rem;margin:0 0 6px}
+    .script{margin-top:28px;background:var(--paper);border:1px solid var(--line);border-radius:12px;padding:20px 22px}.script h2{margin:0 0 10px;font-size:1.2rem}.script blockquote{margin:0;border-left:4px solid var(--blue);padding:10px 16px;background:#f7f9fd;color:#293750}
+    footer{max-width:1120px;margin:0 auto;padding:0 20px 32px;color:var(--muted);font-size:.85rem}
+    @media(max-width:650px){header{padding-top:30px;padding-bottom:28px}.toolbar{align-items:stretch;flex-direction:column}.toolbar input{width:100%}main{padding-inline:14px}.notice,.goal{font-size:.94rem}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">會議準備｜供內部使用</div>
+    <h1>文錦設備退貨會議</h1>
+    <p class="subtitle">目標：協商退回 10 件未拆封設備。主軸聚焦在 T5377S 使用情境下的穩定性疑慮、過去多次求助仍未解決，以及不再投入重複測試。</p>
+  </header>
+  <main>
+    <aside class="notice"><strong>發布前請確認資料可公開</strong>GitHub Pages 網站可能讓任何人瀏覽。此頁包含廠商談判立場、設備型號與數量等商務資訊；若不適合公開，請勿將網站發布至公開 Pages。</aside>
+    <section class="goal"><h2>我方唯一目標：退貨</h2><p>退回 10 件未拆封設備；不以共同驗證、繼續試用或重複測試作為後續處理方案。要求廠商確認退貨流程、條件與時程。</p></section>
+    <div class="toolbar"><div><strong>談判議題與應對</strong><p id="count" aria-live="polite"></p></div><input id="search" type="search" placeholder="搜尋議題或回應…" aria-label="搜尋表格"></div>
+    <div class="table-wrap"><table><thead><tr><th>議題</th><th>我方立場／建議說法</th><th>廠商可能回應</th><th>我方回應</th></tr></thead><tbody id="rows"></tbody></table></div>
+    <section class="script"><h2>建議開場說法</h2><blockquote>今天主要希望處理 10 件未拆封設備的退貨。從 3 月至今，我方已多次向貴司尋求協助，但問題仍未解決。舊設備當下可用，不代表長時間穩定；設備在使用一段時間後出現間歇性當機，而穩定性是我們的重要考量。我方不是主張這 10 件新品已逐件故障，也理解當初沒有明文約定穩定性；但目前沒有足夠依據確認這批設備符合 T5377S 的實際需求，因此已決定不導入。我方不打算再投入時間與人力重複測試，尤其在沒有新改善方案的情況下，測試沒有意義。今天希望直接確認退貨流程、條件與時程。</blockquote></section>
+    <section class="script"><h2>若廠商拒絕退貨</h2><blockquote>請提供具體拒絕依據、適用條款及本案可行的處理方案，並確認負責窗口與明確回覆期限。我方希望以退回未拆封品作為結案方案。</blockquote></section>
+  </main>
+  <footer>本頁整理的是會議溝通策略，不構成法律意見。退貨權利仍須依採購條款、往來紀錄及適用規定判斷。</footer>
+  <script>
+    const data = [
+      ["本次會議目標","退回 10 件未拆封設備，不以共同驗證或繼續試用作為後續方案。","「可以先測試或試用，再決定是否退貨。」","「我方目前的決定是退貨，不希望再投入時間與人力試用。請直接確認退貨流程、條件與時程。」"],
+      ["核心理由：穩定性風險","目前使用結果顯示，設備在 T5377S 使用情境中的穩定性存在疑慮，尚無足夠依據確認符合需求。","「新品沒有測試過，不能說新品不穩。」","「我方不是主張這 10 件新品已逐件故障，而是目前無法確認新品在 T5377S 上能穩定符合需求。基於這項風險，我方決定不導入並要求退貨。」"],
+      ["舊設備間歇性當機","舊設備運作一段時間後會不定時當機。當下可使用，不代表長時間穩定，也不代表是可接受的使用方案。","「舊設備用久了才會當機，不能代表新品。」","「同意不能直接據此認定新品故障；但目前的現象使我們無法確認新品在相同使用情境下能穩定運作。穩定性是重要考量，這項疑慮已影響我方是否接受導入。」"],
+      ["新舊設備條件相同、表現不同","新舊設備當初是在相同條件下評估，卻出現表現差異，讓我方無法確認設備在實際使用情境中的穩定性與一致性。","「新舊設備可能有使用年限、零件狀態等差異。」","「我們理解可能存在差異，但目前的表現仍不足以讓我方接受這批設備。請說明新舊設備差異如何影響穩定性；我方不希望因此再承擔重複測試的時間成本。」"],
+      ["廠商曾派員入廠安裝","廠商曾派員入廠，當時使用舊設備完成安裝。初期可以使用，但後續仍觀察到間歇性當機。","「當時只是協助安裝，沒有承諾長期穩定。」","「我們理解當時工作的範圍可能有限；但現有使用結果仍讓我方無法確認設備適合 T5377S，因此希望退回尚未使用的新品。」"],
+      ["初期可用不代表長期穩定","安裝當下可以正常使用，但運作一段時間後會不定時當機；短時間正常不足以證明長時間穩定。","「當時可以正常使用，表示設備沒有問題。」","「初期能使用只代表當時可以操作，不能代表長時間穩定，也不能證明符合實際使用需求。」"],
+      ["當初未約定穩定性","當初沒有完整書面規格與驗收條件，目前也沒有足夠依據確認設備符合 T5377S 的穩定性需求。","「我們沒有保證穩定性，當初也沒有約定。」","「我們理解當初沒有明文約定穩定性標準，不會說貴司違反了某項明文保證。但穩定性仍是設備能否實際使用的重要考量；目前的間歇性當機讓我們無法接受導入。」"],
+      ["未約定就不能以穩定性要求退貨","我方不是只爭論是否有明文保證，而是依目前使用結果評估設備是否適合實際使用，並協商處理未拆封品。","「沒有約定穩定性，就不能說設備不合格。」","「我們不會把未約定的標準說成既定驗收條件；但目前使用結果確實有間歇性當機。我方依此評估後，決定不再導入，並希望協商退回未拆封品。」"],
+      ["已多次尋求協助","從 3 月至今，我方已多次向廠商尋求協助，但問題仍未解決。","「這次可以再安排人員處理。」","「過去已多次尋求協助，問題至今仍未解決。我方已投入相當時間，不打算再重複投入時間與人力成本測試。」"],
+      ["廠商提出測試方案","我方不打算再進行測試；若沒有新的改善方案，重複測試沒有意義。","「再測一次才能確認問題。」","「從 3 月至今已多次配合處理，若沒有新的改善方案或新的根因判斷，單純重複測試不會改變目前疑慮。我方不接受以再測試作為退貨前提，請直接討論退貨安排。」"],
+      ["當下可用、未保證穩定","當下能啟動或操作，只能證明當時可用，不能代表長時間穩定或符合實際需求。","「設備當下可用，但我們沒有保證、也未約定穩定性。」","「我們理解當初沒有明文約定，也不會將此表述成違反書面保證。但穩定性仍是設備能否實際使用的重要考量；依目前表現，我方無法接受導入。」"],
+      ["沒訂標準，不能說不合格","我方不主張違反未約定的驗收標準，而是說目前無法確認適用性，並已決定不導入。","「你們沒訂穩定性標準，所以不能說設備不合格。」","「我們不會將未約定的標準說成既定驗收條件；但也沒有足夠依據確認設備符合實際使用需求。我方希望協商退回未拆封品，而不是繼續承擔不確定性。」"],
+      ["10 件未拆封新品","10 件尚未拆封、未投入使用。我方希望退回未使用品，不主張它們已逐件故障。","「新品未拆封、未測試，沒有理由退貨。」","「我方不是宣稱這 10 件已逐件故障，而是因目標機型上的適用性與穩定性無法確認，決定不導入；希望協商退回尚未拆封的設備。」"],
+      ["設備與現場整合責任","設備採購目的在於實際使用，目前結果未能讓我方確認適合 T5377S。","「設備交付後，現場整合或使用方式由你們負責。」","「我們理解現場整合可能涉及雙方工作，但目前使用結果仍未能讓我方確認設備適用。我方希望透過協商退回未使用庫存。」"],
+      ["沒有規格書或驗收條件","當初沒有完整書面規格或驗收條件，也沒有充分資料確認設備符合 T5377S 的穩定性需求。","「當初沒有約定 T5377S 或相關穩定性標準。」","「這正是我方目前無法確認適用性的原因之一。依目前使用結果，我方決定不導入，並希望就未拆封品協商退貨。」"],
+      ["退貨流程與時程","請廠商確認退貨文件、取回方式、退款或折讓流程及完成時程。","「需要內部確認，或不符合一般退貨政策。」","「請提供適用政策或採購條款，並提出本案可行的處理方式及明確回覆期限。我方希望以退回未拆封品作為結案方案。」"]
+    ];
+    const tbody = document.getElementById('rows');
+    const search = document.getElementById('search');
+    const count = document.getElementById('count');
+    function render(){
+      const q=search.value.trim().toLocaleLowerCase();
+      const filtered=data.filter(row=>row.join(' ').toLocaleLowerCase().includes(q));
+      tbody.replaceChildren(...filtered.map(row=>{const tr=document.createElement('tr');row.forEach((text,i)=>{const td=document.createElement('td');if(i===0){const tag=document.createElement('span');tag.className='tag';tag.textContent='議題';td.append(tag)}td.append(document.createTextNode(text));tr.append(td)});return tr}));
+      count.textContent=`顯示 ${filtered.length} / ${data.length} 項議題`;
+    }
+    search.addEventListener('input',render);render();
+  </script>
+</body>
+</html>
