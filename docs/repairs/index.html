@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1118">
+  <title>備品送修管理</title>
+  <style>
+    :root{color-scheme:dark;--bg:#0b1118;--panel:#111a24;--panel2:#172330;--border:#263747;--text:#e7eef5;--muted:#91a2b3;--blue:#58a6ff;--green:#3fb950;--yellow:#d29922;--red:#ff7b72;--purple:#bc8cff}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.55 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    header{background:linear-gradient(120deg,#101d2b,#0c141e 62%,#142638);border-bottom:1px solid var(--border);padding:26px max(18px,calc((100% - 1320px)/2)) 24px}.topline{display:flex;align-items:center;justify-content:space-between;gap:14px}.eyebrow,.mono{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);letter-spacing:.035em}h1{font-size:clamp(1.55rem,3vw,2.15rem);line-height:1.2;margin:10px 0 7px;letter-spacing:.01em}.subtitle{color:var(--muted);margin:0;max-width:850px}.phase{display:inline-flex;align-items:center;gap:7px;border:1px solid #315276;border-radius:999px;padding:5px 10px;color:#9ccaff;background:#102338;font-size:12px;white-space:nowrap}.phase:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--blue)}
+    main{max-width:1320px;margin:24px auto;padding:0 18px 50px}.toolbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}.auth{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-left:auto}.auth input,.filter input,.filter select{background:#0b121a;border:1px solid var(--border);border-radius:6px;color:var(--text);padding:9px 11px;font:inherit;min-height:38px}.auth input{width:min(270px,65vw)}input::placeholder{color:#74879a}.button{border:1px solid var(--border);border-radius:6px;background:var(--panel2);color:var(--text);padding:8px 12px;min-height:36px;font:inherit;cursor:pointer}.button:hover{border-color:var(--blue);color:#b9dcff}.button:disabled{opacity:.55;cursor:wait}.button.primary{background:#174d78;border-color:#286b9d}.message{flex-basis:100%;font-size:12px;color:var(--muted);text-align:right;min-height:1em}.login-state{color:#9ccaff;font-size:12px}.notice{padding:11px 13px;border:1px solid #72581f;background:#241d0c;color:#e7d29c;border-radius:7px;margin-bottom:16px}.notice strong{color:#ffdf79}.notice.error{border-color:#713b3b;background:#281516;color:#ffc2bf}.notice.success{border-color:#285b3d;background:#102117;color:#a7e3b6}
+    .stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:11px;margin:15px 0 19px}.stat{background:var(--panel);border:1px solid var(--border);border-radius:8px;padding:13px 15px}.stat-label{color:var(--muted);font-size:12px}.stat-value{font:600 1.45rem ui-monospace,SFMono-Regular,Menlo,monospace;margin-top:4px}.stat-value.blue{color:#79bdff}.stat-value.yellow{color:#f2cc60}.stat-value.green{color:#70d88b}.stat-value.purple{color:#d2a8ff}
+    .list-head{display:flex;align-items:baseline;justify-content:space-between;gap:10px;margin:22px 0 10px}.list-head h2{font-size:1rem;margin:0}.list-head span{color:var(--muted);font-size:12px}.filters{display:grid;grid-template-columns:minmax(220px,1.6fr) repeat(2,minmax(150px,.7fr)) auto;gap:9px;margin-bottom:12px}.filter label{display:block;color:var(--muted);font-size:11px;margin:0 0 4px 2px}.filter input,.filter select{width:100%}.results{border:1px solid var(--border);border-radius:8px;overflow:hidden;background:var(--panel)}.table-wrap{overflow:auto}table{border-collapse:collapse;width:100%;min-width:1050px}th{position:sticky;top:0;background:#172330;color:#aab9c7;font-size:11px;text-align:left;white-space:nowrap;letter-spacing:.04em;padding:10px 12px;border-bottom:1px solid var(--border)}td{padding:11px 12px;border-bottom:1px solid #1d2b38;vertical-align:top}tbody tr:hover{background:#14202c}tbody tr:last-child td{border-bottom:0}.machine{font:600 12px ui-monospace,SFMono-Regular,Menlo,monospace;color:#9ccaff;white-space:nowrap}.secondary{display:block;color:var(--muted);font-size:11px;margin-top:3px}.part{font:12px ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}.description{max-width:250px;min-width:150px}.clip{white-space:pre-wrap;overflow-wrap:anywhere}.status{display:inline-flex;align-items:center;border:1px solid var(--border);border-radius:999px;padding:3px 8px;white-space:nowrap;font-size:11px}.status.current{color:#ffdf79;border-color:#66531e;background:#251f0f}.status.closed{color:#8de0a3;border-color:#28583a;background:#102117}.status.working{color:#9ccaff;border-color:#315276;background:#102338}.status.order{color:#d2a8ff;border-color:#563e75;background:#20162d}.dates{white-space:nowrap;font-size:12px}.empty{padding:38px 16px;text-align:center;color:var(--muted)}.cards{display:none}.record-card{padding:13px;border-bottom:1px solid var(--border)}.record-card:last-child{border:0}.card-top{display:flex;justify-content:space-between;align-items:flex-start;gap:9px}.card-body{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:12px}.field-label{font-size:10px;color:var(--muted);margin-bottom:2px}.field-value{overflow-wrap:anywhere}.mobile-description{margin-top:11px;border-top:1px solid var(--border);padding-top:9px;white-space:pre-wrap}.footer{color:var(--muted);font-size:11px;margin-top:16px}.preview-label{color:#f2cc60;font-size:11px;margin-left:7px}.pill{display:inline-block;padding:2px 7px;border-radius:999px;background:#192a3b;color:#a8caff;font:11px ui-monospace,monospace;margin:2px 3px 2px 0}[hidden]{display:none!important}
+    @media(max-width:850px){.filters{grid-template-columns:1fr 1fr}.filters .search-filter{grid-column:1/-1}.stats{grid-template-columns:repeat(2,1fr)}.auth{margin-left:0}.message{text-align:left}}
+    @media(max-width:620px){header{padding:21px 14px 18px}main{padding:0 12px 34px;margin-top:16px}.topline{align-items:flex-start;flex-direction:column;gap:9px}.toolbar{align-items:stretch}.auth{width:100%}.auth input{flex:1;min-width:150px}.filters{grid-template-columns:1fr 1fr}.filters .search-filter{grid-column:1/-1}.stats{gap:8px}.stat{padding:10px 12px}.stat-value{font-size:1.25rem}.table-wrap{display:none}.cards{display:block}.list-head{align-items:flex-start;flex-direction:column;gap:2px}.phase{font-size:11px}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="topline"><div class="eyebrow">EQUIPMENT SERVICE · CLOUD PREVIEW</div><span class="phase">第一階段｜版面測試</span></div>
+    <h1>備品送修管理</h1>
+    <p class="subtitle">集中查看送修狀態、開單狀態、機台與送修／回修日期。機台與 TesterID 依設備對照資料顯示。</p>
+  </header>
+  <main>
+    <div id="notice" class="notice" role="status"><strong>尚未連線。</strong>登入後讀取 Supabase；目前顯示的是版面示例資料，不是正式紀錄。</div>
+    <section class="toolbar" aria-label="資料連線">
+      <div class="auth">
+        <input id="email" type="email" autocomplete="email" placeholder="已授權的 email" aria-label="已授權的 email">
+        <button id="login" class="button primary" type="button">寄送登入連結</button>
+        <button id="logout" class="button" type="button" hidden>登出</button>
+        <span id="login-state" class="login-state">示例預覽</span>
+      </div>
+      <div id="auth-message" class="message" aria-live="polite">正式資料僅限 Supabase 授權帳號讀取。</div>
+    </section>
+    <section class="stats" aria-label="送修摘要">
+      <article class="stat"><div class="stat-label">顯示筆數</div><div id="count-total" class="stat-value blue">—</div></article>
+      <article class="stat"><div class="stat-label">處理中</div><div id="count-working" class="stat-value yellow">—</div></article>
+      <article class="stat"><div class="stat-label">取回驗證中</div><div id="count-verify" class="stat-value purple">—</div></article>
+      <article class="stat"><div class="stat-label">結案</div><div id="count-closed" class="stat-value green">—</div></article>
+    </section>
+    <div class="list-head"><h2>送修紀錄 <span id="preview-label" class="preview-label">示例資料</span></h2><span id="result-count">—</span></div>
+    <section class="filters" aria-label="搜尋與篩選">
+      <div class="filter search-filter"><label for="search">快速搜尋</label><input id="search" type="search" placeholder="機台、TesterID、板件料號、序號或故障描述"></div>
+      <div class="filter"><label for="status-filter">目前狀態</label><select id="status-filter"><option value="">全部狀態</option></select></div>
+      <div class="filter"><label for="order-filter">開單狀態</label><select id="order-filter"><option value="">全部開單狀態</option></select></div>
+    </section>
+    <section class="results" aria-label="送修紀錄清單">
+      <div class="table-wrap"><table><thead><tr><th>目前狀態</th><th>開單狀態</th><th>月份／項目</th><th>Area</th><th>Machine／TesterID</th><th>Board Part Code／Serial NO</th><th>Description／Failure Data</th><th>日期</th></tr></thead><tbody id="record-rows"></tbody></table></div>
+      <div id="record-cards" class="cards"></div>
+    </section>
+    <p class="footer">第一階段為雲端唯讀版面測試。此頁不新增或修改資料；SQLite 匯出與每日同步留待你確認版面後再進行。</p>
+  </main>
+  <script type="module">
+    import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+    const supabase = createClient("https://ywazcutaodqrthhighod.supabase.co", "sb_publishable_wu8mVnxG-ifzSDB8Zl4wlg_xCRjl9k3");
+    const demoRecords = [
+      {current_status:"取回驗證中",order_status:"已開單",repair_month:"202606",item:"示例 A",area:"CP",machine_code:"F20",model:"T5377S",tester_id:"TERA76",board_part_code:"DEMO-030001",serial_no:"DEMO-SN-001",description:"I/O PE（示例）",failure_data:"示例故障資料，非實際紀錄",occurred_on:"2026-06-12",sent_on:"2026-06-15",returned_on:null},
+      {current_status:"已送",order_status:"已開單",repair_month:"202606",item:"示例 B",area:"CP",machine_code:"F47",model:"T5377S",tester_id:"TERA8",board_part_code:"DEMO-030002",serial_no:"DEMO-SN-002",description:"DC BOARD（示例）",failure_data:"示例測試失敗訊息",occurred_on:"2026-06-09",sent_on:"2026-06-10",returned_on:null},
+      {current_status:"結案",order_status:"已開單",repair_month:"202606",item:"示例 C",area:"CP",machine_code:"F49",model:"T5377S",tester_id:"PSC118",board_part_code:"DEMO-030003",serial_no:"DEMO-SN-003",description:"FM CONT（示例）",failure_data:"示例維修完成",occurred_on:"2026-06-05",sent_on:"2026-06-06",returned_on:"2026-06-11"}
+    ];
+    let records = demoRecords;
+    let live = false;
+    let currentUser = null;
+    let machinePairs = new Map();
+    const byId = id => document.getElementById(id);
+    const notice = byId("notice"), authMessage = byId("auth-message"), emailInput = byId("email");
+
+    function setNotice(message, kind="") { notice.className = `notice ${kind}`.trim(); notice.replaceChildren(); notice.textContent = message; }
+    function escapeHTML(value) { return String(value ?? "").replace(/[&<>"']/g, char => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[char])); }
+    function dateText(value) { if (!value) return "—"; const d = new Date(`${value}T00:00:00`); return Number.isNaN(d.valueOf()) ? value : new Intl.DateTimeFormat("zh-TW",{year:"numeric",month:"2-digit",day:"2-digit"}).format(d); }
+    function machineLabel(row) {
+      const machine = row.machine_code || "—", tester = row.tester_id || "";
+      const known = machinePairs.get(`${machine}|${tester}`);
+      return known?.tester_id ? `${known.machine_code}-${known.tester_id}` : tester ? `${machine}-${tester}` : machine;
+    }
+    function statusClass(value) {
+      const s = String(value || "");
+      if (s.includes("結案") || s.includes("完成")) return "closed";
+      if (s.includes("驗證")) return "order";
+      if (s.includes("送") || s.includes("處理") || s.includes("維修")) return "working";
+      return "current";
+    }
+    function fillFilter(id, values, label) {
+      const select = byId(id), selected = select.value;
+      select.replaceChildren(new Option(label, ""));
+      [...new Set(values.map(v => String(v || "").trim()).filter(Boolean))].sort((a,b)=>a.localeCompare(b,"zh-Hant")).forEach(v=>select.add(new Option(v,v)));
+      if ([...select.options].some(o=>o.value===selected)) select.value=selected;
+    }
+    function render() {
+      const query = byId("search").value.trim().toLocaleLowerCase();
+      const status = byId("status-filter").value, order = byId("order-filter").value;
+      const filtered = records.filter(r => {
+        const haystack = [r.machine_code,r.tester_id,machineLabel(r),r.board_part_code,r.serial_no,r.description,r.failure_data,r.area,r.item].join(" ").toLocaleLowerCase();
+        return (!query || haystack.includes(query)) && (!status || r.current_status === status) && (!order || r.order_status === order);
+      });
+      byId("count-total").textContent = records.length;
+      byId("count-working").textContent = records.filter(r => /已送|處理中|維修中/.test(r.current_status||"")).length;
+      byId("count-verify").textContent = records.filter(r => (r.current_status||"").includes("驗證")).length;
+      byId("count-closed").textContent = records.filter(r => (r.current_status||"").includes("結案")).length;
+      byId("result-count").textContent = `符合 ${filtered.length} 筆／共 ${records.length} 筆`;
+      const rows = byId("record-rows"), cards = byId("record-cards");
+      if (!filtered.length) {
+        rows.innerHTML = '<tr><td colspan="8"><div class="empty">沒有符合條件的送修紀錄</div></td></tr>';
+        cards.innerHTML = '<div class="empty">沒有符合條件的送修紀錄</div>';
+        return;
+      }
+      rows.innerHTML = filtered.map(r => `<tr>
+        <td><span class="status ${statusClass(r.current_status)}">${escapeHTML(r.current_status||"未設定")}</span></td>
+        <td><span class="status order">${escapeHTML(r.order_status||"未設定")}</span></td>
+        <td>${escapeHTML(r.repair_month||"—")}<span class="secondary">${escapeHTML(r.item||"")}</span></td>
+        <td>${escapeHTML(r.area||"—")}</td>
+        <td><span class="machine">${escapeHTML(machineLabel(r))}</span><span class="secondary">${escapeHTML(r.model||"")}</span></td>
+        <td><span class="part">${escapeHTML(r.board_part_code||"—")}</span><span class="secondary">S/N ${escapeHTML(r.serial_no||"—")}</span></td>
+        <td class="description"><div class="clip">${escapeHTML(r.description||"—")}</div><span class="secondary clip">${escapeHTML(r.failure_data||"")}</span></td>
+        <td class="dates">發生 ${escapeHTML(dateText(r.occurred_on))}<span class="secondary">送修 ${escapeHTML(dateText(r.sent_on))}</span><span class="secondary">回修 ${escapeHTML(dateText(r.returned_on))}</span></td>
+      </tr>`).join("");
+      cards.innerHTML = filtered.map(r => `<article class="record-card">
+        <div class="card-top"><div><span class="machine">${escapeHTML(machineLabel(r))}</span><span class="secondary">${escapeHTML(r.model||"")} · ${escapeHTML(r.area||"—")}</span></div><div><span class="status ${statusClass(r.current_status)}">${escapeHTML(r.current_status||"未設定")}</span></div></div>
+        <div style="margin-top:8px"><span class="status order">開單：${escapeHTML(r.order_status||"未設定")}</span></div>
+        <div class="card-body"><div><div class="field-label">月份／項目</div><div class="field-value">${escapeHTML(r.repair_month||"—")} · ${escapeHTML(r.item||"—")}</div></div><div><div class="field-label">Area</div><div class="field-value">${escapeHTML(r.area||"—")}</div></div><div><div class="field-label">Board Part Code</div><div class="field-value mono">${escapeHTML(r.board_part_code||"—")}</div></div><div><div class="field-label">Serial NO</div><div class="field-value mono">${escapeHTML(r.serial_no||"—")}</div></div><div><div class="field-label">發生日期</div><div>${escapeHTML(dateText(r.occurred_on))}</div></div><div><div class="field-label">送修／回修</div><div>${escapeHTML(dateText(r.sent_on))} ／ ${escapeHTML(dateText(r.returned_on))}</div></div></div>
+        <div class="mobile-description"><strong>${escapeHTML(r.description||"—")}</strong><div class="secondary clip">${escapeHTML(r.failure_data||"")}</div></div>
+      </article>`).join("");
+    }
+    function setData(data, machines=[]) {
+      records = data || [];
+      machinePairs = new Map((machines||[]).map(m=>[`${m.machine_code}|${m.tester_id}`,m]));
+      live = true;
+      byId("preview-label").hidden = true;
+      fillFilter("status-filter",records.map(r=>r.current_status),"全部狀態");
+      fillFilter("order-filter",records.map(r=>r.order_status),"全部開單狀態");
+      render();
+    }
+    function showPreview(message, kind="") {
+      records = demoRecords; live = false; byId("preview-label").hidden = false;
+      fillFilter("status-filter",records.map(r=>r.current_status),"全部狀態");
+      fillFilter("order-filter",records.map(r=>r.order_status),"全部開單狀態");
+      setNotice(message,kind); render();
+    }
+    async function loadRecords() {
+      if (!currentUser) { showPreview("未登入：以下是版面示例資料，不是正式紀錄。正式資料需使用已授權帳號登入。"); return; }
+      authMessage.textContent = "正在讀取 Supabase…";
+      const [recordResult,machineResult] = await Promise.all([
+        supabase.from("repair_records").select("id,current_status,order_status,repair_month,item,area,machine_code,model,tester_id,board_part_code,serial_no,description,failure_data,occurred_on,sent_on,returned_on,updated_at").order("occurred_on",{ascending:false,nullsFirst:false}),
+        supabase.from("repair_machines").select("machine_code,tester_id,model,source_machine_number").order("machine_code")
+      ]);
+      if (recordResult.error || machineResult.error) {
+        const error = recordResult.error || machineResult.error;
+        authMessage.textContent = `資料讀取失敗：${error.message}`;
+        showPreview(`無法讀取 Supabase（${error.message}）。目前顯示的是版面示例資料，請確認已執行 supabase/repairs_setup.sql 並授權此帳號。`, "error");
+        return;
+      }
+      setData(recordResult.data||[],machineResult.data||[]);
+      byId("login-state").textContent = `已登入：${currentUser.email}`;
+      authMessage.textContent = `已連線 Supabase · ${machineResult.data?.length||0} 組機台對照`;
+      setNotice(recordResult.data?.length ? "已連線 Supabase，顯示雲端正式資料。" : "已連線 Supabase；目前尚無送修紀錄。", "success");
+    }
+
+    byId("login").addEventListener("click",async()=>{
+      const email=emailInput.value.trim().toLowerCase();
+      if(!email){authMessage.textContent="請先輸入已授權的 email。";emailInput.focus();return;}
+      byId("login").disabled=true;authMessage.textContent="正在寄送登入連結…";
+      const {error}=await supabase.auth.signInWithOtp({email,options:{shouldCreateUser:false,emailRedirectTo:location.href}});
+      byId("login").disabled=false;authMessage.textContent=error?`寄送失敗：${error.message}`:"若帳號已受邀，請查看信箱並點擊登入連結。";
+    });
+    byId("logout").addEventListener("click",async()=>{await supabase.auth.signOut();});
+    for(const id of ["search","status-filter","order-filter"]) byId(id).addEventListener("input",render);
+    byId("status-filter").addEventListener("change",render);byId("order-filter").addEventListener("change",render);
+    supabase.auth.onAuthStateChange((_event,session)=>{
+      currentUser=session?.user||null;
+      byId("login").hidden=!!currentUser;emailInput.hidden=!!currentUser;byId("logout").hidden=!currentUser;
+      byId("login-state").textContent=currentUser?`已登入：${currentUser.email}`:"示例預覽";
+      if(currentUser) loadRecords(); else showPreview("未登入：以下是版面示例資料，不是正式紀錄。正式資料需使用已授權帳號登入。");
+    });
+    byId("preview-label").hidden=false;render();
+    supabase.auth.getSession().then(({data})=>{currentUser=data.session?.user||null;byId("login").hidden=!!currentUser;emailInput.hidden=!!currentUser;byId("logout").hidden=!currentUser;loadRecords();});
+  </script>
+</body>
+</html>
