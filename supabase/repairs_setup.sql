@@ -2,6 +2,7 @@
 -- WARNING: this intentionally allows unauthenticated public read/write/delete.
 -- Anyone with the URL can view and change records or upload/delete fail logs.
 -- Run once in Supabase Dashboard > SQL Editor after reviewing this warning.
+-- After setup, run supabase/repair_history_migration.sql once to enable PASS/FAIL verification and retries.
 
 create table if not exists public.repair_machines (
   machine_code text not null,
@@ -31,7 +32,9 @@ create table if not exists public.repair_records (
   occurred_on date,
   sent_on date,
   returned_on date,
-  source_system text not null default 'repair-list',
+  closed_on date,
+  retry_of_record_id uuid references public.repair_records(id) on delete set null,
+  source_system text not null default 'web',
   source_record_id text,
   version integer not null default 1 check (version > 0),
   created_at timestamptz not null default now(),
@@ -44,8 +47,12 @@ alter table public.repair_records add column if not exists source_record_id text
 alter table public.repair_records add column if not exists version integer not null default 1;
 alter table public.repair_records add column if not exists created_at timestamptz not null default now();
 alter table public.repair_records add column if not exists updated_at timestamptz not null default now();
+alter table public.repair_records add column if not exists closed_on date;
+alter table public.repair_records add column if not exists retry_of_record_id uuid references public.repair_records(id) on delete set null;
+alter table public.repair_records alter column source_system set default 'web';
 
 -- Normalize statuses from the original sheet. Preserve the original order-status text.
+alter table public.repair_records drop constraint if exists repair_records_current_status_check;
 update public.repair_records
 set current_status = case trim(coalesce(current_status, ''))
   when '' then '待送修'
@@ -54,8 +61,10 @@ set current_status = case trim(coalesce(current_status, ''))
   when '已送修' then '已送修'
   when '取回驗證中' then '取回驗證'
   when '取回驗證' then '取回驗證'
-  when '結案' then '已結案'
-  when '已結案' then '已結案'
+  when '結案' then '結案（PASS）'
+  when '已結案' then '結案（PASS）'
+  when '結案（PASS）' then '結案（PASS）'
+  when '結案（FAIL）' then '結案（FAIL）'
   else '待送修'
 end;
 update public.repair_records
@@ -65,19 +74,14 @@ alter table public.repair_records alter column current_status set default '待�
 alter table public.repair_records alter column is_opened set default false;
 alter table public.repair_records alter column is_opened set not null;
 
-do $$
-begin
-  if not exists (
-    select 1 from pg_constraint
-    where conrelid = 'public.repair_records'::regclass
-      and conname = 'repair_records_current_status_check'
-  ) then
-    alter table public.repair_records
-      add constraint repair_records_current_status_check
-      check (current_status in ('待送修', '已送修', '取回驗證', '已結案'));
-  end if;
-end;
-$$;
+alter table public.repair_records
+  add constraint repair_records_current_status_check
+  check (current_status in ('待送修', '已送修', '取回驗證', '結案（PASS）', '結案（FAIL）'));
+alter table public.repair_records
+  drop constraint if exists repair_records_serial_no_format_check;
+alter table public.repair_records
+  add constraint repair_records_serial_no_format_check
+  check (serial_no = '' or serial_no ~ '^[0-9]{9}$');
 
 create table if not exists public.repair_attachments (
   id uuid primary key default gen_random_uuid(),
@@ -95,6 +99,10 @@ create index if not exists repair_records_machine_idx
   on public.repair_records (machine_code, tester_id);
 create index if not exists repair_records_dates_idx
   on public.repair_records (occurred_on desc);
+create index if not exists repair_records_serial_history_idx
+  on public.repair_records (serial_no, closed_on, created_at);
+create index if not exists repair_records_retry_idx
+  on public.repair_records (retry_of_record_id);
 create unique index if not exists repair_records_source_id_idx
   on public.repair_records (source_system, source_record_id)
   where source_record_id is not null;
@@ -215,27 +223,27 @@ on conflict (machine_code, tester_id) do update set
 
 -- Imported from 參考資料/送修清單.xlsx, worksheet 2026.
 -- 46 records with at least one used field. Whitespace-only rows are skipped.
--- Blank current status -> 待送修; 已送 -> 已送修; 取回驗證中 -> 取回驗證; 結案 -> 已結案.
+-- Blank current status -> 待送修; 已送 -> 已送修; 取回驗證中 -> 取回驗證; legacy closed -> 結案（PASS）.
 -- is_opened is checked only for exact 已開單; order_status retains the original text.
 insert into public.repair_records (
   current_status, order_status, is_opened, repair_month, item, area,
   machine_code, model, tester_id, board_part_code, serial_no, description,
   failure_data, occurred_on, sent_on, returned_on, source_system, source_record_id
 ) values
-  ('已結案', '已開單', true, '', '', 'CP', '', '', '', 'BIR-030083', '2352846', 'I/O PE', 'RTE12367', NULL, '2026-03-23', '2026-04-17', 'repair-list-2026', '2026-row-2'),
-  ('已結案', '已開單', true, '', '', 'CP', '', '', '', 'BIR-030083', '2650046', 'I/O PE', 'RTE12367', NULL, '2026-03-23', '2026-04-17', 'repair-list-2026', '2026-row-3'),
+  ('結案（PASS）', '已開單', true, '', '', 'CP', '', '', '', 'BIR-030083', '2352846', 'I/O PE', 'RTE12367', NULL, '2026-03-23', '2026-04-17', 'repair-list-2026', '2026-row-2'),
+  ('結案（PASS）', '已開單', true, '', '', 'CP', '', '', '', 'BIR-030083', '2650046', 'I/O PE', 'RTE12367', NULL, '2026-03-23', '2026-04-17', 'repair-list-2026', '2026-row-3'),
   ('取回驗證', '已開單', true, '202606', 'W24', 'CP', 'R9', 'T5377', 'INF29', 'BIR-030083', '2570821', 'I/O PE', '5602 TH(6) 97G5 FAIL', '2026-05-22', '2026-06-09', NULL, 'repair-list-2026', '2026-row-5'),
   ('取回驗證', '已開單', true, '202606', 'W24', 'CP', 'R9', 'T5377', 'INF29', 'BIR-030083', '2674288', 'I/O PE', '5605 TH(6) 49 H1 33G1 FAIL', '2026-05-22', '2026-06-09', NULL, 'repair-list-2026', '2026-row-6'),
-  ('已結案', '已開單', true, '202606', 'W24', 'CP', 'R9', 'T5377', 'INF29', 'BGR-030182', '2779082', 'FMRA', '電容脫落', '2026-06-09', '2026-06-10', NULL, 'repair-list-2026', '2026-row-7'),
-  ('已結案', '已開單', true, '202606', 'W24', 'CP', 'R9', 'T5377', 'INF29', 'BGR-030181', '2327350', 'FM CONT', '底部PIN腳變形', '2026-06-09', '2026-06-10', NULL, 'repair-list-2026', '2026-row-8'),
+  ('結案（PASS）', '已開單', true, '202606', 'W24', 'CP', 'R9', 'T5377', 'INF29', 'BGR-030182', '2779082', 'FMRA', '電容脫落', '2026-06-09', '2026-06-10', NULL, 'repair-list-2026', '2026-row-7'),
+  ('結案（PASS）', '已開單', true, '202606', 'W24', 'CP', 'R9', 'T5377', 'INF29', 'BGR-030181', '2327350', 'FM CONT', '底部PIN腳變形', '2026-06-09', '2026-06-10', NULL, 'repair-list-2026', '2026-row-8'),
   ('已送修', '已開單', true, '202606', 'W24', 'CP', 'F47', 'T5377S', 'TERA8', 'BGR-026902', '2247045', 'DC BOARD', 'Diag DC CH63 SLOT3 FAIL', '2026-06-09', NULL, NULL, 'repair-list-2026', '2026-row-10'),
   ('已送修', '已開單', true, '202606', 'W24', 'CP', 'F49', 'T5377S', 'PSC11', 'WBL-H3610178TP6A', '2563178', 'TP6B', 'RTE 210, 無法進入test mode', '2026-06-10', NULL, NULL, 'repair-list-2026', '2026-row-11'),
   ('取回驗證', '已開單', true, '202606', 'W26', 'CP', 'F51', 'T5377S', 'TERA6', 'BIR-030083', '2594383', 'I/O PE', '12367, 103 STN1 F1', '2026-06-13', NULL, '2026-08-03', 'repair-list-2026', '2026-row-13'),
   ('取回驗證', '已開單', true, '202606', 'W26', 'CP', 'F51', 'T5377S', 'TERA6', 'BIR-030083', '2384849', 'I/O PE', '12367, 99 STN1 B5', '2026-06-16', NULL, '2026-08-03', 'repair-list-2026', '2026-row-14'),
-  ('已結案', '已開單', true, '202606', 'W26', 'CP', 'F19', 'T5377S', 'TAS05', 'BPR-030837', '2736581', 'DR PE', '底部PIN腳變形', '2026-06-17', NULL, NULL, 'repair-list-2026', '2026-row-15'),
+  ('結案（PASS）', '已開單', true, '202606', 'W26', 'CP', 'F19', 'T5377S', 'TAS05', 'BPR-030837', '2736581', 'DR PE', '底部PIN腳變形', '2026-06-17', NULL, NULL, 'repair-list-2026', '2026-row-15'),
   ('取回驗證', '已開單', true, '202606', 'W26', 'CP', 'F19', 'T5377S', 'TAS05', 'BPR-030837', '2785113', 'DR PE', 'test 5307 th(3) PIN8 F5 1E5', '2026-06-17', NULL, '2026-08-03', 'repair-list-2026', '2026-row-16'),
   ('取回驗證', '已開單', true, '202606', 'W26', 'CP', 'F51', 'T5377S', 'TERA6', 'BIR-030083', '2778014', 'I/O PE', '12367, 103 STN1 G1', '2026-06-18', NULL, '2026-08-03', 'repair-list-2026', '2026-row-17'),
-  ('已結案', '已開單', true, '202607', 'W27', 'CP', 'R7', 'T5377', 'SMIC2', 'BIR-026380', '2323398', 'PDS', '底部PIN腳變形', '2026-07-02', '2026-07-02', NULL, 'repair-list-2026', '2026-row-19'),
+  ('結案（PASS）', '已開單', true, '202607', 'W27', 'CP', 'R7', 'T5377', 'SMIC2', 'BIR-026380', '2323398', 'PDS', '底部PIN腳變形', '2026-07-02', '2026-07-02', NULL, 'repair-list-2026', '2026-row-19'),
   ('已送修', '已開單', true, '202607', 'W27', 'CP', 'F49', 'T5377S', 'PSC118', 'BIR-030182', '2601415', 'FMRA', 'RTE 210, 無法進test mode', '2026-07-02', '2026-07-02', NULL, 'repair-list-2026', '2026-row-20'),
   ('已送修', '已開單', true, '202607', 'W27', 'CP', 'R7', 'T5377', 'SMIC2', 'BIR-026805', '2379829', 'DR PE', '5302 TH(3) 25 G1 FAIL', '2026-07-02', '2026-07-02', NULL, 'repair-list-2026', '2026-row-21'),
   ('已送修', '已開單', true, '202607', 'W27', 'CP', 'R9', 'T5377', 'INF29', 'BIR-026805', '2304465', 'DR PE', '快速接頭漏液', '2026-07-02', '2026-07-02', NULL, 'repair-list-2026', '2026-row-22'),
