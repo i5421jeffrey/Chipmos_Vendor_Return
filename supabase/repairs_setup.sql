@@ -8,6 +8,8 @@ create table if not exists public.repair_machines (
   tester_id text not null default '',
   model text not null default '',
   source_machine_number text not null,
+  machine_serial text not null default '',
+  machine_name text not null default '',
   primary key (machine_code, tester_id)
 );
 
@@ -184,12 +186,13 @@ create policy "Public can delete repair fail logs" on storage.objects
   for delete to public using (bucket_id = 'repair-fail-logs');
 
 -- Machine/tester pairs from machines.db; Sxx is shown as Fxx for T5377S.
+-- Run supabase/machine_data_20261003.sql after setup to populate machine serial/name from the CSV.
 insert into public.repair_machines (machine_code, tester_id, model, source_machine_number) values
   ('HQ01', 'CMI1', 'T5833', 'HQ01'), ('HQ02', 'CMI2', 'T5833', 'HQ02'),
   ('HQ03', 'CMI3', 'T5833', 'HQ03'), ('HQ04', 'CMI4', 'T5833', 'HQ04'),
   ('HQ05', 'CMI5', 'T5833', 'HQ05'), ('HQ06', 'TERA1', 'T5833', 'HQ06'),
   ('HQ09', 'CM18', 'T5833', 'HQ09'), ('HQ10', 'CM19', 'T5833', 'HQ10'),
-  ('R05', 'PMOS2', '', 'R05'), ('R07', 'SMIC2', '', 'R07'), ('R09', 'INF29', '', 'R09'),
+  ('R5', 'PMOS2', 'T5377', 'R05'), ('R7', 'SMIC2', 'T5377', 'R07'), ('R9', 'INF29', 'T5377', 'R09'),
   ('F14', 'YURA33', 'T5377S', 'S14'), ('F19', 'TAS05', 'T5377S', 'S19'),
   ('F20', 'TERA76', 'T5377S', 'S20'), ('F21', 'TERA43', 'T5377S', 'S21'),
   ('F22', 'C05M7T', 'T5377S', 'S22'), ('F28', 'TERA36', 'T5377S', 'S28'),
