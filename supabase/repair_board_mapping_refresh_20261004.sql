@@ -51,7 +51,15 @@ insert into public.repair_model_boards (model, board_name, board_part_code) valu
   ('T5377S', 'BLADE150', '-'),
   ('T5377', 'BLADE150', '-'),
   ('T5377S', 'Main AC', '-'),
-  ('T5377', 'Main AC', '-')
+  ('T5377', 'Main AC', '-'),
+  ('T5377', 'Mother Board X04', 'H7-0760X04'),
+  ('T5377', 'Mother Board X05', 'H7-0760X05'),
+  ('T5377', 'Mother Board X06', 'H7-0760X06'),
+  ('T5377', 'Mother Board X07', 'H7-0760X07'),
+  ('T5377S', 'Mother Board X04', 'H7-0760X04'),
+  ('T5377S', 'Mother Board X05', 'H7-0760X05'),
+  ('T5377S', 'Mother Board X06', 'H7-0760X06'),
+  ('T5377S', 'Mother Board X07', 'H7-0760X07')
 on conflict (model, board_name) do update
 set board_part_code = excluded.board_part_code;
 
