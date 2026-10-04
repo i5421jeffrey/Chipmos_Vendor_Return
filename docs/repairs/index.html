@@ -45,7 +45,7 @@
     <main class="main">
       <section class="content"><div id="notice" class="notice" role="status" hidden></div><div class="page-title-row"><div><h1 class="page-title">備品管理系統</h1><div id="page-subtitle" class="page-subtitle">追蹤送修狀態、是否開單、設備與 Fail Log</div></div><div class="title-actions"><span id="demo-tag" class="public-tag" hidden>示例資料</span><button id="open-create" class="button primary" type="button">＋ 新增送修</button><button id="open-dbn" class="button primary" type="button" hidden>＋ 新增 DBN</button></div></div>
         <div class="list-toolbar"><div class="search-wrap"><span class="search-icon">⌕</span><input id="search" class="search" type="search" placeholder="搜尋板件、S/N、Model、機台、異常描述或標籤…" aria-label="搜尋送修項目或異常資訊"></div><select id="failure-tag-filter" class="failure-filter" aria-label="依異常標籤篩選"><option value="">全部標籤</option><option value="INIT/DIAG">INIT/DIAG</option><option value="RTE">RTE</option><option value="PBDATA">PBDATA</option><option value="CK">CK</option><option value="LEAK">LEAK</option><option value="OTHER">OTHER</option><option value="AUTO SHUTDOWN">AUTO SHUTDOWN</option><option value="OVER HEAT">OVER HEAT</option><option value="ZEBRA">ZEBRA</option></select><span id="list-count" class="list-count">—</span></div>
-        <div class="list-heading" id="issue-heading"><span>項目</span><span>目前狀態</span><span>機台</span><span id="date-heading">日期</span></div><div id="issue-list" class="rows" aria-label="送修清單"></div>
+        <div class="list-heading" id="issue-heading"><span>項目</span><span>標籤</span><span>DBN</span><span>目前狀態</span><span>機台</span><span id="date-heading">日期</span></div><div id="issue-list" class="rows" aria-label="送修清單"></div>
       </section>
     </main>
   </div>
