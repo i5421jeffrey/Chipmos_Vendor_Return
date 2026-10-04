@@ -50,16 +50,16 @@
 </head>
 <body>
   <div class="app">
-    <aside class="sidebar"><div class="brand"><div class="brand-mark"><img src="ghost-logo.png" alt=""></div><div class="brand-copy"><div class="brand-title">SPMS</div><div class="brand-subtitle">Spare Parts Management System</div></div></div><nav class="nav quick-nav" id="quick-nav" aria-label="快速搜尋"></nav><div><div class="nav-label">紀錄項目</div><nav class="nav" id="side-nav" aria-label="紀錄類型"></nav></div></aside>
+    <aside class="sidebar"><div class="brand"><div class="brand-mark"><img src="ghost-logo.png" alt=""></div><div class="brand-copy"><div class="brand-title">SPMS</div><div class="brand-subtitle">Spare Parts Management System</div></div></div><nav class="nav quick-nav" id="quick-nav" aria-label="Search"></nav><div><div class="nav-label">紀錄項目</div><nav class="nav" id="side-nav" aria-label="紀錄類型"></nav></div></aside>
     <main class="main">
       <section class="content"><div id="notice" class="notice" role="status" hidden></div>
         <section id="quick-search-view" class="quick-search-view" aria-labelledby="quick-search-title">
-          <div class="quick-search-intro"><h1 id="quick-search-title">快速搜尋</h1><p>輸入或掃描板件 S/N，快速查看相關送修與 DBN 紀錄。</p></div>
+          <div class="quick-search-intro"><h1 id="quick-search-title">SPMS</h1><p>Enter a board S/N to quickly view related repair and DBN records.</p></div>
           <form id="quick-search-form" class="quick-search-form">
-            <label for="quick-search-input">板件 S/N</label>
-            <div class="quick-search-controls"><input id="quick-search-input" class="quick-search-input" type="search" inputmode="text" enterkeyhint="search" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="64" placeholder="掃描或輸入 S/N" required><button class="button primary quick-search-submit" type="submit">搜尋</button></div>
+            <label for="quick-search-input">S/N</label>
+            <div class="quick-search-controls"><input id="quick-search-input" class="quick-search-input" type="search" inputmode="text" enterkeyhint="search" autocomplete="off" autocapitalize="characters" spellcheck="false" maxlength="64" placeholder="001234567" required><button class="button primary quick-search-submit" type="submit">Search</button></div>
           </form>
-          <div id="quick-search-status" class="quick-search-status" role="status" aria-live="polite">輸入 S/N 後按 Enter 或點搜尋。</div>
+          <div id="quick-search-status" class="quick-search-status" role="status" aria-live="polite" hidden></div>
           <div id="quick-search-results" class="quick-search-results"></div>
         </section>
         <div id="records-view" hidden><div class="page-title-row"><div><h1 class="page-title">備品管理系統</h1><div id="page-subtitle" class="page-subtitle">追蹤送修狀態、是否開單、設備與 Fail Log</div></div><div class="title-actions"><span id="demo-tag" class="public-tag" hidden>示例資料</span><button id="open-create" class="button primary" type="button">＋ 新增送修</button><button id="open-dbn" class="button primary" type="button" hidden>＋ 新增 DBN</button></div></div>
@@ -131,7 +131,7 @@
     function tone(status){return status===CLOSED_FAIL?"failed":status===CLOSED_PASS?"closed":status==="取回驗證"?"verify":status==="已送修"?"sent":"pending";}
     function shownRecords(){return activeView==="全部"?records:records.filter(r=>r.current_status===activeView);}
     function renderNav(){
-      const quick='<button class="nav-item" type="button" data-view="快速搜尋" aria-current="'+(activeView==="快速搜尋"?"page":"false")+'"><span class="nav-icon">⌕</span><span class="nav-name">快速搜尋</span></button>';
+      const quick='<button class="nav-item" type="button" data-view="快速搜尋" aria-current="'+(activeView==="快速搜尋"?"page":"false")+'"><span class="nav-icon">⌕</span><span class="nav-name">Search</span></button>';
       const nav=views.map(v=>`<button class="nav-item" type="button" data-view="${v.id}" aria-current="${activeView===v.id?"page":"false"}"><span class="nav-icon">${v.icon}</span><span class="nav-name">${v.label}</span><span class="count">${records.filter(r=>r.current_status===v.id).length}</span></button>`).join("");
       const dbn=`<button class="nav-item" type="button" data-view="DBN" aria-current="${activeView==="DBN"?"page":"false"}"><span class="nav-icon">◇</span><span class="nav-name">DBN 紀錄</span><span class="count">${dbnRecords.length}</span></button>`;
       const all=`<button class="nav-item" type="button" data-view="全部" aria-current="${activeView==="全部"?"page":"false"}"><span class="nav-icon">▤</span><span class="nav-name">所有資料</span><span class="count">${records.length}</span></button>`;
@@ -200,7 +200,8 @@
       renderNav();
       if(!showDetail)renderDetail(null);
       const status=byId("quick-search-status"),results=byId("quick-search-results");
-      if(!quickSearchSubmitted){status.textContent="輸入或掃描 S/N 後按 Enter 或點搜尋。";results.replaceChildren();return;}
+      if(!quickSearchSubmitted){status.textContent="";status.hidden=true;results.replaceChildren();return;}
+      status.hidden=false;
       if(quickSearchLoading){status.textContent="正在同時查詢送修與 DBN 紀錄…";results.replaceChildren();return;}
       const repairMatches=quickRepairResults,dbnMatches=quickDbnResults;
       const serialMapping=quickSerialMapping;
