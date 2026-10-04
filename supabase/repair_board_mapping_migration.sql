@@ -16,8 +16,7 @@ create table if not exists public.repair_model_boards (
   model text not null references public.repair_models(model) on update cascade on delete restrict,
   board_name text not null check (board_name = trim(board_name) and board_name <> ''),
   board_part_code text not null check (board_part_code = trim(board_part_code) and board_part_code <> ''),
-  primary key (model, board_part_code),
-  unique (model, board_name)
+  primary key (model, board_name)
 );
 
 insert into public.repair_models (model) values
