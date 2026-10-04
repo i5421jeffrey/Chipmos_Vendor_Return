@@ -1,6 +1,6 @@
 -- Phase 1 setup + import for the public repair-management preview.
 -- WARNING: this intentionally allows unauthenticated public read/write/delete.
--- Anyone with the URL can view and change records or upload/delete fail logs.
+-- Anyone with the URL can view/change/delete records and upload/delete fail logs.
 -- Run once in Supabase Dashboard > SQL Editor after reviewing this warning.
 -- After setup, run supabase/repair_history_migration.sql once to enable PASS/FAIL verification and retries.
 
@@ -130,7 +130,7 @@ alter table public.repair_attachments enable row level security;
 
 grant usage on schema public to anon, authenticated;
 grant select on public.repair_machines to anon, authenticated;
-grant select, insert, update on public.repair_records to anon, authenticated;
+grant select, insert, update, delete on public.repair_records to anon, authenticated;
 grant select, insert, delete on public.repair_attachments to anon, authenticated;
 
 drop policy if exists "Approved users can view repair machines" on public.repair_machines;
@@ -149,6 +149,9 @@ create policy "Public can add repair records" on public.repair_records
   for insert to public with check (true);
 create policy "Public can update repair records" on public.repair_records
   for update to public using (true) with check (true);
+drop policy if exists "Public can delete repair records" on public.repair_records;
+create policy "Public can delete repair records" on public.repair_records
+  for delete to public using (true);
 
 drop policy if exists "Public can manage repair attachments" on public.repair_attachments;
 drop policy if exists "Public can read repair attachments" on public.repair_attachments;
