@@ -25,6 +25,44 @@ alter table public.dbn_records
 alter table public.dbn_records
   drop constraint if exists dbn_records_serial_no_format_check;
 
+-- Preserve old DBN rows whose machine/board snapshot was not recorded. They
+-- remain searchable, while new or populated snapshots are validated normally.
+create or replace function public.validate_dbn_machine_board()
+returns trigger
+language plpgsql
+set search_path = public
+as $$
+declare
+  mapped_model text;
+  mapped_part_number text;
+begin
+  if tg_op = 'UPDATE'
+    and new.machine_code is null and new.model is null then
+    return new;
+  end if;
+  if new.machine_code is null or new.machine_code = ''
+    or new.model is null or new.model = ''
+    or new.board_name is null or new.board_name = ''
+    or new.board_part_code is null or new.board_part_code = '' then
+    raise exception 'DBN 紀錄必須選擇機台與板件名稱';
+  end if;
+  select model into mapped_model
+  from public.repair_machine_models
+  where machine_code = new.machine_code;
+  if not found then raise exception '機台編號不在有效清單中'; end if;
+  if new.model is distinct from mapped_model then
+    raise exception '機台編號與 Model 對應不正確';
+  end if;
+  select board_part_code into mapped_part_number
+  from public.repair_model_boards
+  where model = new.model and board_name = new.board_name;
+  if not found or new.board_part_code is distinct from mapped_part_number then
+    raise exception '板件名稱或 Part Number 不屬於此 Model';
+  end if;
+  return new;
+end;
+$$;
+
 update public.repair_records
 set serial_no = public.normalize_board_serial(serial_no)
 where serial_no <> '' and serial_no is distinct from public.normalize_board_serial(serial_no);
@@ -34,13 +72,22 @@ where serial_no is distinct from public.normalize_board_serial(serial_no);
 
 alter table public.repair_records
   add constraint repair_records_serial_no_format_check
-  check (serial_no = '' or serial_no ~ '^[A-Z0-9][A-Z0-9 ._/-]{0,63}$');
+  check (serial_no = '' or serial_no ~ '^[^[:cntrl:]]{1,64}$');
 alter table public.dbn_records
   add constraint dbn_records_serial_no_format_check
-  check (serial_no ~ '^[A-Z0-9][A-Z0-9 ._/-]{0,63}$');
+  check (serial_no ~ '^[^[:cntrl:]]{1,64}$');
+alter table public.dbn_records
+  drop constraint if exists dbn_records_machine_board_all_or_none_check;
+alter table public.dbn_records
+  add constraint dbn_records_machine_board_all_or_none_check
+  check (
+    (machine_code is null and model is null and
+      ((board_name is null and board_part_code is null) or (board_name is not null and board_part_code is not null)))
+    or (machine_code is not null and model is not null and board_name is not null and board_part_code is not null)
+  );
 
 create table if not exists public.serial_board_mappings (
-  serial_no text primary key check (serial_no ~ '^[A-Z0-9][A-Z0-9 ._/-]{0,63}$'),
+  serial_no text primary key check (serial_no ~ '^[^[:cntrl:]]{1,64}$'),
   board_name text not null check (board_name = btrim(board_name) and board_name <> ''),
   updated_at timestamptz not null default now()
 );
@@ -139,8 +186,8 @@ set search_path = public
 as $$
 begin
   if coalesce(new.source_system, 'web') not like 'repair-list-%'
-    and coalesce(new.serial_no, '') !~ '^[A-Z0-9][A-Z0-9 ._/-]{0,63}$' then
-    raise exception '請輸入有效的 S/N（數字不足 9 位會補 0；字母編號可用英數及 . _ / -）';
+    and coalesce(new.serial_no, '') !~ '^[^[:cntrl:]]{1,64}$' then
+    raise exception '請輸入有效的 S/N（數字不足 9 位會補 0；其他 S/N 去除前後空白並轉大寫）';
   end if;
   return new;
 end;
@@ -163,7 +210,7 @@ begin
   v_serial := public.normalize_board_serial(p_payload->>'serial_no');
   v_machine := nullif(btrim(p_payload->>'machine_code'), '');
   v_board := nullif(btrim(p_payload->>'description'), '');
-  if v_serial is null or v_serial !~ '^[A-Z0-9][A-Z0-9 ._/-]{0,63}$' then
+  if v_serial is null or v_serial !~ '^[^[:cntrl:]]{1,64}$' then
     raise exception 'S/N 格式不正確';
   end if;
 
@@ -200,7 +247,8 @@ begin
     from public.dbn_records d
     left join public.repair_machine_models mm on mm.machine_code = d.machine_code
     left join public.repair_model_boards b on b.model = mm.model and b.board_name = v_board
-    where d.serial_no = v_serial and (d.machine_code is null or mm.machine_code is null or b.board_name is null)
+    where d.serial_no = v_serial and d.machine_code is not null
+      and (mm.machine_code is null or b.board_name is null)
   ) then
     raise exception '此 S/N 有 DBN 紀錄無法依其機台同步板件「%」；請先補齊 DBN 機台資料或選擇可相容的板件', v_board;
   end if;
@@ -211,6 +259,10 @@ begin
   from public.repair_machine_models mm
   join public.repair_model_boards b on b.model = mm.model and b.board_name = v_board
   where d.serial_no = v_serial and d.machine_code = mm.machine_code;
+  update public.dbn_records
+  set board_name = v_board,
+      board_part_code = v_part
+  where serial_no = v_serial and machine_code is null and model is null;
 
   update public.repair_records
   set is_opened = coalesce((p_payload->>'is_opened')::boolean, false),
@@ -250,7 +302,7 @@ begin
   if v_old.current_status <> '取回驗證' then
     raise exception '只有「取回驗證」案件可以登錄 PASS／FAIL';
   end if;
-  if not p_passed and coalesce(v_old.serial_no, '') !~ '^[A-Z0-9][A-Z0-9 ._/-]{0,63}$' then
+  if not p_passed and coalesce(v_old.serial_no, '') !~ '^[^[:cntrl:]]{1,64}$' then
     raise exception '此案件缺少有效 S/N，無法建立再次送修案件';
   end if;
   update public.repair_records
