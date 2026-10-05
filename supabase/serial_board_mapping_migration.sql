@@ -12,7 +12,9 @@ strict
 set search_path = ''
 as $$
   select case
-    when btrim(p_serial) ~ '^[0-9]{1,9}$' then lpad(btrim(p_serial), 9, '0')
+    -- Any existing 9-digit number is valid, including values not starting with 00.
+    when btrim(p_serial) ~ '^[0-9]{9}$' then btrim(p_serial)
+    when btrim(p_serial) ~ '^[0-9]{1,8}$' then lpad(btrim(p_serial), 9, '0')
     else upper(btrim(p_serial))
   end
 $$;
