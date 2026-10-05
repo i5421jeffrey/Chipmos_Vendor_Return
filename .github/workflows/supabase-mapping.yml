@@ -1,0 +1,83 @@
+name: Apply Supabase mapping refresh
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/repair_board_mapping_refresh_*.sql'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-mapping
+  cancel-in-progress: false
+
+jobs:
+  apply-mapping:
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: supabase-production
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Resolve and validate SQL file
+        id: sql
+        env:
+          PUSH_BEFORE: ${{ github.event.before }}
+          PUSH_SHA: ${{ github.sha }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            changed_files="$(git diff --name-only "$PUSH_BEFORE" "$PUSH_SHA" -- 'supabase/repair_board_mapping_refresh_*.sql')"
+            changed_count="$(printf '%s\n' "$changed_files" | awk 'NF { count += 1 } END { print count + 0 }')"
+            if [[ "$changed_count" -ne 1 ]]; then
+              echo "Expected exactly one changed mapping refresh SQL file; found $changed_count." >&2
+              exit 1
+            fi
+            sql_file="$changed_files"
+          else
+            sql_file="$(find supabase -maxdepth 1 -type f -name 'repair_board_mapping_refresh_????????.sql' -print | LC_ALL=C sort | tail -n 1)"
+            if [[ -z "$sql_file" ]]; then
+              echo "No dated mapping refresh SQL files were found." >&2
+              exit 1
+            fi
+          fi
+
+          if [[ ! "$sql_file" =~ ^supabase/repair_board_mapping_refresh_[0-9]{8}\.sql$ ]]; then
+            echo "Refusing to run a file outside the dated mapping-refresh path." >&2
+            exit 1
+          fi
+          if [[ ! -f "$sql_file" ]]; then
+            echo "SQL file not found: $sql_file" >&2
+            exit 1
+          fi
+
+          echo "sql_file=$sql_file" >> "$GITHUB_OUTPUT"
+          echo "Validated mapping refresh: $sql_file"
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends postgresql-client
+
+      - name: Apply mapping refresh to Supabase
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+          SQL_FILE: ${{ steps.sql.outputs.sql_file }}
+        run: |
+          set -euo pipefail
+          if [[ -z "$SUPABASE_DB_URL" ]]; then
+            echo "Missing SUPABASE_DB_URL secret in the supabase-production environment." >&2
+            exit 1
+          fi
+          psql -X "$SUPABASE_DB_URL" --set ON_ERROR_STOP=1 --file "$SQL_FILE"
