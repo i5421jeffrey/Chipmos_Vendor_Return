@@ -13,9 +13,35 @@ update public.repair_records
 set repair_type = '板修'
 where repair_type is null or btrim(repair_type) = '';
 
+-- Centralize amount lookup so a future imported quote list can replace this
+-- temporary category-based value without allowing client edits.
+create or replace function public.resolve_repair_amount(
+  p_repair_type text,
+  p_board_part_code text,
+  p_board_name text
+)
+returns numeric(12, 2)
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select case
+    when p_repair_type = '保固' then 0::numeric
+    when p_repair_type in ('板修', '外修', '合約') then 1::numeric
+    else null
+  end;
+$$;
+
+update public.repair_records
+set repair_amount = public.resolve_repair_amount(repair_type, board_part_code, description)
+where repair_amount is null;
+
 alter table public.repair_records
   alter column repair_type set default '板修',
-  alter column repair_type set not null;
+  alter column repair_type set not null,
+  alter column repair_amount set default 1,
+  alter column repair_amount set not null;
 
 do $$
 begin
@@ -40,6 +66,9 @@ begin
   if new.repair_type is null or new.repair_type not in ('板修', '外修', '合約', '保固') then
     raise exception '請選擇有效的維修分類';
   end if;
+  new.repair_amount := public.resolve_repair_amount(
+    new.repair_type, new.board_part_code, new.description
+  );
   if new.repair_amount is null or new.repair_amount < 0 then
     raise exception '每筆維修紀錄都必須填寫非負數金額';
   end if;
@@ -53,10 +82,7 @@ $$;
 drop trigger if exists repair_records_validate_repair_accounting on public.repair_records;
 drop trigger if exists repair_records_validate_repair_accounting_update on public.repair_records;
 create trigger repair_records_validate_repair_accounting
-before insert on public.repair_records
-for each row execute function public.validate_repair_accounting();
-create trigger repair_records_validate_repair_accounting_update
-before update of repair_type, repair_amount on public.repair_records
+before insert or update on public.repair_records
 for each row execute function public.validate_repair_accounting();
 
 -- Keep each attempt's description and attachment independent; inherit only its failure tag.
@@ -198,7 +224,7 @@ grant execute on function public.save_repair_record_edit_with_failure_info(uuid,
 -- own classification and amount. Selecting an external category converts the
 -- chain from in-house board repair to external/contract/warranty repair.
 drop function if exists public.finish_repair_verification(uuid, boolean, uuid, text, jsonb);
-create function public.finish_repair_verification(
+create or replace function public.finish_repair_verification(
   p_record_id uuid, p_passed boolean, p_retry_record_id uuid,
   p_failure_description text, p_attachment jsonb,
   p_retry_repair_type text, p_retry_repair_amount numeric
