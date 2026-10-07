@@ -35,19 +35,34 @@ begin
 end;
 $$;
 
--- Prefer an unambiguous Part Number already recorded in repair / DBN history.
-with known as (
+-- Use recorded Part Numbers first, and derive missing ones from the historical
+-- machine Model + board pair. Model is only a backfill source, never catalog data.
+with history as (
   select public.normalize_board_serial(r.serial_no) as serial_no,
+         nullif(btrim(r.model), '') as model,
          nullif(btrim(r.description), '') as board_name,
          nullif(btrim(r.board_part_code), '') as board_part_code
   from public.repair_records r
   where nullif(btrim(r.serial_no), '') is not null
   union all
   select public.normalize_board_serial(d.serial_no),
+         nullif(btrim(d.model), ''),
          nullif(btrim(d.board_name), ''),
          nullif(btrim(d.board_part_code), '')
   from public.dbn_records d
   where nullif(btrim(d.serial_no), '') is not null
+), known as (
+  select serial_no, board_name, board_part_code
+  from history
+  where board_part_code is not null
+  union all
+  select history.serial_no, history.board_name, boards.board_part_code
+  from history
+  join public.repair_model_boards boards
+    on boards.model = history.model
+   and boards.board_name = history.board_name
+  where history.model is not null
+    and history.board_name is not null
 ), unambiguous as (
   select serial_no, min(board_name) as board_name,
          min(board_part_code) as board_part_code
