@@ -1,0 +1,45 @@
+name: Apply machine maintenance schema
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'supabase/machine_maintenance_migration.sql'
+      - '.github/workflows/supabase-machine-maintenance.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: supabase-machine-maintenance
+  cancel-in-progress: false
+
+jobs:
+  apply-schema:
+    if: github.ref == 'refs/heads/main'
+    environment:
+      name: supabase-production
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install PostgreSQL client
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends postgresql-client
+
+      - name: Apply machine maintenance schema
+        env:
+          SUPABASE_DB_URL: ${{ secrets.SUPABASE_DB_URL }}
+          PGSSLMODE: require
+        run: |
+          set -euo pipefail
+          if [[ -z "$SUPABASE_DB_URL" ]]; then
+            echo "Missing SUPABASE_DB_URL secret in the supabase-production environment." >&2
+            exit 1
+          fi
+          psql -X "$SUPABASE_DB_URL" --set ON_ERROR_STOP=1 --file supabase/machine_maintenance_migration.sql
