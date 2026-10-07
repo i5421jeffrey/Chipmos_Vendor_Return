@@ -7,6 +7,11 @@ alter table public.serial_board_mappings
   add column if not exists board_part_code text,
   add column if not exists updated_at timestamptz not null default now();
 
+-- The previous catalog tied Model and Part Number with a paired-null check.
+-- Drop it before backfilling Part Numbers for rows whose legacy Model is null.
+alter table public.serial_board_mappings
+  drop constraint if exists serial_board_mappings_model_part_pair_check;
+
 -- Upgrade rows created by the previous catalog migration when they still have
 -- the legacy Model column. Model is used only to backfill a Part Number here.
 do $$
@@ -108,7 +113,6 @@ end;
 $$;
 
 alter table public.serial_board_mappings
-  drop constraint if exists serial_board_mappings_model_part_pair_check,
   drop column if exists model;
 alter table public.serial_board_mappings
   alter column board_part_code set not null;
