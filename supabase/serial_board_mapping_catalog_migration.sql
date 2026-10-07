@@ -90,8 +90,11 @@ end;
 $$;
 
 -- Public clients can write through this validated RPC, but do not receive raw
--- INSERT/UPDATE permissions on the catalog table.
-create or replace function public.save_serial_board_mapping(
+-- INSERT/UPDATE/DELETE permissions on the catalog table.
+drop function if exists public.save_serial_board_mapping(text, text, text);
+drop function if exists public.save_serial_board_mapping(text, text, text, text);
+create function public.save_serial_board_mapping(
+  p_previous_serial_no text,
   p_serial_no text,
   p_model text,
   p_board_name text
@@ -106,14 +109,22 @@ declare
   v_model text;
   v_board text;
   v_part text;
-  v_locked_serial text;
+  v_previous_serial text;
+  v_previous_exists boolean;
 begin
   v_serial := public.normalize_board_serial(p_serial_no);
+  v_previous_serial := case
+    when nullif(btrim(p_previous_serial_no), '') is null then null
+    else public.normalize_board_serial(p_previous_serial_no)
+  end;
   v_model := nullif(btrim(p_model), '');
   v_board := nullif(btrim(p_board_name), '');
 
   if v_serial is null or v_serial !~ '^[^[:cntrl:]]{1,64}$' then
     raise exception 'S/N 格式不正確';
+  end if;
+  if v_previous_serial is not null and v_previous_serial !~ '^[^[:cntrl:]]{1,64}$' then
+    raise exception '原 S/N 格式不正確';
   end if;
   if v_model is null or v_board is null then
     raise exception '請選擇 Model 與板件名稱';
@@ -126,10 +137,44 @@ begin
     raise exception '板件名稱不屬於所選 Model，或尚未設定 Part Number';
   end if;
 
-  select serial_no into v_locked_serial
+  perform serial_no
   from public.serial_board_mappings
-  where serial_no = v_serial
+  where serial_no = v_serial or serial_no = v_previous_serial
+  order by serial_no
   for update;
+
+  if v_previous_serial is null then
+    if exists (select 1 from public.serial_board_mappings where serial_no = v_serial) then
+      raise exception '此 S/N 已有對應資料，請先搜尋並按「修改」';
+    end if;
+  elsif v_previous_serial <> v_serial then
+    select exists (
+      select 1 from public.serial_board_mappings where serial_no = v_previous_serial
+    ) into v_previous_exists;
+    if not v_previous_exists then
+      raise exception '找不到要修改的原 S/N 對應，請重新搜尋後再試';
+    end if;
+    if exists (
+      select 1 from public.repair_records r
+      where public.normalize_board_serial(r.serial_no) = v_previous_serial
+      union all
+      select 1 from public.dbn_records d
+      where public.normalize_board_serial(d.serial_no) = v_previous_serial
+    ) then
+      raise exception '原 S/N 已有送修或 DBN 歷史，為保留歷史關聯，無法更改 S/N';
+    end if;
+    if exists (select 1 from public.serial_board_mappings where serial_no = v_serial) then
+      raise exception '新 S/N 已有對應資料，請先搜尋並確認是否為重複資料';
+    end if;
+    delete from public.serial_board_mappings where serial_no = v_previous_serial;
+  else
+    select exists (
+      select 1 from public.serial_board_mappings where serial_no = v_previous_serial
+    ) into v_previous_exists;
+    if not v_previous_exists then
+      raise exception '找不到要修改的 S/N 對應，請重新搜尋後再試';
+    end if;
+  end if;
 
   if exists (
     select 1
@@ -167,8 +212,8 @@ begin
 end;
 $$;
 
-revoke all on function public.save_serial_board_mapping(text, text, text) from public;
-grant execute on function public.save_serial_board_mapping(text, text, text) to anon, authenticated;
+revoke all on function public.save_serial_board_mapping(text, text, text, text) from public;
+grant execute on function public.save_serial_board_mapping(text, text, text, text) to anon, authenticated;
 
 -- Keep independently maintained catalog entries authoritative: later repair
 -- or DBN edits must not silently associate the same S/N with another model.
