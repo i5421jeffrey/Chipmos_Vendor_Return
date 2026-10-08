@@ -9,6 +9,7 @@
   </style>
   <style>
     .filters{align-items:flex-end}.filters label{display:flex;flex-direction:column;gap:5px}.filters input,.filters select,.filters button{height:40px;min-height:40px;margin:0;line-height:20px;padding:9px 10px}.filters input,.filters select{width:100%;min-width:0}.filters button{flex:none;align-self:flex-end}.pager button{height:40px}.pager{flex-wrap:wrap}
+    #query::placeholder{color:#b8b9bd;opacity:1}
   </style>
 </head>
 <body>
@@ -16,7 +17,7 @@
   <a href="./">← 返回 SPMS</a>
   <h1>異動紀錄</h1>
   <form id="filters" class="filters">
-    <label>搜尋 S/N、板名、料號或異動內容<input id="query" type="search" maxlength="100"></label>
+    <label><input id="query" type="search" maxlength="100" placeholder="S/N" aria-label="搜尋 S/N、板名、料號或異動內容"></label>
     <label>資料類型<select id="source"><option value="">全部</option><option value="repair_records">送修</option><option value="dbn_records">DBN</option><option value="serial_board_mappings">S/N 對應</option></select></label>
     <label>操作<select id="operation"><option value="">全部</option><option value="INSERT">新增</option><option value="UPDATE">修改</option><option value="DELETE">刪除</option></select></label>
     <label>開始日期<input id="start" type="date"></label>
