@@ -53,7 +53,7 @@
         return "（未記錄）";
       }).join("-");
     }
-    return [["DBN 組合",{old:combination("old"),new:combination("new")}]];
+    return [["DBN",{old:combination("old"),new:combination("new")}]];
   }
   async function load(){
     const current=++request,status=byId("status");byId("previous").disabled=true;byId("next").disabled=true;byId("rows").replaceChildren();byId("page").textContent="";results=[];status.textContent="正在載入…";
