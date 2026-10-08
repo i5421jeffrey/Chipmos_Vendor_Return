@@ -184,8 +184,9 @@
       const all=`<button class="nav-item" type="button" data-view="全部" aria-current="${activeView==="全部"?"page":"false"}"><span class="nav-icon">▤</span><span class="nav-name">所有資料</span><span class="count">${records.length}</span></button>`;
       const stats=`<button class="nav-item" type="button" data-view="統計資料" aria-current="${activeView==="統計資料"?"page":"false"}"><span class="nav-icon">▥</span><span class="nav-name">統計資料</span></button>`;
       byId("quick-nav").innerHTML=quick;
-      byId("side-nav").innerHTML=nav+dbn+serialMap+'<div class="nav-divider"></div>'+all+'<div class="nav-divider"></div>'+stats;
-      byId("mobile-nav").innerHTML=quick+nav+dbn+serialMap+all+stats;
+       const history='<a class="nav-item" href="history.html" style="text-decoration:none"><span class="nav-icon">◷</span><span class="nav-name">異動紀錄</span></a>';
+       byId("side-nav").innerHTML=nav+dbn+serialMap+'<div class="nav-divider"></div>'+all+'<div class="nav-divider"></div>'+stats+history;
+       byId("mobile-nav").innerHTML=quick+nav+dbn+serialMap+all+stats+history;
       byId("open-create").hidden=activeView==="DBN"||activeView==="S/N 對應"||activeView==="快速搜尋"||activeView==="統計資料";
       byId("open-create").disabled=!!repairMappingError||!failureSchemaReady||!repairAccountingReady||!serialCatalogReady;
       byId("open-create").title=!repairAccountingReady?"請先執行 repair_classification_statistics_migration.sql":!failureSchemaReady?"異常標籤欄位尚未啟用":!serialCatalogReady?"請先執行 serial_board_mapping_catalog_migration.sql":repairMappingError||"";
