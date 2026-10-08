@@ -35,26 +35,28 @@
   const timeFormat=new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Taipei",year:"2-digit",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"});
   function time(value){const parts=Object.fromEntries(timeFormat.formatToParts(new Date(value)).map(p=>[p.type,p.value]));return `${parts.year}${parts.month}${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;}
   function value(field,v){if(v===null||v===undefined)return "—";if(field==="is_opened")return v?"已開單":"未開單";if(v==="")return "（空白）";return typeof v==="object"?JSON.stringify(v):String(v);}
-  function dbnValue(parts){return parts===null?"—":parts.map(part=>part===undefined?"（未記錄）":part===null||part===""?"-":String(part)).join("-");}
-  function visibleChanges(event){
-    const changes=event.changes||{},fields=Object.entries(changes).filter(([field])=>!["version","id","created_at","updated_at","source_system","source_record_id"].includes(field));
-    if(!fields.length)return [];
-    if(event.source_table!=="dbn_records")return fields;
-    const combination=changes.dbn_combination;
-    if(combination)return [["DBN",{old:dbnValue(combination.old),new:dbnValue(combination.new)}]];
-    // Legacy logs may lack unchanged components. Never substitute current data
-    // for a historical value; mark those components as unrecorded instead.
-    const keys=["customer_code","product_code","station_code"];
-    if(!keys.some(key=>changes[key]))return [];
-    const parts=side=>keys.map(key=>changes[key]?.[side]);
-    return [["DBN",{old:event.operation==="INSERT"?"—":dbnValue(parts("old")),new:event.operation==="DELETE"?"—":dbnValue(parts("new"))}]];
-  }
   function cell(row,text){const td=document.createElement("td");td.textContent=text;row.append(td);}
+  function displayChanges(event){
+    const changes=event.changes||{},internal=new Set(["id","version","created_at","updated_at","source_system","source_record_id"]);
+    if(event.source_table!=="dbn_records")return Object.entries(changes).filter(([field])=>!internal.has(field));
+    const fields=["customer_code","product_code","station_code"];
+    if(event.operation==="UPDATE"&&!fields.some(field=>Object.hasOwn(changes,field)))return [];
+    function combination(side){
+      if((side==="old"&&event.operation==="INSERT")||(side==="new"&&event.operation==="DELETE"))return "—";
+      const snapshot=side==="old"?event.dbn_before:event.dbn_after;
+      return fields.map(field=>{
+        if(snapshot&&Object.hasOwn(snapshot,field))return snapshot[field]||"-";
+        if(Object.hasOwn(changes,field))return changes[field][side]||"-";
+        return "（未記錄）";
+      }).join("-");
+    }
+    return [["DBN 組合",{old:combination("old"),new:combination("new")}]];
+  }
   async function load(){
     const current=++request,status=byId("status");byId("previous").disabled=true;byId("next").disabled=true;status.textContent="正在載入…";
     const start=byId("start").value,end=byId("end").value;
     if(start&&end&&start>end){status.textContent="開始日期不可晚於結束日期。";return;}
-    let query=supabase.from("record_change_history").select("id,changed_at,source_table,operation,serial_no,board_name,changes",{count:"exact"}).order("changed_at",{ascending:false}).order("id",{ascending:false});
+    let query=supabase.from("record_change_history").select("*",{count:"exact"}).order("changed_at",{ascending:false}).order("id",{ascending:false});
     if(byId("source").value)query=query.eq("source_table",byId("source").value);
     if(byId("operation").value)query=query.eq("operation",byId("operation").value);
     if(start)query=query.gte("changed_at",`${start}T00:00:00+08:00`);
@@ -65,8 +67,8 @@
       const {data,error,count}=await query.range(page*size,(page+1)*size-1);if(current!==request)return;
       byId("rows").replaceChildren();
       if(error){status.textContent=`讀取失敗：${error.message}。若尚未啟用，請先執行 record_change_history_migration.sql。`;return;}
-      let visible=0;for(const event of data||[]){const fields=visibleChanges(event);if(fields.length)visible++;for(const [field,change] of fields){const row=document.createElement("tr");cell(row,time(event.changed_at));cell(row,`${sources[event.source_table]||event.source_table}／${operations[event.operation]||event.operation}`);cell(row,`${event.serial_no||"—"}－${event.board_name||"—"}`);cell(row,labels[field]||field);cell(row,value(field,change.old));cell(row,value(field,change.new));byId("rows").append(row);}}
-      status.textContent=count?`共 ${count} 次原始操作，本頁顯示 ${visible} 次業務異動；已隱藏系統版本號，DBN 合併顯示客戶－產品－站點。`:"沒有符合條件的異動紀錄。";
+      for(const event of data||[]){for(const [field,change] of displayChanges(event)){const row=document.createElement("tr");cell(row,time(event.changed_at));cell(row,`${sources[event.source_table]||event.source_table}／${operations[event.operation]||event.operation}`);cell(row,`${event.serial_no||"—"}－${event.board_name||"—"}`);cell(row,labels[field]||field);cell(row,value(field,change.old));cell(row,value(field,change.new));byId("rows").append(row);}}
+      status.textContent=count?`共 ${count} 筆原始事件；系統欄位已隱藏，DBN 組合合併顯示。${byId("rows").children.length?"":"本頁沒有可顯示的業務異動。"}`:"沒有符合條件的異動紀錄。";
       byId("page").textContent=`第 ${page+1} 頁`;byId("previous").disabled=page===0;byId("next").disabled=(page+1)*size>=count;
     }catch(error){if(current===request)status.textContent=`讀取失敗：${error.message}`;}
   }

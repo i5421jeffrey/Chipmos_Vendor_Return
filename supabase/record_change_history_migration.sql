@@ -15,6 +15,11 @@ create table if not exists public.record_change_history (
     coalesce(serial_no, '') || ' ' || coalesce(board_name, '') || ' ' || changes::text
   ) stored
 );
+-- Keep the complete historical DBN combination, including unchanged components.
+-- Existing events remain untouched; missing historical components are not guessed.
+alter table public.record_change_history
+  add column if not exists dbn_before jsonb,
+  add column if not exists dbn_after jsonb;
 create index if not exists record_change_history_time_idx
   on public.record_change_history (changed_at desc, id desc);
 alter table public.record_change_history enable row level security;
@@ -46,30 +51,28 @@ begin
   from (
     select jsonb_object_keys(before_row || after_row) as field
   ) fields
-   where field not in ('id', 'created_at', 'updated_at', 'version', 'source_system', 'source_record_id')
+   where field not in ('id', 'version', 'created_at', 'updated_at', 'source_system', 'source_record_id')
     and before_row->field is distinct from after_row->field;
 
   if tg_op <> 'UPDATE' or differences <> '{}'::jsonb then
-    -- Keep the complete DBN identity even when only one component changed.
-    if tg_table_name = 'dbn_records' then
-      differences := differences || jsonb_build_object('dbn_combination', jsonb_build_object(
-        'old', case when tg_op = 'INSERT' then null else jsonb_build_array(
-          before_row->>'customer_code', before_row->>'product_code', before_row->>'station_code'
-        ) end,
-        'new', case when tg_op = 'DELETE' then null else jsonb_build_array(
-          after_row->>'customer_code', after_row->>'product_code', after_row->>'station_code'
-        ) end
-      ));
-    end if;
     insert into public.record_change_history (
-      source_table, record_key, operation, serial_no, board_name, changes
+      source_table, record_key, operation, serial_no, board_name, changes,
+      dbn_before, dbn_after
     ) values (
       tg_table_name,
       coalesce(snapshot->>'id', snapshot->>'serial_no'),
       tg_op,
       snapshot->>'serial_no',
       coalesce(snapshot->>'description', snapshot->>'board_name'),
-      differences
+      differences,
+      case when tg_table_name = 'dbn_records' and tg_op <> 'INSERT' then
+        jsonb_build_object('customer_code', before_row->'customer_code',
+          'product_code', before_row->'product_code', 'station_code', before_row->'station_code')
+      end,
+      case when tg_table_name = 'dbn_records' and tg_op <> 'DELETE' then
+        jsonb_build_object('customer_code', after_row->'customer_code',
+          'product_code', after_row->'product_code', 'station_code', after_row->'station_code')
+      end
     );
   end if;
   if tg_op = 'DELETE' then return old; end if;
