@@ -1,0 +1,22 @@
+/* Interface-only reading mode. Supabase permissions are intentionally unchanged. */
+html:not([data-spms-edit-mode="on"]) :is(
+  #open-create, #open-dbn, #open-serial-map, #edit-record,
+  #resolve-pass, #resolve-fail, #upload-file, #delete-file,
+  #delete-record, #finish-edit, #edit-record-form,
+  [data-dbn-action], [data-serial-map-action],
+  #create-modal, #dbn-modal, #serial-map-modal, #retry-modal
+){display:none!important}
+.spms-mode-controls{display:flex;align-items:center;justify-content:flex-end;gap:10px;flex-wrap:wrap;margin-bottom:18px;font-size:12px}
+.spms-mode-label{color:#929398}
+.spms-mode-button{border:1px solid #45457b;border-radius:5px;padding:8px 12px;background:#22213c;color:#dedee8;cursor:pointer;font:inherit}
+.spms-mode-button:hover{background:#30304a}
+.spms-mode-button:focus-visible{outline:2px solid #a3a1ff;outline-offset:2px}
+.spms-mode-message{flex-basis:100%;text-align:right;color:#d8bc87;font-size:11px}
+.spms-mode-dialog{width:min(380px,calc(100vw - 32px));max-height:90vh;overflow:auto;border:1px solid #393a3f;border-radius:10px;background:#17181a;color:#e7e7e8;padding:24px;font:13px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+.spms-mode-dialog::backdrop{background:#000b}
+.spms-mode-dialog h2{font-size:17px;margin:0 0 20px}
+.spms-mode-dialog label{display:block;margin-bottom:7px;color:#aaa}
+.spms-mode-dialog input{box-sizing:border-box;width:100%;border:1px solid #343539;border-radius:5px;background:#101113;color:#e7e7e8;padding:10px;font:inherit}
+.spms-mode-dialog input:focus{outline:2px solid #7778cf;outline-offset:1px}
+.spms-mode-dialog-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:20px}
+.spms-mode-error{min-height:18px;margin-top:8px;color:#ffaaaa;font-size:12px}

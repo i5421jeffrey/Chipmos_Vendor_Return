@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-Hant">
+<html lang="zh-Hant" data-spms-edit-mode="off">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -11,9 +11,12 @@
     .filters{align-items:flex-end}.filters label{display:flex;flex-direction:column;gap:5px}.filters input,.filters select,.filters button{height:40px;min-height:40px;margin:0;line-height:20px;padding:9px 10px}.filters input,.filters select{width:100%;min-width:0}.filters button{flex:none;align-self:flex-end}.pager button{height:40px}.pager{flex-wrap:wrap}
     #query::placeholder{color:#b8b9bd;opacity:1}
   </style>
+  <link rel="stylesheet" href="edit-mode.css">
+  <script src="edit-mode.js" defer></script>
 </head>
 <body>
 <main>
+  <div id="spms-mode-controls" class="spms-mode-controls" aria-label="閱讀與編輯模式"></div>
   <a href="./">← 返回 SPMS</a>
   <h1>異動紀錄</h1>
   <form id="filters" class="filters">

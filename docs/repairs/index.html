@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="zh-Hant">
+<html lang="zh-Hant" data-spms-edit-mode="off">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -58,12 +58,14 @@
     @media(min-width:801px){.list-heading.dbn-heading,.dbn-row{grid-template-columns:minmax(85px,1.1fr) minmax(100px,1.25fr) minmax(55px,.65fr) minmax(75px,.9fr) minmax(55px,.65fr) minmax(80px,.9fr) minmax(90px,.8fr)}}
     @media(max-width:600px){.dbn-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
   </style>
+  <link rel="stylesheet" href="edit-mode.css">
+  <script src="edit-mode.js" defer></script>
 </head>
 <body>
   <div class="app">
     <aside class="sidebar"><details class="system-switcher sidebar-switcher"><summary class="switcher-trigger"><span class="brand-mark"><img src="ghost-logo.png" alt=""></span><span class="brand-copy"><span class="brand-title">SPMS</span><span class="brand-subtitle">Spare Parts Management System</span></span><span class="switcher-chevron">⌄</span></summary><div class="switcher-menu"><a href="./" aria-current="page"><span>▧</span><span>備品管理系統<small>板件送修管理</small></span><span class="switcher-check">✓</span></a><a href="../machines/"><span>▦</span><span>機台管理系統<small>設備維修案件</small></span></a></div></details><nav class="nav quick-nav" id="quick-nav" aria-label="Search"></nav><div><div class="nav-label">紀錄項目</div><nav class="nav" id="side-nav" aria-label="紀錄類型"></nav></div></aside>
     <main class="main">
-        <section class="content"><div id="notice" class="notice" role="status" hidden></div>
+        <section class="content"><div id="spms-mode-controls" class="spms-mode-controls" aria-label="閱讀與編輯模式"></div><div id="notice" class="notice" role="status" hidden></div>
         <section id="quick-search-view" class="quick-search-view" aria-labelledby="quick-search-title">
           <div class="quick-search-intro"><h1 id="quick-search-title">SPMS</h1><p>Enter a board S/N to quickly view related repair and DBN records.</p></div>
           <form id="quick-search-form" class="quick-search-form">
@@ -420,6 +422,14 @@
     byId("open-create").addEventListener("click",openCreateModal);byId("close-create").addEventListener("click",closeCreateModal);byId("cancel-create").addEventListener("click",closeCreateModal);byId("create-modal").addEventListener("click",e=>{if(e.target===byId("create-modal"))closeCreateModal();});byId("create-form").addEventListener("submit",createRecord);byId("new-repair-type").addEventListener("change",()=>configureRepairAmount("new-repair-type","new-repair-amount"));byId("new-file-button").addEventListener("click",()=>byId("new-file-input").click());byId("new-file-input").addEventListener("change",e=>{const file=e.target.files?.[0];byId("new-file-name").textContent=file?file.name:"尚未選擇檔案";byId("create-message").textContent=file&&!validFailLog(file)?"Fail Log 格式或大小不符；僅接受非空的 .txt／.asc 檔案，最大 5 MB。":"";updateNewFailureDescriptionRequirement();});byId("new-serial").addEventListener("input",()=>clearSerialFormMapping("new"));byId("new-serial").addEventListener("blur",()=>lookupFormSerialMapping("new"));byId("dbn-serial").addEventListener("input",()=>clearSerialFormMapping("dbn"));byId("dbn-serial").addEventListener("blur",()=>lookupFormSerialMapping("dbn"));byId("new-machine").addEventListener("change",updateNewMachine);byId("new-description").addEventListener("change",updateNewBoardPart);byId("open-dbn").addEventListener("click",()=>openDbnModal());byId("open-serial-map").addEventListener("click",()=>openSerialMappingModal());byId("serial-map-form").addEventListener("submit",saveSerialMapping);byId("serial-map-board").addEventListener("change",updateSerialPart);byId("close-serial-map").addEventListener("click",closeSerialMappingModal);byId("cancel-serial-map").addEventListener("click",closeSerialMappingModal);byId("serial-map-modal").addEventListener("click",e=>{if(e.target===byId("serial-map-modal"))closeSerialMappingModal();});byId("close-dbn").addEventListener("click",closeDbnModal);byId("cancel-dbn").addEventListener("click",closeDbnModal);byId("dbn-modal").addEventListener("click",e=>{if(e.target===byId("dbn-modal"))closeDbnModal();});byId("dbn-form").addEventListener("submit",saveDbnRecord);byId("dbn-machine").addEventListener("change",updateDbnMachine);byId("dbn-board").addEventListener("change",updateDbnPart);byId("dbn-customer").addEventListener("change",updateDbnProducts);byId("dbn-product").addEventListener("change",updateDbnStations);document.addEventListener("keydown",e=>{if(e.key==="Escape"){if(!byId("create-modal").hidden)closeCreateModal();if(!byId("dbn-modal").hidden)closeDbnModal();if(!byId("serial-map-modal").hidden)closeSerialMappingModal();}});
     byId("retry-repair-type").addEventListener("change",()=>configureRepairAmount("retry-repair-type","retry-repair-amount"));byId("retry-file-button").addEventListener("click",()=>byId("retry-file-input").click());byId("retry-file-input").addEventListener("change",e=>{const file=e.target.files?.[0];byId("retry-file-name").textContent=file?file.name:"尚未選擇檔案";byId("retry-message").textContent=file&&!validFailLog(file)?"Fail Log 格式或大小不符；僅接受非空的 .txt／.asc 檔案，最大 5 MB。":"";});byId("retry-form").addEventListener("submit",createRetry);byId("close-retry").addEventListener("click",closeRetryModal);byId("cancel-retry").addEventListener("click",closeRetryModal);byId("retry-modal").addEventListener("click",e=>{if(e.target===byId("retry-modal"))closeRetryModal();});document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!byId("retry-modal").hidden)closeRetryModal();});
     byId("stats-mode-year").addEventListener("click",()=>{statsMode="year";renderStatistics();});byId("stats-mode-month").addEventListener("click",()=>{statsMode="month";renderStatistics();});byId("stats-year").addEventListener("change",e=>{statsYear=e.target.value;renderStatistics();});byId("stats-month").addEventListener("change",e=>{statsMonth=e.target.value;renderStatistics();});byId("demo-tag").hidden=false;render();if(window.matchMedia("(pointer:fine) and (min-width: 601px)").matches)byId("quick-search-input").focus({preventScroll:true});loadRecords();loadDbnData();loadRepairMappings();
+    document.addEventListener("spms-edit-mode-change",event=>{
+      if(!event.detail.enabled){
+        editingRecordId=null;dbnEditingId=null;dbnFormRecordId=null;retrySourceRecordId=null;serialMappingEditingSerial=null;
+        for(const id of ["create-modal","dbn-modal","serial-map-modal","retry-modal"])byId(id).hidden=true;
+        showDetail=false;renderDetail(null);
+      }
+      render();
+    });
     byId("machine-ranking-sort").addEventListener("change",renderMachineDamageRanking);
     // Refresh after user selections, catalog autofill, or opening an edit form.
     document.addEventListener("change",event=>{if(["new-machine","new-description","dbn-machine","dbn-board","edit-machine_code","edit-description","serial-map-board"].includes(event.target.id))updateSerialFormatHints();});
