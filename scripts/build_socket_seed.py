@@ -22,7 +22,7 @@ def parse_socket(text):
         dut = str(int(match[1]))
         if dut in pins:
             raise ValueError(f'Duplicate DUT {dut} on line {number}')
-        tokens = [token.strip() for token in match[2].split(',') if token.strip()]
+        tokens = [token for token in re.split(r'[,\s]+', match[2].strip()) if token]
         if not tokens:
             raise ValueError(f'Empty PIN list on line {number}')
         for token in tokens:
@@ -37,7 +37,10 @@ def parse_socket(text):
 
 def build_seed(source, product):
     raw = source.read_bytes()
-    text = raw.decode('utf-8-sig')
+    # Legacy files may contain non-UTF-8 comments. Parse ASCII syntax without
+    # guessing their encoding; preserve every original byte in source_bytes.
+    # Non-ASCII PIN tokens still fail validation rather than being replaced.
+    text = raw.decode('utf-8-sig', errors='surrogateescape')
     count, pins = parse_socket(text)
     digest = hashlib.sha256(raw).hexdigest()
     literal = lambda value: "'" + value.replace("'", "''") + "'"
