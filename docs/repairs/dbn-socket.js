@@ -10,9 +10,21 @@ export function parseDut(value, maximum = 2048) {
 export function socketPinsMarkup(dut, snapshot, escape) {
   if (!dut) return '';
   const selection = parseDut(dut);
-  return selection.numbers.map(number => {
+  const rows = selection.numbers.map(number => {
     const pins = snapshot?.[String(number)];
-    return `<div class="dut-pin-line"><strong>DUT${number}</strong><span>${Array.isArray(pins) ? escape(pins.join(', ')) : '尚無對應'}</span></div>`;
+    return { number, pins: Array.isArray(pins) ? [...new Set(pins)] : null };
+  });
+  // Only exact tokens shared by every selected DUT can lose their DUT label.
+  // Missing mappings must not make a partially shared PIN look universal.
+  const pinSets = rows.map(row => new Set(row.pins || []));
+  const common = rows.length > 1 && rows.every(row => row.pins?.length)
+    ? rows[0].pins.filter(pin => pinSets.every(pins => pins.has(pin))) : [];
+  const shared = new Set(common);
+  const header = common.length
+    ? `<div class="dut-pin-line"><strong>共用PIN:</strong><span>${escape(common.join(', '))}</span></div>` : '';
+  return header + rows.map(({ number, pins }) => {
+    const remaining = pins?.filter(pin => !shared.has(pin));
+    return `<div class="dut-pin-line"><strong>DUT${number}:</strong><span>${pins ? (remaining.length ? escape(remaining.join(', ')) : '無額外 PIN') : '尚無對應'}</span></div>`;
   }).join('');
 }
 
