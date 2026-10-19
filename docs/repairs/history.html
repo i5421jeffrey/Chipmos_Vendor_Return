@@ -38,15 +38,18 @@
   const sources={repair_records:"送修",dbn_records:"DBN",serial_board_mappings:"S/N 對應"},operations={INSERT:"新增",UPDATE:"修改",DELETE:"刪除"};
   const labels={current_status:"目前狀態",order_status:"開單狀態",is_opened:"是否開單",serial_no:"S/N",description:"板件名稱",board_name:"板件名稱",board_part_code:"Part Number",machine_code:"機台編號",model:"Model",tester_id:"Tester ID",repair_month:"送修月份",item:"項目",area:"區域",failure_tag:"異常標籤",failure_description:"異常描述",failure_data:"異常資料",repair_type:"維修分類",repair_amount:"維修金額",occurred_on:"損壞日期",sent_on:"送修日期",returned_on:"回修日期",closed_on:"結案日期",retry_of_record_id:"前次送修資料 ID",customer_code:"客戶",product_code:"產品",station_code:"站點"};
   let page=0,request=0,results=[];
+  Object.assign(labels,{dut:"DUT",socket_file_id:"Socket File 版本",dut_pin_snapshot:"PIN"});
   const timeFormat=new Intl.DateTimeFormat("en-GB",{timeZone:"Asia/Taipei",year:"2-digit",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"});
   function time(value){const parts=Object.fromEntries(timeFormat.formatToParts(new Date(value)).map(p=>[p.type,p.value]));return `${parts.year}${parts.month}${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;}
-  function value(field,v){if(v===null||v===undefined)return "—";if(field==="is_opened")return v?"已開單":"未開單";if(v==="")return "（空白）";return typeof v==="object"?JSON.stringify(v):String(v);}
+  function value(field,v){if(v===null||v===undefined)return "—";if(field==="is_opened")return v?"已開單":"未開單";if(v==="")return "（空白）";if(field==="dut_pin_snapshot")return Object.entries(v).map(([dut,pins])=>`DUT${dut}: ${pins.join(", ")}`).join("\n")||"（空白）";return typeof v==="object"?JSON.stringify(v):String(v);}
   function cell(row,text){const td=document.createElement("td");td.textContent=text;row.append(td);}
   function displayChanges(event){
     const changes=event.changes||{},internal=new Set(["id","version","created_at","updated_at","source_system","source_record_id"]);
     if(event.source_table!=="dbn_records")return Object.entries(changes).filter(([field])=>!internal.has(field));
     const fields=["customer_code","product_code","station_code"];
-    if(event.operation==="UPDATE"&&!fields.some(field=>Object.hasOwn(changes,field)))return [];
+    const hasValue=v=>v!==null&&v!==undefined&&v!==""&&(typeof v!=="object"||Object.keys(v).length>0);
+    const extras=Object.entries(changes).filter(([field,change])=>["dut","socket_file_id","dut_pin_snapshot"].includes(field)&&(hasValue(change.old)||hasValue(change.new)));
+    if(event.operation==="UPDATE"&&!fields.some(field=>Object.hasOwn(changes,field)))return extras;
     function combination(side){
       if((side==="old"&&event.operation==="INSERT")||(side==="new"&&event.operation==="DELETE"))return "—";
       const snapshot=side==="old"?event.dbn_before:event.dbn_after;
@@ -56,7 +59,7 @@
         return "（未記錄）";
       }).join("-");
     }
-    return [["DBN",{old:combination("old"),new:combination("new")}]];
+    return [["DBN",{old:combination("old"),new:combination("new")}],...extras];
   }
   async function load(){
     const current=++request,status=byId("status");byId("previous").disabled=true;byId("next").disabled=true;byId("rows").replaceChildren();byId("page").textContent="";results=[];status.textContent="正在載入…";
