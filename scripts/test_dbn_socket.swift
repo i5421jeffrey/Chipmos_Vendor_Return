@@ -26,6 +26,7 @@ const sharedMapping={'1':['PPS126','PD2H6','P105H5','PPS126'],'2':['PPS126','PD2
 const beforeShared=JSON.stringify(sharedMapping);
 const sharedHtml=socketPinsMarkup('1-2',sharedMapping,escape);
 assert(sharedHtml.includes('<strong>共用PIN:</strong><span>PPS126, PD2H6</span>'),'Common PIN header');
+assert(sharedHtml.includes('class="dut-pin-line dut-pin-common"'),'Common PIN row has a separate wrapping style');
 assert(sharedHtml.includes('<strong>DUT1:</strong><span>P105H5</span>'),'First DUT only unique remainder');
 assert(sharedHtml.includes('<strong>DUT2:</strong><span>P106H5</span>'),'Second DUT only unique remainder');
 assert(sharedHtml.split('PPS126').length===2,'Shared PIN appears once');

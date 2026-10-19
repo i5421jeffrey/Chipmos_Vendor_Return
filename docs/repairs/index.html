@@ -61,6 +61,8 @@
     .dut-pin-line strong{flex-shrink:0}
     .dbn-pin-details{margin-top:6px;max-width:100%;overflow-x:auto;font-size:12px;white-space:normal;overflow-wrap:anywhere}
     .dbn-pin-details .dut-pin-line{width:max-content;min-width:100%;white-space:nowrap;overflow-wrap:normal}
+    .dbn-pin-details .dut-pin-common{width:100%;white-space:normal;overflow-wrap:anywhere}
+    .dbn-pin-details .dut-pin-common span{min-width:0}
     .dbn-pin-details summary{cursor:pointer;color:var(--accent,#5865bc)}
     #dbn-dut-pins{max-height:320px;overflow:auto;padding:8px 0}
   </style>
@@ -174,7 +176,7 @@
   <script type="module">
     import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
     import { resolveRepairPrice } from "./repair-pricing.js";
-    import { createDbnSockets, socketPinsMarkup } from "./dbn-socket.js?v=all-dut-common-20261019";
+    import { createDbnSockets, socketPinsMarkup } from "./dbn-socket.js?v=common-pin-wrap-20261019";
     const supabase=createClient("https://ywazcutaodqrthhighod.supabase.co","sb_publishable_wu8mVnxG-ifzSDB8Zl4wlg_xCRjl9k3");
     const BUCKET="repair-fail-logs",MAX_FILE_SIZE=5*1024*1024;
     const ACTIVE_STATUSES=["待送修","已送修","取回驗證"],CLOSED_PASS="結案（PASS）",CLOSED_FAIL="結案（FAIL）",STATUSES=[...ACTIVE_STATUSES,CLOSED_PASS,CLOSED_FAIL];

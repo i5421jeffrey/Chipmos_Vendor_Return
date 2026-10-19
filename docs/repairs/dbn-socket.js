@@ -21,7 +21,7 @@ export function socketPinsMarkup(dut, snapshot, escape) {
     ? rows[0].pins.filter(pin => pinSets.every(pins => pins.has(pin))) : [];
   const shared = new Set(common);
   const header = common.length
-    ? `<div class="dut-pin-line"><strong>共用PIN:</strong><span>${escape(common.join(', '))}</span></div>` : '';
+    ? `<div class="dut-pin-line dut-pin-common"><strong>共用PIN:</strong><span>${escape(common.join(', '))}</span></div>` : '';
   return header + rows.map(({ number, pins }) => {
     const remaining = pins?.filter(pin => !shared.has(pin));
     return `<div class="dut-pin-line"><strong>DUT${number}:</strong><span>${pins ? (remaining.length ? escape(remaining.join(', ')) : '無額外 PIN') : '尚無對應'}</span></div>`;
