@@ -50,7 +50,7 @@ insert into public.dbn_valid_combinations (customer_code, product_code, station_
   ('AB', 'CAA100', 'CP3'),
   ('AB', 'GAA098', 'CP1'), ('AB', 'GAA098', 'CP2'),
   ('AB', 'GAA112', 'CP1'), ('AB', 'GAA112', 'CP4'),
-  ('AB', 'GAA112', 'CP20'),
+  ('AB', 'GAA112', 'CP20'), ('AB', 'GAA112', 'CP2'),
   ('AB', 'GAA102', 'CP1'), ('AB', 'GAA102', 'CP2'),
   ('AB', 'GAA128', 'CP1'), ('AB', 'GAA128', 'CP2'),
   ('AB', 'GAA108', 'CP1'), ('AB', 'GAA108', 'CP2'),
