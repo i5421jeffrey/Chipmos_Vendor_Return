@@ -16,16 +16,40 @@ export function socketPinsMarkup(dut, snapshot, escape) {
   }).join('');
 }
 
+export function validateDbnIssue(type, dut, description) {
+  if (!['Group', 'Single Dut', 'RTE', 'Other'].includes(type)) throw new Error('請選擇 DBN 類型');
+  if (type === 'RTE' || type === 'Other') {
+    const text = String(description ?? '').trim();
+    if (!text) throw new Error('異常描述：此欄位必填');
+    return { issue_type: type, dut: null, issue_description: text };
+  }
+  const selection = parseDut(dut);
+  if (!selection.numbers.length) throw new Error('DUT：此欄位必填');
+  if (type === 'Single Dut' && (selection.numbers.length !== 1 || String(dut).includes('-'))) throw new Error('Single Dut 請填寫單一 DUT 編號');
+  if (type === 'Group' && selection.numbers.length > 8) throw new Error('Group 僅接受連續 1–8 個 DUT');
+  return { issue_type: type, dut: selection.text, issue_description: null };
+}
+
 export function createDbnSockets(supabase, byId, escape) {
   const files = new Map();
   let ready = false, loadMessage = 'Socket File 載入中…', original = null;
   function preview() {
     const input = byId('dbn-dut'), output = byId('dbn-dut-pins'), product = byId('dbn-product').value;
+    const type = byId('dbn-issue-type').value, usesDut = type === 'Group' || type === 'Single Dut', usesDescription = type === 'RTE' || type === 'Other';
+    byId('dbn-dut-field').hidden = !usesDut;
+    byId('dbn-pin-field').hidden = !usesDut;
+    byId('dbn-description-field').hidden = !usesDescription;
+    input.required = usesDut;input.disabled = !usesDut;
+    byId('dbn-issue-description').required = usesDescription;
+    byId('dbn-issue-description').disabled = !usesDescription;
+    input.placeholder = type === 'Single Dut' ? '例如：39' : '例如：1-4、1-8、21-28';
     input.setCustomValidity('');
+    if (!usesDut) { output.textContent = '';return; }
     try {
       const selection = parseDut(input.value), file = files.get(product);
+      if (selection.text) validateDbnIssue(type, input.value, '');
       const same = original?.socket_file_id && selection.text === (original.dut || '') && product === original.product_code;
-      if (!selection.text) { output.textContent = '填入 DUT 後自動顯示 PIN（選填）'; return; }
+      if (!selection.text) { output.textContent = '填入 DUT 後自動顯示 PIN'; return; }
       if (!ready) { output.textContent = loadMessage; return; }
       if (file && !same) parseDut(selection.text, file.dut_count);
       output.innerHTML = socketPinsMarkup(selection.text, same ? original.dut_pin_snapshot : file?.dut_pins, escape);
@@ -42,14 +66,18 @@ export function createDbnSockets(supabase, byId, escape) {
       } catch (error) { ready = false;loadMessage = `Socket File 尚未就緒，請先執行 DUT 與 Socket File 遷移：${error.message}`; }
       preview();
     },
-    open(record) { original = record;byId('dbn-dut').value = record?.dut || '';preview(); },
+    open(record) {
+      original = record;byId('dbn-dut').value = record?.dut || '';
+      byId('dbn-issue-type').value = record?.issue_type || '';
+      byId('dbn-issue-description').value = record?.issue_description || '';preview();
+    },
     preview,
     payload() {
       preview();
-      const selection = parseDut(byId('dbn-dut').value);
-      if (selection.text && !ready) throw new Error(loadMessage);
+      const issue = validateDbnIssue(byId('dbn-issue-type').value, byId('dbn-dut').value, byId('dbn-issue-description').value);
+      if (issue.dut && !ready) throw new Error(loadMessage);
       if (!byId('dbn-dut').checkValidity()) throw new Error(byId('dbn-dut').validationMessage);
-      return ready ? { dut: selection.text || null } : {};
+      return issue;
     },
   };
 }

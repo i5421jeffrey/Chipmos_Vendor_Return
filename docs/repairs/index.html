@@ -145,8 +145,10 @@
           <div class="form-field"><label for="dbn-station">站點</label><select id="dbn-station" name="station_code" disabled><option value="">請先選產品</option></select></div>
         </div>
         <div class="file-hint">DBN 僅記錄板件在指定客戶／產品／站點的問題，不會建立送修案件。QR、VB 目前沒有產品與站點對應，會以「-」顯示並保持不可選。</div>
-        <div class="form-field"><label for="dbn-dut">DUT（選填）</label><input id="dbn-dut" name="dut" type="text" maxlength="16" placeholder="例如：39、1-8、21-28"></div>
-        <div class="form-field wide"><label>PIN（依 Socket File 原文）</label><div id="dbn-dut-pins" class="file-hint" aria-live="polite"></div></div>
+        <div class="form-field"><label for="dbn-issue-type">DBN 類型</label><select id="dbn-issue-type" required><option value="">請選擇類型</option><option>Group</option><option>Single Dut</option><option>RTE</option><option>Other</option></select></div>
+        <div id="dbn-dut-field" class="form-field" hidden><label for="dbn-dut">DUT</label><input id="dbn-dut" name="dut" type="text" maxlength="16" placeholder="例如：1-4、1-8、21-28"></div>
+        <div id="dbn-pin-field" class="form-field wide" hidden><label>PIN（依 Socket File 原文）</label><div id="dbn-dut-pins" class="file-hint" aria-live="polite"></div></div>
+        <div id="dbn-description-field" class="form-field wide" hidden><label for="dbn-issue-description">異常描述</label><textarea id="dbn-issue-description" rows="4" placeholder="請填寫 Fail 資訊／異常描述"></textarea></div>
         <div id="dbn-message" class="form-message" role="status" aria-live="polite"></div>
         <div class="form-actions"><button id="cancel-dbn" class="button" type="button">取消</button><button id="submit-dbn" class="button primary" type="submit">新增 DBN 紀錄</button></div>
       </form>
@@ -185,7 +187,11 @@
      let records=demoRecords,machines=[],modelBoards=[],repairMappingError="對應資料載入中…",repairAttachments=[],dbnRecords=[],dbnCustomers=[],dbnCombinations=[],dbnLoadError="",dbnSchemaReady=false,dbnLegacySchema=false,serialMappingReady=false,serialCatalogReady=false,serialMappingRows=[],serialMappingLoadError="",serialMappingRequest=0,serialMappingEditingSerial=null,serialMappingSearchTimer=0,failureSchemaReady=false,repairAccountingReady=false,dbnEditingId=null,dbnFormRecordId=null,retrySourceRecordId=null,selectedId="demo-1",activeView="快速搜尋",showDetail=false,attachmentRequest=0,editingRecordId=null,statsMode="year",statsYear="",statsMonth=String(new Date().getMonth()+1).padStart(2,"0"),quickSearchSerial="",quickSearchSubmitted=false,quickSearchLoading=false,quickRepairResults=[],quickDbnResults=[],quickSerialMapping=null,quickRepairError="",quickDbnError="",quickSearchRequest=0,newSerialMapping=null,newSerialMappingError="",dbnSerialMapping=null,dbnSerialMappingError="",serialFormLookupRequest={new:0,dbn:0};
     const byId=id=>document.getElementById(id),notice=byId("notice");
     const dbnSockets=createDbnSockets(supabase,byId,esc);
-    function dbnPinDetails(r){return r.dut?`<details class="dbn-pin-details"><summary>DUT ${esc(r.dut)} · PIN</summary>${socketPinsMarkup(r.dut,r.dut_pin_snapshot,esc)}</details>`:"";}
+    function dbnPinDetails(r){
+      const type=r.issue_type?`<div>${esc(r.issue_type)}</div>`:"";
+      const description=r.issue_description?`<div style="white-space:pre-wrap">${esc(r.issue_description)}</div>`:"";
+      return type+description+(r.dut?`<details class="dbn-pin-details"><summary>DUT ${esc(r.dut)} · PIN</summary>${socketPinsMarkup(r.dut,r.dut_pin_snapshot,esc)}</details>`:"");
+    }
     function esc(v){return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[c]));}
     function formatAmount(value){return new Intl.NumberFormat("zh-TW",{maximumFractionDigits:2}).format(Number(value)||0);}
     let repairPrices=[],repairPriceError="板件價格載入中…",repairPricesReady=false;
@@ -343,7 +349,7 @@
       heading.className="list-heading dbn-heading";heading.innerHTML="<span>S/N</span><span>板件名稱</span><span>機台</span><span>客戶</span><span>產品</span><span>站點</span><span>紀錄日期</span><span>操作</span>";
       list.className="rows dbn-list";renderDetail(null);
       if(dbnLoadError){byId("list-count").textContent="—";list.innerHTML=`<div class="empty">${esc(dbnLoadError)}</div>`;return;}
-      const q=byId("search").value.trim().toLocaleLowerCase(),filtered=dbnRecords.filter(r=>[r.serial_no,r.board_name,r.product_code,r.dut].join(" ").toLocaleLowerCase().includes(q));
+      const q=byId("search").value.trim().toLocaleLowerCase(),filtered=dbnRecords.filter(r=>[r.serial_no,r.board_name,r.product_code,r.dut,r.issue_type,r.issue_description].join(" ").toLocaleLowerCase().includes(q));
       byId("list-count").textContent=`${filtered.length} 筆`;
       list.innerHTML=filtered.map(r=>{
         const editing=dbnEditingId===r.id;
@@ -544,6 +550,7 @@
     loadRepairPrices();
     dbnSockets.load();
     byId("dbn-dut").addEventListener("input",()=>dbnSockets.preview());
+    byId("dbn-issue-type").addEventListener("change",()=>dbnSockets.preview());
     for(const id of ["dbn-customer","dbn-product"])byId(id).addEventListener("change",()=>dbnSockets.preview());
     byId("machine-ranking-sort").addEventListener("change",renderMachineDamageRanking);
     // Refresh after user selections, catalog autofill, or opening an edit form.

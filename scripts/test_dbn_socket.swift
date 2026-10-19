@@ -23,7 +23,18 @@ assert(!html.includes('P49C1'),'No prefix correction');
 assert(socketPinsMarkup('3',{},escape).includes('尚無對應'),'Missing mapping');
 assert(socketPinsMarkup('1',{'1':['<img>']},escape).includes('&lt;img>'),'Escapes customer content');
 const elements={};
-for(const id of ['dbn-dut','dbn-dut-pins','dbn-product']) elements[id]={value:'',textContent:'',innerHTML:'',validationMessage:'',setCustomValidity(s){this.validationMessage=s;},checkValidity(){return !this.validationMessage;}};
+for(const id of ['dbn-dut','dbn-dut-pins','dbn-product','dbn-issue-type','dbn-issue-description','dbn-dut-field','dbn-pin-field','dbn-description-field']) elements[id]={value:'',textContent:'',innerHTML:'',validationMessage:'',setCustomValidity(s){this.validationMessage=s;},checkValidity(){return !this.validationMessage;}};
+for(const type of ['','Unknown'])rejects(()=>validateDbnIssue(type,'1','text'),'Mandatory known type');
+for(const dut of ['','1,2','1-9','9-1'])rejects(()=>validateDbnIssue('Group',dut,''),'Group rules');
+for(const dut of ['1-1','1-2',''])rejects(()=>validateDbnIssue('Single Dut',dut,''),'Single rules');
+assert(validateDbnIssue('Group','1-4','old').dut==='1-4','Group four');
+assert(validateDbnIssue('Group','1-8','old').issue_description===null,'Group clears description');
+assert(validateDbnIssue('Group','39','').dut==='39','Group one');
+for(const type of ['RTE','Other']){
+ rejects(()=>validateDbnIssue(type,'1',' \\n '),'Description required');
+ assert(validateDbnIssue(type,'invalid',' fail\\ninfo ').dut===null,'Description type clears DUT');
+ assert(validateDbnIssue(type,'',' fail ').issue_description==='fail','Trim description');
+}
 let failure=false;
 const client={from(table){assert(table==='dbn_socket_files','Socket table');return {select(){return {async eq(){return failure?{error:{message:'unavailable'}}:{data:[{id:'new-version',product_code:'JAA118',dut_count:512,dut_pins:mapping}]};}};}};}};
 const controller=createDbnSockets(client,id=>elements[id],escape);
@@ -31,12 +42,13 @@ let completed=false;
 (async()=>{
  await controller.load();assert(controller.ready,'Catalog ready');
  elements['dbn-product'].value='JAA118';controller.open(null);
- assert(controller.payload().dut===null,'Empty clears DUT');
+  rejects(()=>controller.payload(),'Must classify new record');
+  elements['dbn-issue-type'].value='Group';
  elements['dbn-dut'].value='1-2';controller.preview();
  assert(elements['dbn-dut-pins'].innerHTML.includes('PD49C1'),'Live preview');
  assert(controller.payload().dut==='1-2','DUT payload');
  elements['dbn-dut'].value='513';controller.preview();rejects(()=>controller.payload(),'Product bound guard');
- const historical={product_code:'JAA118',dut:'1',socket_file_id:'old-version',dut_pin_snapshot:{'1':['PD49C1','OLD']}};
+  const historical={product_code:'JAA118',issue_type:'Single Dut',dut:'1',socket_file_id:'old-version',dut_pin_snapshot:{'1':['PD49C1','OLD']}};
  controller.open(historical);assert(elements['dbn-dut-pins'].innerHTML.includes('OLD'),'Preserve old snapshot');
  elements['dbn-dut'].value='2';controller.preview();assert(!elements['dbn-dut-pins'].innerHTML.includes('OLD'),'Changed DUT uses active version');
  elements['dbn-product'].value='UNKNOWN';controller.preview();assert(elements['dbn-dut-pins'].innerHTML.includes('尚無對應'),'Unknown product allowed');
@@ -44,7 +56,11 @@ let completed=false;
  controller.open(null);assert(elements['dbn-dut'].value==='','New form reset');
  failure=true;await controller.load();assert(!controller.ready,'Load failure');
  elements['dbn-dut'].value='1';rejects(()=>controller.payload(),'Unavailable catalog blocks nonempty DUT');
- elements['dbn-dut'].value='';assert(!Object.hasOwn(controller.payload(),'dut'),'Legacy blank write compatibility');
+  elements['dbn-issue-type'].value='Other';elements['dbn-issue-description'].value='fail';
+  assert(controller.payload().dut===null,'Other works without socket catalog');
+  assert(elements['dbn-dut'].disabled&&!elements['dbn-issue-description'].disabled,'Conditional fields');
+  controller.open({dut:'1-8'});assert(elements['dbn-issue-type'].value==='','Never guess legacy type');
+  rejects(()=>controller.payload(),'Legacy edit needs classification');
  completed=true;
 })().catch(error=>{globalThis.testFailure=String(error.stack||error);});
 """)
