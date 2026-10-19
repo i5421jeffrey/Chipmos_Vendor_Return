@@ -14,34 +14,14 @@ export function socketPinsMarkup(dut, snapshot, escape) {
     const pins = snapshot?.[String(number)];
     return { number, pins: Array.isArray(pins) ? [...new Set(pins)] : null };
   });
-  // Group exact tokens by their DUT membership, including partial sharing.
-  const membership = new Map(), groups = new Map(), shared = new Set();
-  for (const { number, pins } of rows) for (const pin of pins || []) {
-    if (!membership.has(pin)) membership.set(pin, []);
-    membership.get(pin).push(number);
-  }
-  for (const [pin, numbers] of membership) {
-    if (numbers.length < 2) continue;
-    shared.add(pin);
-    const key = numbers.join(',');
-    if (!groups.has(key)) groups.set(key, { numbers, pins: [] });
-    groups.get(key).pins.push(pin);
-  }
-  function dutLabel(numbers) {
-    const ranges = [];
-    for (let i = 0; i < numbers.length; i++) {
-      const first = numbers[i];
-      while (numbers[i + 1] === numbers[i] + 1) i++;
-      ranges.push(first === numbers[i] ? `DUT${first}` : `DUT${first}-${numbers[i]}`);
-    }
-    return ranges.join(', ');
-  }
-  const header = [...groups.values()]
-    .sort((a, b) => Number(b.numbers.length === rows.length) - Number(a.numbers.length === rows.length))
-    .map(({ numbers, pins }) => {
-      const scope = numbers.length === rows.length ? '' : `${dutLabel(numbers)}：`;
-      return `<div class="dut-pin-line"><strong>共用PIN:</strong><span>${escape(scope + pins.join(', '))}</span></div>`;
-    }).join('');
+  // Only exact tokens shared by every selected DUT can lose their DUT label.
+  // Missing mappings must not make a partially shared PIN look universal.
+  const pinSets = rows.map(row => new Set(row.pins || []));
+  const common = rows.length > 1 && rows.every(row => row.pins?.length)
+    ? rows[0].pins.filter(pin => pinSets.every(pins => pins.has(pin))) : [];
+  const shared = new Set(common);
+  const header = common.length
+    ? `<div class="dut-pin-line"><strong>共用PIN:</strong><span>${escape(common.join(', '))}</span></div>` : '';
   return header + rows.map(({ number, pins }) => {
     const remaining = pins?.filter(pin => !shared.has(pin));
     return `<div class="dut-pin-line"><strong>DUT${number}:</strong><span>${pins ? (remaining.length ? escape(remaining.join(', ')) : '無額外 PIN') : '尚無對應'}</span></div>`;
