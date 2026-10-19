@@ -173,7 +173,7 @@
   <script type="module">
     import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
     import { resolveRepairPrice } from "./repair-pricing.js";
-    import { createDbnSockets, socketPinsMarkup } from "./dbn-socket.js";
+    import { createDbnSockets, socketPinsMarkup } from "./dbn-socket.js?v=d8cbc32";
     const supabase=createClient("https://ywazcutaodqrthhighod.supabase.co","sb_publishable_wu8mVnxG-ifzSDB8Zl4wlg_xCRjl9k3");
     const BUCKET="repair-fail-logs",MAX_FILE_SIZE=5*1024*1024;
     const ACTIVE_STATUSES=["待送修","已送修","取回驗證"],CLOSED_PASS="結案（PASS）",CLOSED_FAIL="結案（FAIL）",STATUSES=[...ACTIVE_STATUSES,CLOSED_PASS,CLOSED_FAIL];
