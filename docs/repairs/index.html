@@ -55,11 +55,12 @@
       @media(max-width:800px){.serial-map-heading{display:none}.serial-map-row{grid-template-columns:1fr 1fr;gap:8px;padding:12px}.serial-map-row>span::before{content:attr(data-label);display:block;color:#77787e;font-size:9px}.serial-map-actions{grid-column:1/-1;justify-content:flex-start}.serial-map-actions::before{content:"操作";color:#77787e;font-size:9px;margin-right:5px}}
     .machine-ranking{margin-top:14px}.machine-ranking-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.machine-ranking-controls label{color:var(--muted);font-size:11px}.machine-ranking-table{width:100%;border-collapse:collapse;margin-top:14px;text-align:left;font-size:12px}.machine-ranking-table th{color:var(--muted);font-size:11px;font-weight:500}.machine-ranking-table th,.machine-ranking-table td{padding:10px 8px;border-bottom:1px solid var(--line)}.machine-ranking-table th:last-child,.machine-ranking-table td:last-child{text-align:right}.machine-ranking-table td:nth-child(2){font-family:ui-monospace,monospace}.machine-ranking-summary{color:var(--muted);font-size:11px;margin-top:10px}
     .dbn-heading>span:nth-child(3),.dbn-row>span[data-label="機台"]{display:none}
-    @media(min-width:801px){.list-heading.dbn-heading,.dbn-row{grid-template-columns:minmax(85px,1.1fr) minmax(100px,1.25fr) minmax(55px,.65fr) minmax(75px,.9fr) minmax(55px,.65fr) minmax(80px,.9fr) minmax(90px,.8fr)}}
+    @media(min-width:801px){.list-heading.dbn-heading,.dbn-row{grid-template-columns:minmax(85px,.8fr) minmax(300px,3fr) minmax(45px,.5fr) minmax(75px,.7fr) minmax(45px,.5fr) minmax(80px,.8fr) minmax(90px,.7fr)}}
     @media(max-width:600px){.dbn-row{grid-template-columns:repeat(2,minmax(0,1fr))}}
     .dut-pin-line{display:flex;gap:10px;align-items:baseline;margin:6px 0;white-space:normal;overflow-wrap:anywhere;line-height:1.6}
     .dut-pin-line strong{flex-shrink:0}
-    .dbn-pin-details{margin-top:6px;font-size:12px;white-space:normal;overflow-wrap:anywhere}
+    .dbn-pin-details{margin-top:6px;max-width:100%;overflow-x:auto;font-size:12px;white-space:normal;overflow-wrap:anywhere}
+    .dbn-pin-details .dut-pin-line{width:max-content;min-width:100%;white-space:nowrap;overflow-wrap:normal}
     .dbn-pin-details summary{cursor:pointer;color:var(--accent,#5865bc)}
     #dbn-dut-pins{max-height:320px;overflow:auto;padding:8px 0}
   </style>
