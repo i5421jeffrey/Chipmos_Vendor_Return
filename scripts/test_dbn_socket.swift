@@ -135,3 +135,40 @@ if(eventIdentity(repairEdit)!=='002850948－TP68 CPU')throw Error('Update identi
 """)
 if let error = historyContext.exception { print(error);exit(1) }
 print("History includes DUT-only edits and clearing without empty-field clutter: OK")
+let formPage = try String(contentsOfFile: "docs/repairs/index.html", encoding: .utf8)
+let guardStart = formPage.range(of: "    function protectEditingForms(event){")!.lowerBound
+let guardEnd = formPage.range(of: "    byId(\"quick-search-form\").addEventListener")!.lowerBound
+let guardContext = JSContext()!
+guardContext.evaluateScript("""
+const modalIds=['create-modal','retry-modal','dbn-modal','serial-map-modal'];
+const elements=Object.fromEntries(modalIds.map(id=>[id,{hidden:true,value:'unsaved input'}]));
+const byId=id=>elements[id];
+let editingRecordId=null;
+const listeners={};
+const document={addEventListener(type,handler,capture){if(!capture)throw Error('Guard must run in capture phase');listeners[type]=handler;}};
+function dispatch(type,id,key){
+ const event={type,target:{id},key,stopped:false,prevented:false,stopImmediatePropagation(){this.stopped=true;},preventDefault(){this.prevented=true;}};
+ listeners[type](event);return event;
+}
+function assert(ok,label){if(!ok)throw Error(label);}
+""")
+guardContext.evaluateScript(String(formPage[guardStart..<guardEnd]))
+guardContext.evaluateScript("""
+for(const id of modalIds){
+ elements[id].hidden=false;
+ assert(dispatch('click',id).stopped,'Backdrop must not dismiss '+id);
+ assert(dispatch('keydown','input','Escape').prevented,'Escape must not dismiss '+id);
+ assert(elements[id].value==='unsaved input'&&!elements[id].hidden,'Unsaved form state preserved');
+ elements[id].hidden=true;
+}
+for(const id of ['close-create','cancel-create','close-retry','cancel-retry','close-dbn','cancel-dbn','close-serial-map','cancel-serial-map','submit-button','dbn-serial'])assert(!dispatch('click',id).stopped,'Explicit button/input must remain usable: '+id);
+assert(!dispatch('keydown','input','Enter').stopped,'Enter submission remains usable');
+assert(!dispatch('keydown','input','Escape').stopped,'No open form leaves Escape alone');
+assert(!dispatch('click','detail-backdrop').stopped,'Read-only detail can still close');
+editingRecordId='record-id';
+assert(dispatch('click','detail-backdrop').stopped,'Editing detail protected');
+assert(dispatch('keydown','input','Escape').stopped,'Editing detail Escape protected');
+assert(!dispatch('click','close-detail').stopped,'Explicit detail close remains usable');
+""")
+if let error = guardContext.exception { print(error);exit(1) }
+print("Form background/Escape dismissal blocked; explicit controls and unsaved values preserved: OK")
