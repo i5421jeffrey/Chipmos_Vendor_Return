@@ -45,6 +45,7 @@
   function cell(row,text){const td=document.createElement("td");td.textContent=text;row.append(td);}
   function displayChanges(event){
     const changes=event.changes||{},internal=new Set(["id","version","created_at","updated_at","source_system","source_record_id"]);
+    if(event.operation==="INSERT")return [["serial_no",{old:null,new:event.serial_no??changes.serial_no?.new??null}]];
     if(event.source_table!=="dbn_records")return Object.entries(changes).filter(([field])=>!internal.has(field));
     const fields=["customer_code","product_code","station_code"];
     const hasValue=v=>v!==null&&v!==undefined&&v!==""&&(typeof v!=="object"||Object.keys(v).length>0);
@@ -60,6 +61,10 @@
       }).join("-");
     }
     return [["DBN",{old:combination("old"),new:combination("new")}],...extras];
+  }
+  function eventIdentity(event){
+    if(event.operation==="INSERT")return event.serial_no||event.changes?.serial_no?.new||"—";
+    return `${event.serial_no||"—"}－${event.board_name||"—"}`;
   }
   async function load(){
     const current=++request,status=byId("status");byId("previous").disabled=true;byId("next").disabled=true;byId("rows").replaceChildren();byId("page").textContent="";results=[];status.textContent="正在載入…";
@@ -89,7 +94,7 @@
   function pageInfo(total,index){const pages=Math.max(1,Math.ceil(total/size)),current=Math.max(0,Math.min(index,pages-1));return {page:current,pages,start:total?current*size+1:0,end:Math.min((current+1)*size,total)};}
   function renderPage(){
     const info=pageInfo(results.length,page);page=info.page;byId("rows").replaceChildren();
-    for(const {event,field,change} of results.slice(page*size,(page+1)*size)){const row=document.createElement("tr");cell(row,time(event.changed_at));cell(row,`${sources[event.source_table]||event.source_table}／${operations[event.operation]||event.operation}`);cell(row,`${event.serial_no||"—"}－${event.board_name||"—"}`);cell(row,labels[field]||field);cell(row,value(field,change.old));cell(row,value(field,change.new));byId("rows").append(row);}
+    for(const {event,field,change} of results.slice(page*size,(page+1)*size)){const row=document.createElement("tr"),isInsert=event.operation==="INSERT";cell(row,time(event.changed_at));cell(row,`${sources[event.source_table]||event.source_table}／${operations[event.operation]||event.operation}`);cell(row,eventIdentity(event));cell(row,isInsert?"—":labels[field]||field);cell(row,isInsert?"—":value(field,change.old));cell(row,isInsert?"—":value(field,change.new));byId("rows").append(row);}
     byId("status").textContent=`共${results.length}筆資料 顯示${info.start}-${info.end}`;
     byId("page").textContent=`第 ${page+1} / ${info.pages} 頁`;byId("previous").disabled=page===0;byId("next").disabled=page+1>=info.pages;
   }
