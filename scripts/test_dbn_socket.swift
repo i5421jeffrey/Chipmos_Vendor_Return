@@ -124,11 +124,12 @@ for(const source of ['repair_records','dbn_records','serial_board_mappings']){
  const inserted={source_table:source,operation:'INSERT',serial_no:'002850948',board_name:'TP68 CPU',changes:{serial_no:{old:null,new:'002850948'},board_name:{old:null,new:'TP68 CPU'},repair_amount:{old:null,new:33800},dut:{old:null,new:'1'},dut_pin_snapshot:{old:null,new:{'1':['PD49C1']}}}};
  const original=JSON.stringify(inserted),summary=displayChanges(inserted);
  if(summary.length!==1||summary[0][0]!=='serial_no'||summary[0][1].new!=='002850948')throw Error('Insert must collapse to one serial-number summary');
- if(eventIdentity(inserted)!=='002850948')throw Error('Insert identity includes extra board details');
+ if(eventIdentity(inserted)!=='002850948－TP68 CPU')throw Error('Insert identity must retain board name');
  if(JSON.stringify(inserted)!==original)throw Error('Insert summary changed stored event');
 }
-if(eventIdentity({operation:'INSERT',changes:{serial_no:{new:'001234567'}}})!=='001234567')throw Error('Recorded serial fallback missing');
-if(eventIdentity({operation:'INSERT'})!=='—')throw Error('Missing serial must not be guessed');
+if(eventIdentity({operation:'INSERT',changes:{serial_no:{new:'001234567'},board_name:{new:'HVDR PE'}}})!=='001234567－HVDR PE')throw Error('Recorded serial/board fallback missing');
+if(eventIdentity({operation:'INSERT',changes:{serial_no:{new:'001234567'},description:{new:'TP68 CPU'}}})!=='001234567－TP68 CPU')throw Error('Recorded repair description fallback missing');
+if(eventIdentity({operation:'INSERT'})!=='—－—')throw Error('Missing serial/board must not be guessed');
 const repairEdit={source_table:'repair_records',operation:'UPDATE',serial_no:'002850948',board_name:'TP68 CPU',changes:{repair_amount:{old:1,new:2},machine_code:{old:'F22',new:'F23'}}};
 if(displayChanges(repairEdit).length!==2||displayChanges(repairEdit)[0][1].old!==1)throw Error('Update details changed');
 if(eventIdentity(repairEdit)!=='002850948－TP68 CPU')throw Error('Update identity changed');

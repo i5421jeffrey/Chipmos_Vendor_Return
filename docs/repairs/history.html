@@ -63,7 +63,7 @@
     return [["DBN",{old:combination("old"),new:combination("new")}],...extras];
   }
   function eventIdentity(event){
-    if(event.operation==="INSERT")return event.serial_no||event.changes?.serial_no?.new||"—";
+    if(event.operation==="INSERT")return `${event.serial_no||event.changes?.serial_no?.new||"—"}－${event.board_name||event.changes?.board_name?.new||event.changes?.description?.new||"—"}`;
     return `${event.serial_no||"—"}－${event.board_name||"—"}`;
   }
   async function load(){
