@@ -60,6 +60,15 @@ insert into public.dbn_valid_combinations (customer_code, product_code, station_
   ('AB', 'CAA099', 'CP1')
 on conflict do nothing;
 
+-- QR products share the explicitly requested seven stations (no CP6 or CP8).
+insert into public.dbn_valid_combinations (customer_code, product_code, station_code)
+select 'QR', products.product_code, stations.station_code
+from (values ('LB128E'), ('LB256K'), ('LB512M'), ('LE128E'), ('LE16E'), ('LE32D'))
+  as products(product_code)
+cross join (values ('CP1'), ('CP2'), ('CP3'), ('CP4'), ('CP5'), ('CP7'), ('CP9'))
+  as stations(station_code)
+on conflict (customer_code, product_code, station_code) do nothing;
+
 create index if not exists dbn_records_serial_created_idx
   on public.dbn_records (serial_no, created_at desc);
 create index if not exists dbn_records_context_idx
