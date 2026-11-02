@@ -1,4 +1,7 @@
 /* Local bindings for the unchanged original SPMS visual components. */
+.upload-picker{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:8px 0}
+.upload-file-name{overflow-wrap:anywhere;min-width:0;flex:1;font-size:11px}
+.upload-picker .button{width:auto;flex:none}
 .master-section{margin:18px 0 28px}.master-section td{vertical-align:middle}
 .master-section td:last-child .button{white-space:nowrap}
 .history-filters{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0;align-items:flex-end}

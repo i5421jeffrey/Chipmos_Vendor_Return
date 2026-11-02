@@ -207,8 +207,10 @@ function updateBoards(preferred = byId('board').value) {
 
 function updatePricePreview() {
   const model = catalogs?.machines.find(row => row.machine_code === byId('machine').value)?.model;
-  const amount = repairPrice(model, byId('board').value, byId('part').value, byId('repair-type').value);
-  byId('repair-amount-preview').textContent = amount == null ? '未設定' : (amount / 100).toLocaleString('zh-TW') + ' 元';
+  const preserve = current && !byId('reprice').checked && current.model === model && current.description === byId('board').value && current.board_part_code === byId('part').value && current.repair_type === byId('repair-type').value;
+  const cents = repairPrice(model, byId('board').value, byId('part').value, byId('repair-type').value);
+  const amount = preserve ? current.repair_amount : cents == null ? null : cents / 100;
+  byId('repair-amount-preview').textContent = (amount == null ? '未設定' : amount.toLocaleString('zh-TW') + ' 元') + (preserve ? '（保留原金額）' : '（目前價目）');
 }
 
 function repairPrice(model, board, part, type) {
@@ -235,6 +237,7 @@ byId('cancel').addEventListener('click', closeEditor);
 byId('machine').addEventListener('change', () => updateBoards());
 byId('board').addEventListener('change', () => updateBoards());
 byId('repair-type').addEventListener('change', updatePricePreview);
+byId('reprice').addEventListener('change', updatePricePreview);
 byId('serial').addEventListener('input', () => {mappingRequest++; mapping = null; updateBoards();});
 byId('serial').addEventListener('blur', () => lookupMapping().catch(error => {byId('form-message').textContent = error.message;}));
 
@@ -243,8 +246,11 @@ async function openEditor(record = null) {
   mapping = null;
   mappingRequest++;
   byId('record-form').reset();
+  byId('reprice').checked = false;
+  byId('reprice-field').hidden = !record;
   byId('create-attachment-field').hidden = Boolean(record);
   byId('create-attachment').value = '';
+  filePickerUpdates.get(byId('create-attachment'))?.();
   byId('editor-title').textContent = record ? '編輯送修' : '新增送修';
   byId('form-message').textContent = '';
   byId('history').replaceChildren();
@@ -293,6 +299,10 @@ byId('record-form').addEventListener('submit', async event => {
     // Disabled locked fields are deliberately omitted by FormData.
     payload.description = byId('board').value;
     payload.is_opened = byId('is-opened').checked;
+    if (current) payload.reprice = byId('reprice').checked;
+    if (current && payload.reprice && !window.confirm('確認重新套用目前價目？這會更新此案金額，已結案案件也會影響歷史統計。')) {
+      byId('form-message').textContent = '已取消重新計價，尚未儲存；輸入內容已保留。'; return;
+    }
     if (!current && byId('create-attachment').files?.[0]) payload.attachment = await encodeFile(byId('create-attachment').files[0]);
     if (current) payload.expected_version = current.version;
     frozen = [...byId('record-form').elements].map(input => [input, input.disabled]);

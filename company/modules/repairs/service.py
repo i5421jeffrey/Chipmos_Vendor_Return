@@ -137,7 +137,7 @@ def validate(connection, payload):
     if result["repair_type"] not in PRICE_COLUMNS:
         raise APIError("請選擇有效維修分類")
     if result["current_status"] not in ACTIVE_STATUSES:
-        raise APIError("結案／再次送修尚未移植，不能從編輯表單直接結案")
+        raise APIError("不能從編輯表單直接結案，請使用詳細資料中的 PASS／FAIL 操作")
     for field in ("occurred_on", "sent_on", "returned_on"):
         value = result[field]
         if not value:
@@ -175,6 +175,9 @@ def validate(connection, payload):
 def save_record(path, payload, record_id=None):
     payload = dict(payload)
     expected = payload.pop("expected_version", None)
+    reprice = payload.pop('reprice', False)
+    if type(reprice) is not bool:
+        raise APIError('重新套用價目須為布林值')
     attachment = payload.pop('attachment', None)
     if record_id and attachment is not None:
         raise APIError('編輯附件請使用附件操作')
@@ -194,6 +197,11 @@ def save_record(path, payload, record_id=None):
                 # Validate dates/context using the final active state, then retain closure.
                 payload['current_status'] = '取回驗證'
         values = validate(connection, payload)
+        # Ordinary edits preserve the recorded price, including NULL and zero.
+        # Only an explicit reprice or a changed accounting identity uses today's catalog.
+        accounting = ('model', 'description', 'board_part_code', 'repair_type')
+        if previous and not reprice and all(values[key] == row[key] for key in accounting):
+            values['repair_amount_cents'] = row['repair_amount_cents']
         if previous and previous['current_status'] not in ACTIVE_STATUSES:
             values['current_status'] = previous['current_status']
             if not previous['closed_on']:

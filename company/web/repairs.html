@@ -75,6 +75,7 @@
       <label>S/N<input name="serial_no" id="serial" maxlength="64" autocomplete="off" required></label>
       <label>維修分類<select name="repair_type" id="repair-type" required></select></label>
       <label>金額<output id="repair-amount-preview" class="form-static-value" role="status"></output></label>
+      <label id="reprice-field" class="wide check" hidden><input id="reprice" type="checkbox">重新套用目前價目（變更板件／Model／維修分類也會重新計價）</label>
       <label>異常類別<select name="failure_tag" id="failure-tag" required></select></label>
       <p id="mapping-hint" class="wide hint" role="status"></p>
       <label class="wide">異常描述<textarea name="failure_description" id="failure-description" maxlength="10000" required></textarea></label>
@@ -83,8 +84,8 @@
       <label>損壞日期<input type="date" name="occurred_on" id="occurred-on" required></label>
       <label>送修日期<input type="date" name="sent_on" id="sent-on"></label>
       <label>回修日期<input type="date" name="returned_on" id="returned-on"></label>
-      <label id="create-attachment-field" class="wide">Fail Log（新增時選填）<input type="file" id="create-attachment" accept=".txt,.asc"><span class="hint">每筆限一個非空 .txt／.asc，最大 5 MB；編輯附件請至詳細資料。</span></label>
-      <p class="hint">金額依本機板件價格及維修分類自動帶入；空白保留未設定，0 為零元。</p>
+      <div id="create-attachment-field" class="wide"><label for="create-attachment">Fail Log（新增時選填）</label><input type="file" id="create-attachment" accept=".txt,.asc"><p class="hint">每筆限一個非空 .txt／.asc，最大 5 MB；編輯附件請至詳細資料。</p></div>
+      <p class="hint">新增依本機價目計價；一般編輯保留原金額。未設定不等於 0 元。</p>
     </div>
     <p id="form-message" role="status" aria-live="polite"></p>
     <div class="actions"><button id="cancel" type="button">取消</button><button id="save" type="submit">儲存</button></div>

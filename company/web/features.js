@@ -3,6 +3,7 @@ let workspace = '', workspacePage = 1, workspaceSerial = '', workspaceRequest = 
 let operationsSaving = false, operationsSubmit = null, masterData = null;
 let statisticsMode = 'year', statisticsYear = String(new Date().getFullYear()), statisticsMonth = String(new Date().getMonth() + 1).padStart(2, '0');
 const fieldContainers = new WeakMap();
+const filePickerUpdates = new WeakMap();
 const workspaceTitles = {dbn:'DBN 紀錄', mappings:'S/N 主檔維護', history:'全站異動紀錄', statistics:'統計資料', masters:'機台／板件／價格對應'};
 const operationsDialog = byId('operations-modal');
 const descriptions = {dbn:'DBN 紀錄獨立於送修案件；DUT／PIN 保存當時快照。', mappings:'主檔只保存 S/N、板名與 PN；歷史同步須先預覽及確認，不重算金額。', history:'本機異動紀錄；尚未登入，這不是具名操作人員稽核。', statistics:'首輪損壞頻率與機台排行；依結案日期加總各輪已知金額。', masters:'修改只影響後續選擇與儲存，不自動改寫既有案件、S/N 或價格快照。'};
@@ -28,6 +29,24 @@ async function encodeFile(file) {
   return {filename:file.name, content_base64:encoded};
 }
 
+function mountFilePicker(input, container) {
+  input.hidden = true;
+  const picker = element('div', 'upload-picker'), name = element('div', 'upload-file-name');
+  const choose = element('button', 'button primary upload-trigger', '↑ 選擇 Fail Log'); choose.type = 'button';
+  choose.addEventListener('click', () => input.click());
+  const clear = element('button', 'button', '清除選擇'); clear.type = 'button';
+  const update = () => {
+    const file = input.files?.[0];
+    name.textContent = file ? `${file.name} · ${(file.size / 1024).toLocaleString('zh-TW', {maximumFractionDigits:1})} KB` : '尚未選擇檔案';
+    clear.hidden = !file;
+  };
+  clear.addEventListener('click', () => {input.value = ''; update();});
+  input.addEventListener('change', update); filePickerUpdates.set(input, update);
+  picker.append(choose, name, clear); container.append(picker); update();
+  return picker;
+}
+mountFilePicker(byId('create-attachment'), byId('create-attachment-field'));
+
 function openOperations(title, submit) {
   byId('operations-title').textContent = title;
   byId('operations-fields').replaceChildren(); byId('operations-message').textContent = '';
@@ -36,7 +55,7 @@ function openOperations(title, submit) {
 }
 
 function formField(label, kind = 'text', value = '', choices = null) {
-  const wrapper = element('label', kind === 'textarea' || kind === 'file' ? 'wide' : '', label);
+  const wrapper = element(kind === 'file' ? 'div' : 'label', kind === 'textarea' || kind === 'file' ? 'wide' : '', label);
   const input = element(kind === 'select' ? 'select' : kind === 'textarea' ? 'textarea' : 'input');
   if (kind !== 'select' && kind !== 'textarea') input.type = kind;
   if (kind === 'select') fillSelect(input, choices || [], '請選擇');
@@ -45,6 +64,7 @@ function formField(label, kind = 'text', value = '', choices = null) {
   if (kind === 'textarea') input.maxLength = 10000;
   if (kind === 'file') input.accept = '.txt,.asc';
   wrapper.append(input); byId('operations-fields').append(wrapper);
+  if (kind === 'file') {input.setAttribute('aria-label', label); mountFilePicker(input, wrapper);}
   fieldContainers.set(input, wrapper);
   return input;
 }
@@ -469,6 +489,10 @@ async function editMaster(kind, record = null) {
 async function renderDetailFeatures(record, container, stillCurrent) {
   const [meta, chainResult] = await Promise.all([api(`/api/repairs/records/${encodeURIComponent(record.id)}/attachment`), api(`/api/repairs/records/${encodeURIComponent(record.id)}/chain`)]);
   if (!stillCurrent()) return;
+  const previousAttempt = chainResult.data.find(row => row.id === record.retry_of_record_id);
+  if (previousAttempt?.current_status === '結案（FAIL）' && !['結案（PASS）','結案（FAIL）'].includes(record.current_status)) {
+    container.append(element('p', 'notice retry-warning', '上次維修未完成（前一輪結案結果為 FAIL）；本輪仍待處理。'));
+  }
   const fileSection = element('section', 'detail-section'); fileSection.append(element('h3', '', 'Fail Log'));
   if (meta.data) {
     fileSection.append(element('p', '', `${meta.data.filename} · ${meta.data.file_size} bytes`));
@@ -485,7 +509,9 @@ async function renderDetailFeatures(record, container, stillCurrent) {
   } else {
     fileSection.append(element('p', 'hint', '尚無附件。非空 .txt／.asc，最大 5 MB。'));
     const picker = element('input'); picker.type = 'file'; picker.accept = '.txt,.asc';
-    fileSection.append(picker, action('上傳 Fail Log', async () => {
+    picker.setAttribute('aria-label', '選擇此案 Fail Log');
+    fileSection.append(picker); mountFilePicker(picker, fileSection);
+    fileSection.append(action('上傳 Fail Log', async () => {
       if (!picker.files?.[0]) throw new Error('請先選擇檔案');
       const attachment = await encodeFile(picker.files[0]);
       await api(`/api/repairs/records/${encodeURIComponent(record.id)}/attachment`, 'POST', {expected_version:record.version, attachment});
@@ -496,19 +522,25 @@ async function renderDetailFeatures(record, container, stillCurrent) {
   container.append(renderRepairChain(record, chainResult.data), action('查看此 S/N 的 DBN', () => {detail.close(); return openWorkspace('dbn', record.serial_no);}));
   if (record.current_status === '取回驗證') {
     const resolve = element('section', 'detail-section'); resolve.append(element('h3', '', '驗證結果'));
-    if (record.repair_amount == null) resolve.append(element('p', 'hint', '金額未設定，請先補齊價格並編輯案件，再結案。'));
-    else resolve.append(action('PASS・成功維修', async () => {
+    const passButton = action('PASS・成功維修', async () => {
       if (!window.confirm('確認 PASS 結案？')) return;
       await api(`/api/repairs/records/${encodeURIComponent(record.id)}/resolve`, 'POST', {expected_version:record.version, passed:true});
       await refreshFeatures(); await openDetail(record.id);
-    }), action('FAIL・建立下一筆維修', () => retryRepair(record)));
+    });
+    const failButton = action('FAIL・建立下一筆維修', () => retryRepair(record), 'button danger');
+    passButton.disabled = failButton.disabled = record.repair_amount == null;
+    resolve.append(passButton, failButton);
+    if (record.repair_amount == null) resolve.append(element('p', 'hint', '金額未設定，請先補齊價格，在編輯案件時勾選「重新套用目前價目」並儲存，再結案。'));
     container.append(resolve);
   }
-  container.append(action('刪除此筆送修', async () => {
+  const deleteButton = action('刪除此筆送修', async () => {
     if (!window.confirm(`永久刪除 ${record.serial_no} 的這筆送修及附件？連續送修鏈不允許刪除。`)) return;
     await api('/api/repairs/records/' + encodeURIComponent(record.id), 'DELETE', {expected_version:record.version});
     detail.close(); selectedRecord = null; await refreshFeatures();
-  }));
+  }, 'button danger');
+  deleteButton.disabled = chainResult.data.length > 1;
+  container.append(deleteButton);
+  if (deleteButton.disabled) container.append(element('p', 'hint', '此案屬於連續送修鏈，不能單獨刪除，以保留各輪追溯關係。'));
 }
 
 function renderRepairChain(record, rows) {

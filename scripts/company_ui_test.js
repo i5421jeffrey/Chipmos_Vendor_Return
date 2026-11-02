@@ -7,6 +7,8 @@ class TestNode {
     this._text = ''; this.classList = {toggle(){}};
   }
   set textContent(text) {this._text = String(text); this.children = [];}
+  set value(value) {this._value = value; if (this.type === 'file' && value === '') this.files = [];}
+  get value() {return this._value;}
   get textContent() {return this._text + this.children.map(child => child.textContent).join('');}
   set innerHTML(value) {throw Error('User data must not be rendered with innerHTML');}
   append(...nodes) {
@@ -24,6 +26,7 @@ class TestNode {
   showModal() {this.open = true;}
   close() {this.open = false;}
   focus() {}
+  click() {this.clicks = (this.clicks || 0) + 1;}
   reportValidity() {return true;}
   get elements() {
     if (this._elements) return this._elements;
@@ -73,6 +76,7 @@ const document = {
 const testRecord = {id:'record-1', serial_no:'002850948', machine_code:'F45', model:'T5377S', description:'HVDR PE', board_part_code:'BPR-030837', failure_tag:'RTE', failure_description:'<script>not markup</script>', repair_type:'板修', repair_amount:0, current_status:'待送修', is_opened:false, occurred_on:'2026-11-02', sent_on:null, returned_on:null, version:1};
 const testDbn = {id:'dbn-1',serial_no:'002850948',machine_code:'F45',model:'T5377S',board_name:'HVDR PE',board_part_code:'BPR-030837',customer_code:'AB',product_code:'JAA118',station_code:'CP1',issue_type:'Group',dut:'1-2',dut_pin_snapshot:{'1':['COMMON','ONE'], '2':['COMMON','TWO']},socket_file_id:'socket-1',created_at:'2026-11-02T00:00:00Z',version:1};
 const requests = [];
+let featureChain = null;
 async function fetch(path, options = {}) {
   requests.push({path:String(path), options});
   let data;
@@ -86,7 +90,7 @@ async function fetch(path, options = {}) {
   else if (String(path).includes('/serial-summary')) data = {serial_no:'002850948',mapping:{board_name:'HVDR PE',board_part_code:'BPR-030837'},models:['T5377S'],machines:['F45']};
   else if (String(path).includes('/history')) data = {data:[{operation:'INSERT', source_table:'repair_records', changes:{description:{old:null,new:'HVDR PE'}}, changed_at:'2026-11-02T00:00:00Z', serial_no:testRecord.serial_no, board_name:testRecord.description}],total:1,page:1};
   else if (String(path).includes('/attachment')) data = {data:null};
-  else if (String(path).includes('/chain')) data = {data:[{...testRecord,attachment:null}]};
+  else if (String(path).includes('/chain')) data = {data:featureChain || [{...testRecord,attachment:null}]};
   else if (String(path).includes('/dbn/catalog')) data = {customers:['AB','VB'],combinations:[{customer_code:'AB',product_code:'JAA118',station_code:'CP1'}],sockets:[]};
   else if (String(path).startsWith('/api/repairs/dbn?')) data = {data:[{...testDbn}], total:1, page:1, page_size:20};
   else if (String(path).startsWith('/api/repairs/mappings?')) data = {data:[{serial_no:'002850948',board_name:'HVDR PE',board_part_code:'BPR-030837',version:1}],total:1,page:1,page_size:20};
@@ -105,6 +109,15 @@ function assert(ok, message) {if (!ok) throw Error(message);}
   // Let the bootstrap's immediate mocked promises finish first.
   for (let i = 0; i < 10; i++) await Promise.resolve();
   assert(catalogs && !nodes.create.disabled, 'Catalog loads without cloud SDK');
+  const selectedFile = new TestNode('input'); selectedFile.type = 'file';
+  const pickerContainer = new TestNode(), picker = mountFilePicker(selectedFile, pickerContainer);
+  assert(selectedFile.hidden && picker.textContent.includes('尚未選擇檔案'), 'Shared picker replaces native file appearance without uploading');
+  picker.children[0].listeners.click[0]();
+  assert(selectedFile.clicks === 1, 'Picker opens the native file selection dialog');
+  selectedFile.files = [{name:'<log>.asc',size:1024}]; selectedFile.listeners.change[0]();
+  assert(picker.textContent.includes('<log>.asc · 1 KB') && !picker.children[2].hidden, 'Picker displays untrusted filename as text and file size');
+  picker.children[2].listeners.click[0]();
+  assert(!selectedFile.files.length && picker.children[2].hidden && picker.textContent.includes('尚未選擇檔案'), 'Clearing selection resets only the local input');
   assert(navigation.length === 6 && counters.length === 6, 'All status navigation entries exist');
   assert(nodes.records.children.length === 1, 'Original-style list renders');
   assert(nodes.records.children[0].children.length === 6, 'List retains original six-column structure');
@@ -121,6 +134,17 @@ function assert(ok, message) {if (!ok) throw Error(message);}
   assert(nodes['quick-results'].children[0].className === 'quick-board-summary', 'Quick search restores original board summary');
   assert(nodes['quick-results'].children.filter(node => node.className === 'quick-result-section').length === 2, 'Quick results have separate repair and DBN sections');
   await openDetail(testRecord.id);
+  featureChain = [{...testRecord,current_status:'結案（FAIL）'}, {...testRecord,id:'retry-2',retry_of_record_id:testRecord.id,current_status:'取回驗證',repair_amount:null}];
+  const featureContainer = new TestNode();
+  await renderDetailFeatures(featureChain[1], featureContainer, () => true);
+  assert(featureContainer.textContent.includes('上次維修未完成'), 'Active retries visibly warn of preceding FAIL');
+  const resolveSection = featureContainer.children.find(node => node.textContent.includes('驗證結果'));
+  assert(resolveSection.children.filter(node => node.tag === 'button').every(node => node.disabled), 'Unset price blocks both verification outcomes');
+  assert(featureContainer.children.find(node => node.textContent === '刪除此筆送修').disabled, 'Retry chains visibly disable unsupported deletion');
+  const staleContainer = new TestNode();
+  await renderDetailFeatures(featureChain[1], staleContainer, () => false);
+  assert(!staleContainer.children.length, 'Late detail feature responses cannot populate a different record');
+  featureChain = null;
   assert(nodes['record-detail'].open, 'Right-side detail opens');
   assert(nodes['detail-content'].textContent.includes('0'), 'Zero price is not replaced by unset');
   assert(nodes['detail-content'].textContent.includes('維修時程'), 'Original repair timeline appears');
@@ -142,6 +166,15 @@ function assert(ok, message) {if (!ok) throw Error(message);}
   await nodes['edit-detail'].listeners.click[0]();
   assert(!nodes['record-detail'].open && nodes.editor.open, 'Detail transitions to edit dialog');
   assert(nodes.board.disabled && nodes.part.value === 'BPR-030837', 'Serial mapping locks board and PN');
+  assert(nodes['repair-amount-preview'].textContent.includes('0 元（保留原金額）'), 'Edit preview keeps recorded zero even without current price');
+  nodes.reprice.checked = true; nodes.reprice.listeners.change[0]();
+  assert(nodes['repair-amount-preview'].textContent.includes('未設定（目前價目）'), 'Explicit reprice switches to current catalog preview');
+  const beforeCancel = requests.filter(request => request.options.method === 'PUT').length;
+  window.confirm = () => false;
+  await nodes['record-form'].listeners.submit[0]({preventDefault(){}});
+  assert(requests.filter(request => request.options.method === 'PUT').length === beforeCancel && nodes.editor.open && !saving, 'Cancelling reprice preserves form and sends no write');
+  window.confirm = () => true;
+  nodes.reprice.checked = false; nodes.reprice.listeners.change[0]();
   let cancelled = false;
   nodes.editor.listeners.cancel[0]({preventDefault(){cancelled=true;}});
   assert(cancelled && nodes.editor.open, 'Escape cannot discard edit');
@@ -150,6 +183,8 @@ function assert(ok, message) {if (!ok) throw Error(message);}
   assert(nodes.editor.open && nodes['failure-description'].value === '保留未儲存描述', 'Conflict preserves entered data');
   assert(nodes['form-message'].textContent.includes('此紀錄已被其他人修改'), 'Conflict is shown');
   assert(!nodes.save.disabled && nodes.board.disabled, 'Controls recover and mapped board stays locked');
+  const editWrite = requests.find(request => request.options.method === 'PUT' && request.path.endsWith('/record-1'));
+  assert(JSON.parse(editWrite.options.body).reprice === false, 'Ordinary edit does not implicitly request repricing');
   nodes.editor.close();
   await openWorkspace('dbn');
   assert(!nodes['workspace-view'].hidden && nodes['records-view'].hidden, 'DBN workspace opens');

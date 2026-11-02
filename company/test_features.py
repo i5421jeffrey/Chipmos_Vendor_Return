@@ -78,6 +78,38 @@ class FeatureTests(unittest.TestCase):
             with self.assertRaises(APIError):
                 ops.history(self.path, invalid)
 
+    def test_ordinary_edits_preserve_prices_and_explicit_reprice_updates(self):
+        for index, original in enumerate((None, 0, 12345)):
+            with self.subTest(original=original):
+                with connect(self.path) as connection:
+                    connection.execute('UPDATE repair_board_prices SET board_repair_cents=?', (original,))
+                payload = example(serial_no=str(index + 100))
+                row = service.save_record(self.path, payload)['data']
+                with connect(self.path) as connection:
+                    connection.execute('UPDATE repair_board_prices SET board_repair_cents=98765')
+                updated = service.save_record(self.path, dict(payload, expected_version=1, failure_description='只修改描述'), row['id'])['data']
+                self.assertEqual(updated['repair_amount'], None if original is None else original / 100)
+                event = service.list_history(self.path, row['id'])['data'][0]
+                self.assertNotIn('repair_amount', event['changes'])
+                repriced = service.save_record(self.path, dict(payload, expected_version=2, reprice=True), row['id'])['data']
+                self.assertEqual(repriced['repair_amount'], 987.65)
+                self.assertIn('repair_amount', service.list_history(self.path, row['id'])['data'][0]['changes'])
+                with self.assertRaises(APIError):
+                    service.save_record(self.path, dict(payload, expected_version=3, reprice='yes'), row['id'])
+
+    def test_closed_edits_preserve_price_and_type_change_reprices(self):
+        row = self.ready(repair_type='合約')
+        closed = ops.resolve(self.path, row['id'], {'expected_version':row['version'], 'passed':True})['data']
+        with connect(self.path) as connection:
+            connection.execute('UPDATE repair_board_prices SET contract_repair_cents=12345,external_repair_cents=23456')
+        payload = example(repair_type='合約', current_status=closed['current_status'], sent_on='2026-11-02', returned_on='2026-11-02', expected_version=closed['version'])
+        updated = service.save_record(self.path, payload, row['id'])['data']
+        self.assertEqual(updated['repair_amount'], closed['repair_amount'])
+        self.assertEqual(updated['closed_on'], closed['closed_on'])
+        repriced = service.save_record(self.path, dict(payload, expected_version=updated['version'], repair_type='外修'), row['id'])['data']
+        self.assertEqual(repriced['repair_amount'], 234.56)
+        self.assertEqual(repriced['current_status'], closed['current_status'])
+
     def test_dbn_snapshot_is_historical(self):
         row = ops.save_dbn(self.path, dbn())['data']
         self.assertEqual(row['serial_no'], '002850948')
