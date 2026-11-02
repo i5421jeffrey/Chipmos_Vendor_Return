@@ -47,7 +47,7 @@
     </section>
     <section id="workspace-view" hidden>
       <div class="title-row"><div><h1 id="workspace-title"></h1><p id="workspace-description"></p></div><div id="workspace-actions" class="actions"></div></div>
-      <form id="workspace-search" class="toolbar"><input id="workspace-query" type="search" placeholder="搜尋 S/N、板名或相關資訊" aria-label="管理清單搜尋"><button>查詢</button></form>
+      <form id="workspace-search" class="toolbar"><input id="workspace-query" type="search" maxlength="200" placeholder="搜尋 S/N、板名或相關資訊" aria-label="管理清單搜尋"><button>查詢</button></form>
       <div id="history-filters" class="history-filters" hidden>
         <label>資料類型<select id="history-source" form="workspace-search"><option value="">全部</option><option value="repair_records">送修</option><option value="dbn_records">DBN</option><option value="serial_board_mappings">S/N 對應</option><option value="repair_machine_models">機台對應</option><option value="repair_model_boards">板件對應</option><option value="repair_board_prices">價格</option><option value="repair_attachments">附件</option></select></label>
         <label>操作<select id="history-operation" form="workspace-search"><option value="">全部</option><option value="INSERT">新增</option><option value="UPDATE">修改</option><option value="DELETE">刪除</option></select></label>

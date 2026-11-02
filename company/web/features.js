@@ -101,7 +101,8 @@ function openWorkspace(kind, number = '') {
   byId('workspace-title').textContent = workspaceTitles[kind];
   byId('workspace-description').textContent = descriptions[kind];
   byId('workspace-query').value = ''; byId('workspace-actions').replaceChildren();
-  byId('workspace-search').hidden = ['statistics', 'masters'].includes(kind);
+  byId('workspace-search').hidden = kind === 'statistics';
+  byId('workspace-query').placeholder = kind === 'masters' ? '搜尋機台、Model、板件名稱或 Part Number' : '搜尋 S/N、板名或相關資訊';
   byId('stats-controls').hidden = kind !== 'statistics';
   byId('workspace-pager').hidden = ['statistics', 'masters'].includes(kind);
   byId('history-filters').hidden = kind !== 'history';
@@ -114,7 +115,7 @@ function openWorkspace(kind, number = '') {
 }
 
 for (const button of document.querySelectorAll('[data-workspace]')) button.addEventListener('click', () => openWorkspace(button.dataset.workspace));
-byId('workspace-search').addEventListener('submit', event => {event.preventDefault(); workspaceSerial = ''; workspacePage = 1; loadWorkspace();});
+byId('workspace-search').addEventListener('submit', event => {event.preventDefault(); workspaceSerial = ''; workspacePage = 1; return loadWorkspace();});
 byId('workspace-previous').addEventListener('click', () => {workspacePage--; loadWorkspace();});
 byId('workspace-next').addEventListener('click', () => {workspacePage++; loadWorkspace();});
 byId('ranking-sort').addEventListener('change', loadWorkspace);
@@ -148,8 +149,8 @@ async function loadWorkspace() {
     if (kind === 'statistics') {renderStatistics(result, content); return;}
     if (kind === 'masters') {
       masterData = result;
-      renderMasters(result, content);
-      byId('workspace-message').textContent = '主檔不自動改寫歷史案件。'; return;
+      const matches = renderMasters(result, content, byId('workspace-query').value);
+      byId('workspace-message').textContent = `顯示 ${matches} 筆對應；主檔不自動改寫歷史案件。`; return;
     }
     workspacePage = result.page;
     if (kind === 'dbn') content.append(workspaceHeading(['S/N','板件名稱','機台','客戶','產品','站點','紀錄日期','操作'], 'dbn-heading'));
@@ -417,18 +418,26 @@ async function editMapping(record = null) {
   board.addEventListener('change', preview); preview(); number.focus();
 }
 
-function renderMasters(result, container) {
+function renderMasters(result, container, query = '') {
+  // Filter the fetched snapshot for display only; keep the full token/data for editing.
+  const terms = query.trim().slice(0, 200).toLocaleUpperCase().split(/\s+/).filter(Boolean);
+  let matches = 0;
   const groups = [
     ['machines','machine','機台／機型', [['machine_code','機台'],['model','Model']]],
     ['boards','board','板件對應', [['model','Model'],['board_name','板件名稱'],['board_part_code','Part Number']]],
     ['prices','price','價格（元；未設定不等於零元）', [['model','Model'],['board_name','板件名稱'],['board_part_code','Part Number'],['board_repair_cents','板修'],['external_repair_cents','外修'],['contract_repair_cents','合約'],['warranty_repair_cents','保固']]]
   ];
   for (const [key, kind, title, columns] of groups) {
-    const section = element('section', 'master-section'); section.append(element('h2', '', title));
+    const records = result[key].filter(record => {
+      const identity = columns.filter(([field]) => !field.endsWith('_cents')).map(([field]) => record[field] ?? '').join(' ').toLocaleUpperCase();
+      return terms.every(term => identity.includes(term));
+    });
+    matches += records.length;
+    const section = element('section', 'master-section'); section.append(element('h2', '', `${title}（${records.length}／${result[key].length} 筆）`));
     const wrapper = element('div', 'table-wrap'), grid = element('table'), head = element('thead'), header = element('tr'), body = element('tbody');
     for (const label of [...columns.map(([,label]) => label), '操作']) header.append(element('th', '', label));
     head.append(header); grid.append(head, body);
-    for (const record of result[key]) {
+    for (const record of records) {
       const row = element('tr');
       for (const [field] of columns) {
         const value = record[field];
@@ -437,9 +446,10 @@ function renderMasters(result, container) {
       const controls = element('td'); controls.append(action('修改', () => editMaster(kind, record))); row.append(controls); body.append(row);
     }
     wrapper.append(grid); section.append(wrapper);
-    if (!result[key].length) section.append(element('p', 'hint', '尚無對應資料，可使用上方按鈕新增。'));
+    if (!records.length) section.append(element('p', 'hint', result[key].length ? '沒有符合搜尋條件的對應；清空搜尋後可顯示全部。' : '尚無對應資料，可使用上方按鈕新增。'));
     container.append(section);
   }
+  return matches;
 }
 
 async function editMaster(kind, record = null) {

@@ -60,6 +60,9 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             '- 機台／板件／價格清單使用中文欄名，價格以元顯示並區分未設定與零元；逐列「修改」帶入原值並鎖定識別欄位。板件的 PN、機台的 '
                                             'Model 仍可修改；價格只能改該組識別下的金額。清單讀取後若主檔 token 改變，阻止開啟舊列編輯；儲存仍有後端 '
                                             'token 衝突保護。新增識別使用上方新增／修改表單。尚未經公司端驗收。\n'
+                                            '- **保留「機台／板件／價格對應」側欄與完整維護功能**，不因原版外觀還原而移除。支援機台、Model、板名、PN '
+                                            '搜尋（不分大小寫，空白分隔的條件須全部命中）；各表獨立篩選識別欄位並顯示命中／總筆數，金額不作為識別搜尋條件。清空搜尋再查詢可看全部。搜尋只影響顯示，不修改主檔、不重設價目，也不改變版本衝突 '
+                                            'token。\n'
                                             '- 異動紀錄提供資料類型、操作、開始／結束日期篩選及舊值／新值六欄表格；日期依台北時區、包含結束日，搜尋包含異動內容並將 '
                                             '`%`／`_` 視為文字。以每頁 20 個事件分頁，同一事件的變更欄位一併顯示（不同於原版每頁 10 '
                                             '個欄位）；新增／刪除也保留各欄細節，不隱藏來源紀錄。尚非具名人員稽核。\n'
@@ -296,7 +299,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             '產生；公司版程式更新後必須重新產生。\n'
                                             '安裝測試：`python -m unittest discover -s scripts -p '
                                             '"test_company_installer.py" -v`。\n',
-                                 'sha256': '1dce599291420a3c7446b56126b31aac8aec407de20c23b37ce862a670775b6a'},
+                                 'sha256': 'df36e537488409aa660c62092142eef40a4053742f598f45b0e0fd434ba7e42a'},
            'company/database.py': {'content': '"""Shared SQLite connections and additive, backed-up module '
                                               'migrations."""\n'
                                               'import json\n'
@@ -5483,8 +5486,11 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   'descriptions[kind];\n'
                                                   "  byId('workspace-query').value = ''; "
                                                   "byId('workspace-actions').replaceChildren();\n"
-                                                  "  byId('workspace-search').hidden = ['statistics', "
-                                                  "'masters'].includes(kind);\n"
+                                                  "  byId('workspace-search').hidden = kind === "
+                                                  "'statistics';\n"
+                                                  "  byId('workspace-query').placeholder = kind === "
+                                                  "'masters' ? '搜尋機台、Model、板件名稱或 Part Number' : '搜尋 "
+                                                  "S/N、板名或相關資訊';\n"
                                                   "  byId('stats-controls').hidden = kind !== 'statistics';\n"
                                                   "  byId('workspace-pager').hidden = ['statistics', "
                                                   "'masters'].includes(kind);\n"
@@ -5509,7 +5515,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   'openWorkspace(button.dataset.workspace));\n'
                                                   "byId('workspace-search').addEventListener('submit', event "
                                                   "=> {event.preventDefault(); workspaceSerial = ''; "
-                                                  'workspacePage = 1; loadWorkspace();});\n'
+                                                  'workspacePage = 1; return loadWorkspace();});\n'
                                                   "byId('workspace-previous').addEventListener('click', () "
                                                   '=> {workspacePage--; loadWorkspace();});\n'
                                                   "byId('workspace-next').addEventListener('click', () => "
@@ -5570,9 +5576,10 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   'content); return;}\n'
                                                   "    if (kind === 'masters') {\n"
                                                   '      masterData = result;\n'
-                                                  '      renderMasters(result, content);\n'
-                                                  "      byId('workspace-message').textContent = "
-                                                  "'主檔不自動改寫歷史案件。'; return;\n"
+                                                  '      const matches = renderMasters(result, content, '
+                                                  "byId('workspace-query').value);\n"
+                                                  "      byId('workspace-message').textContent = `顯示 "
+                                                  '${matches} 筆對應；主檔不自動改寫歷史案件。`; return;\n'
                                                   '    }\n'
                                                   '    workspacePage = result.page;\n'
                                                   "    if (kind === 'dbn') "
@@ -6088,7 +6095,12 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   'number.focus();\n'
                                                   '}\n'
                                                   '\n'
-                                                  'function renderMasters(result, container) {\n'
+                                                  "function renderMasters(result, container, query = '') {\n"
+                                                  '  // Filter the fetched snapshot for display only; keep '
+                                                  'the full token/data for editing.\n'
+                                                  '  const terms = query.trim().slice(0, '
+                                                  '200).toLocaleUpperCase().split(/\\s+/).filter(Boolean);\n'
+                                                  '  let matches = 0;\n'
                                                   '  const groups = [\n'
                                                   "    ['machines','machine','機台／機型', "
                                                   "[['machine_code','機台'],['model','Model']]],\n"
@@ -6100,15 +6112,24 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   "Number'],['board_repair_cents','板修'],['external_repair_cents','外修'],['contract_repair_cents','合約'],['warranty_repair_cents','保固']]]\n"
                                                   '  ];\n'
                                                   '  for (const [key, kind, title, columns] of groups) {\n'
+                                                  '    const records = result[key].filter(record => {\n'
+                                                  '      const identity = columns.filter(([field]) => '
+                                                  "!field.endsWith('_cents')).map(([field]) => record[field] "
+                                                  "?? '').join(' ').toLocaleUpperCase();\n"
+                                                  '      return terms.every(term => '
+                                                  'identity.includes(term));\n'
+                                                  '    });\n'
+                                                  '    matches += records.length;\n'
                                                   "    const section = element('section', 'master-section'); "
-                                                  "section.append(element('h2', '', title));\n"
+                                                  "section.append(element('h2', '', "
+                                                  '`${title}（${records.length}／${result[key].length} 筆）`));\n'
                                                   "    const wrapper = element('div', 'table-wrap'), grid = "
                                                   "element('table'), head = element('thead'), header = "
                                                   "element('tr'), body = element('tbody');\n"
                                                   '    for (const label of [...columns.map(([,label]) => '
                                                   "label), '操作']) header.append(element('th', '', label));\n"
                                                   '    head.append(header); grid.append(head, body);\n'
-                                                  '    for (const record of result[key]) {\n'
+                                                  '    for (const record of records) {\n'
                                                   "      const row = element('tr');\n"
                                                   '      for (const [field] of columns) {\n'
                                                   '        const value = record[field];\n'
@@ -6122,10 +6143,12 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   'record))); row.append(controls); body.append(row);\n'
                                                   '    }\n'
                                                   '    wrapper.append(grid); section.append(wrapper);\n'
-                                                  "    if (!result[key].length) section.append(element('p', "
-                                                  "'hint', '尚無對應資料，可使用上方按鈕新增。'));\n"
+                                                  "    if (!records.length) section.append(element('p', "
+                                                  "'hint', result[key].length ? '沒有符合搜尋條件的對應；清空搜尋後可顯示全部。' : "
+                                                  "'尚無對應資料，可使用上方按鈕新增。'));\n"
                                                   '    container.append(section);\n'
                                                   '  }\n'
+                                                  '  return matches;\n'
                                                   '}\n'
                                                   '\n'
                                                   'async function editMaster(kind, record = null) {\n'
@@ -6539,7 +6562,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '= index + 1; last = row.count; return [rank, row.machine, '
                                                   'row.count];}))); container.append(rankingCard);\n'
                                                   '}\n',
-                                       'sha256': '2cf9290d42c474092828b4c60bda418532fd5fe251e942f6f638e9ee1eb11d37'},
+                                       'sha256': '340d54f1f22b1de76e6383d262227fbd668fc7a8917f99bdf406cb7bb0195fae'},
            'company/web/index.html': {'content': '<!doctype html>\n'
                                                  '<html lang="zh-Hant">\n'
                                                  '<head>\n'
@@ -7403,8 +7426,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    'id="workspace-description"></p></div><div '
                                                    'id="workspace-actions" class="actions"></div></div>\n'
                                                    '      <form id="workspace-search" class="toolbar"><input '
-                                                   'id="workspace-query" type="search" placeholder="搜尋 '
-                                                   'S/N、板名或相關資訊" '
+                                                   'id="workspace-query" type="search" maxlength="200" '
+                                                   'placeholder="搜尋 S/N、板名或相關資訊" '
                                                    'aria-label="管理清單搜尋"><button>查詢</button></form>\n'
                                                    '      <div id="history-filters" class="history-filters" '
                                                    'hidden>\n'
@@ -7536,7 +7559,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    'type="submit">儲存</button></div></form></dialog>\n'
                                                    '</body>\n'
                                                    '</html>\n',
-                                        'sha256': '29fb45d8aa95a9bb6a764b35cb7c75010f4446743ca2674dd382f86df27dc1f7'},
+                                        'sha256': '4ae26e426bcc221c3003646dcbdaacf0b00d97b204dd0bda25204986a32b67f1'},
            'company/web/repairs.js': {'content': 'const byId = id => document.getElementById(id);\n'
                                                  'let catalogs, current = null, mapping = null, '
                                                  'mappingRequest = 0, saving = false;\n'
@@ -8121,7 +8144,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                 '@media(max-width:600px){main{margin:25px auto;padding:0 '
                                                 '16px}h1{font-size:22px}section{padding:18px}dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:10px}}\n',
                                      'sha256': '064406c8758be5620dfe7440f59d59ec1de5f6307e74f5bad85dd03e018c0769'}},
- 'version': '2026-11-02-price-snapshots'}
+ 'version': '2026-11-02-master-search'}
 
 
 def check_local_path(path):
