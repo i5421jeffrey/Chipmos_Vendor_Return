@@ -5,7 +5,7 @@ let quickRequest = 0, detailRequest = 0, selectedRecord = null, serialFilter = '
 let quickSerial = '';
 const editor = byId('editor');
 const detail = byId('record-detail');
-const fieldLabels = {serial_no:'S/N', machine_code:'機台', model:'機型', description:'板件名稱', board_part_code:'Part Number', failure_tag:'異常類別', failure_description:'異常描述', repair_type:'維修分類', repair_amount:'維修金額', current_status:'狀態', is_opened:'已開單', occurred_on:'損壞日期', sent_on:'送修日期', returned_on:'回修日期'};
+const fieldLabels = {serial_no:'S/N', machine_code:'機台', model:'機型', description:'板件名稱', board_part_code:'Part Number', failure_tag:'異常類別', failure_description:'異常描述', repair_type:'維修分類', repair_amount:'維修金額', current_status:'狀態', is_opened:'已開單', occurred_on:'損壞日期', sent_on:'送修日期', returned_on:'回修日期', attachment:'Fail Log', closed_on:'結案日期', retry_of_record_id:'前次案件'};
 
 async function api(path, method = 'GET', body) {
   const options = {method, cache:'no-store', headers:{'X-SPMS-Request':'1'}};
@@ -46,6 +46,8 @@ function updateCounts(counts) {
 }
 
 function setView(quick, status = '') {
+  byId('workspace-view').hidden = true;
+  for (const button of document.querySelectorAll('[data-workspace]')) button.removeAttribute('aria-current');
   byId('quick-view').hidden = !quick;
   byId('records-view').hidden = quick;
   byId('nav-quick').toggleAttribute('aria-current', quick);
@@ -72,8 +74,11 @@ function renderRecord(record) {
   main.append(element('span', 'state-symbol', symbol), copy);
   const tags = element('span', 'record-tags');
   tags.append(element('span', 'failure-tag', record.failure_tag), element('span', 'repair-tag', record.repair_type));
-  row.append(main, statusPill(record.current_status), tags, element('span', 'dbn-pending', '尚未移植'),
-    element('span', 'machine-cell', record.machine_code), element('span', 'date-cell', record.occurred_on));
+  const dbn = element('span', 'dbn-link', record.dbn_count ? `DBN ${record.dbn_count}` : '—');
+  if (record.dbn_count) dbn.addEventListener('click', event => {event.stopPropagation(); openWorkspace('dbn', record.serial_no);});
+  const date = {'已送修':record.sent_on, '取回驗證':record.returned_on, '結案（PASS）':record.returned_on, '結案（FAIL）':record.returned_on}[byId('status-filter').value] || record.occurred_on;
+  row.append(main, statusPill(record.current_status), tags, dbn,
+    element('span', 'machine-cell', record.machine_code), element('span', 'date-cell', date));
   row.addEventListener('click', () => openDetail(record.id));
   return row;
 }
@@ -101,16 +106,21 @@ async function openDetail(id) {
     selectedRecord = record;
     byId('detail-serial').textContent = record.serial_no;
     byId('detail-title').textContent = record.description;
-    byId('edit-detail').disabled = !catalogs?.statuses.includes(record.current_status);
+    byId('edit-detail').disabled = !catalogs;
     const body = byId('detail-content');
     body.replaceChildren(statusPill(record.current_status));
     body.append(detailSection('板件資訊', [['機台', record.machine_code], ['Model', record.model],
       ['S/N', record.serial_no], ['Part Number', record.board_part_code], ['是否開單', record.is_opened ? 'O' : 'X']]));
     body.append(detailSection('維修資訊', [['維修分類', record.repair_type], ['維修金額', record.repair_amount == null ? '未設定' : record.repair_amount.toLocaleString('zh-TW')],
-      ['損壞日期', record.occurred_on], ['送修日期', record.sent_on], ['回修日期', record.returned_on], ['異常類別', record.failure_tag]]));
+      ['損壞日期', record.occurred_on], ['送修日期', record.sent_on], ['回修日期', record.returned_on], ['結案日期', record.closed_on], ['異常類別', record.failure_tag]]));
+    if (record.sent_on && record.returned_on) {
+      body.append(element('p', 'hint', `損壞→送修 ${Math.round((Date.parse(record.sent_on) - Date.parse(record.occurred_on)) / 86400000)} 天 · 送修→回修 ${Math.round((Date.parse(record.returned_on) - Date.parse(record.sent_on)) / 86400000)} 天`));
+    }
     const failure = element('section', 'detail-section');
     failure.append(element('h3', '', '異常描述'), element('div', 'detail-text', record.failure_description));
-    body.append(failure, element('p', 'detail-note', '附件、結案／再次送修及跨案件連續送修歷史尚未移植。本筆新增／修改紀錄可從「編輯／異動」查看。'));
+    body.append(failure);
+    if (typeof renderDetailFeatures === 'function') await renderDetailFeatures(record, body, () => request === detailRequest);
+    if (request !== detailRequest) return;
     if (!detail.open) detail.showModal();
   } catch (error) {
     if (request !== detailRequest) return;
@@ -119,6 +129,7 @@ async function openDetail(id) {
 }
 
 byId('close-detail').addEventListener('click', () => {detailRequest++; detail.close();});
+detail.addEventListener('cancel', () => {detailRequest++;});
 byId('edit-detail').addEventListener('click', async () => {
   if (!selectedRecord) return;
   const button = byId('edit-detail');
@@ -142,8 +153,8 @@ async function searchSerial() {
   byId('quick-results').replaceChildren();
   try {
     const query = new URLSearchParams({serial});
-    const [records, master] = await Promise.all([api('/api/repairs/records?' + query),
-      api('/api/repairs/serial-mapping?' + query)]);
+    const [records, master, dbn] = await Promise.all([api('/api/repairs/records?' + query),
+      api('/api/repairs/serial-mapping?' + query), api('/api/repairs/dbn?' + query)]);
     if (request !== quickRequest) return;
     quickSerial = serial;
     updateCounts(records.status_counts);
@@ -166,7 +177,14 @@ async function searchSerial() {
       all.addEventListener('click', () => {serialFilter = serial; byId('query').value = ''; setView(false); page = 1; loadRecords();});
       byId('quick-results').append(all);
     }
-    byId('quick-message').textContent = records.total ? '點選紀錄查看詳細資料。' : '此 S/N 尚無本機送修紀錄。';
+    const dbnHeading = element('h2', '', `DBN 紀錄（${dbn.total} 筆）`);
+    byId('quick-results').append(dbnHeading);
+    if (typeof renderDbnCard === 'function') for (const row of dbn.data) byId('quick-results').append(renderDbnCard(row));
+    if (dbn.total > 20) {
+      const allDbn = element('button', 'quick-card', '前往 DBN 清單查看全部'); allDbn.type = 'button';
+      allDbn.addEventListener('click', () => openWorkspace('dbn', serial)); byId('quick-results').append(allDbn);
+    }
+    byId('quick-message').textContent = records.total || dbn.total ? '點選送修紀錄查看詳細資料。' : '此 S/N 尚無本機送修或 DBN 紀錄。';
   } catch (error) {if (request === quickRequest) byId('quick-message').textContent = error.message;}
 }
 
@@ -192,6 +210,15 @@ function updateBoards(preferred = byId('board').value) {
   byId('mapping-hint').textContent = mapping
     ? `S/N 已綁定 ${mapping.board_name}／${mapping.board_part_code}，板名與 PN 鎖定。${boards.length ? '' : '請選擇相容機台。'}`
     : 'S/N 未綁定時，儲存成功會建立主檔；不會默默修改其他歷史。';
+  updatePricePreview();
+}
+
+function updatePricePreview() {
+  const model = catalogs?.machines.find(row => row.machine_code === byId('machine').value)?.model;
+  const price = catalogs?.prices?.find(row => row.model === model && row.board_name === byId('board').value && row.board_part_code === byId('part').value);
+  const column = {'板修':'board_repair_cents','外修':'external_repair_cents','合約':'contract_repair_cents','保固':'warranty_repair_cents'}[byId('repair-type').value];
+  const amount = price?.[column];
+  byId('repair-amount-preview').textContent = `本次儲存金額：${amount == null ? '未設定' : (amount / 100).toLocaleString('zh-TW') + ' 元'}（依目前本機價目）`;
 }
 
 async function lookupMapping() {
@@ -211,6 +238,7 @@ byId('close').addEventListener('click', closeEditor);
 byId('cancel').addEventListener('click', closeEditor);
 byId('machine').addEventListener('change', () => updateBoards());
 byId('board').addEventListener('change', () => updateBoards());
+byId('repair-type').addEventListener('change', updatePricePreview);
 byId('serial').addEventListener('input', () => {mappingRequest++; mapping = null; updateBoards();});
 byId('serial').addEventListener('blur', () => lookupMapping().catch(error => {byId('form-message').textContent = error.message;}));
 
@@ -219,12 +247,14 @@ async function openEditor(record = null) {
   mapping = null;
   mappingRequest++;
   byId('record-form').reset();
+  byId('create-attachment-field').hidden = Boolean(record);
+  byId('create-attachment').value = '';
   byId('editor-title').textContent = record ? '編輯送修' : '新增送修';
   byId('form-message').textContent = '';
   byId('history').replaceChildren();
   byId('history-section').hidden = !record;
   byId('history-section').open = false;
-  fillSelect(byId('record-status'), record ? catalogs.statuses : ['待送修']);
+  fillSelect(byId('record-status'), record ? (catalogs.statuses.includes(record.current_status) ? catalogs.statuses : [record.current_status]) : ['待送修']);
   for (const [field, value] of Object.entries(record || {})) {
     const input = byId('record-form').elements.namedItem(field);
     if (!input || field === 'description' || field === 'board_part_code') continue;
@@ -245,7 +275,7 @@ async function openEditor(record = null) {
         const item = document.createElement('li');
         const time = new Date(event.changed_at).toLocaleString('zh-TW', {timeZone:'Asia/Taipei', hour12:false});
         if (event.operation === 'INSERT') item.textContent = `${time} 新增 ${event.serial_no}－${event.board_name}`;
-        else item.textContent = `${time} 修改\n` + Object.entries(event.changes).map(([field, change]) => `${fieldLabels[field] || field}：${change.old ?? '—'} → ${change.new ?? '—'}`).join('\n');
+        else item.textContent = `${time} ${event.operation === 'IMPORT' ? '匯入' : '修改'}\n` + Object.entries(event.changes).map(([field, change]) => `${fieldLabels[field] || field}：${typeof change.old === 'object' && change.old !== null ? JSON.stringify(change.old) : change.old ?? '—'} → ${typeof change.new === 'object' && change.new !== null ? JSON.stringify(change.new) : change.new ?? '—'}`).join('\n');
         byId('history').append(item);
       }
     }
@@ -267,6 +297,7 @@ byId('record-form').addEventListener('submit', async event => {
     // Disabled locked fields are deliberately omitted by FormData.
     payload.description = byId('board').value;
     payload.is_opened = byId('is-opened').checked;
+    if (!current && byId('create-attachment').files?.[0]) payload.attachment = await encodeFile(byId('create-attachment').files[0]);
     if (current) payload.expected_version = current.version;
     frozen = [...byId('record-form').elements].map(input => [input, input.disabled]);
     for (const [input] of frozen) input.disabled = true;
@@ -292,12 +323,15 @@ async function loadRecords() {
   byId('previous').disabled = byId('next').disabled = true;
   try {
     const query = new URLSearchParams({q:byId('query').value, status:byId('status-filter').value, page});
+    if (byId('tag-filter').value) query.set('failure_tag', byId('tag-filter').value);
+    if (byId('type-filter').value) query.set('repair_type', byId('type-filter').value);
     if (serialFilter) query.set('serial', serialFilter);
     const result = await api('/api/repairs/records?' + query);
     if (request !== listingRequest) return;
     page = result.page;
     total = result.total;
     updateCounts(result.status_counts);
+    byId('date-heading').textContent = {'已送修':'送修日期','取回驗證':'回修日期','結案（PASS）':'回修日期','結案（FAIL）':'回修日期'}[byId('status-filter').value] || '損壞日期';
     byId('records').replaceChildren();
     for (const record of result.data) byId('records').append(renderRecord(record));
     const first = total ? (page - 1) * 20 + 1 : 0;
@@ -315,6 +349,7 @@ async function loadRecords() {
 byId('search-form').addEventListener('submit', event => {event.preventDefault(); serialFilter = ''; setView(false, byId('status-filter').value); page = 1; loadRecords();});
 byId('previous').addEventListener('click', () => {page--; loadRecords();});
 byId('next').addEventListener('click', () => {page++; loadRecords();});
+for (const id of ['tag-filter', 'type-filter']) byId(id).addEventListener('change', () => {page = 1; loadRecords();});
 
 (async () => {
   try {
@@ -322,6 +357,8 @@ byId('next').addEventListener('click', () => {page++; loadRecords();});
     fillSelect(byId('machine'), catalogs.machines.map(row => row.machine_code), '請選擇機台');
     fillSelect(byId('failure-tag'), catalogs.failure_tags, '請選擇異常類別');
     fillSelect(byId('repair-type'), catalogs.repair_types);
+    fillSelect(byId('tag-filter'), catalogs.failure_tags, '所有異常類別');
+    fillSelect(byId('type-filter'), catalogs.repair_types, '所有維修分類');
     byId('create').disabled = false;
     await loadRecords();
   } catch (error) {byId('message').textContent = error.message; byId('message').dataset.error = 'true';}

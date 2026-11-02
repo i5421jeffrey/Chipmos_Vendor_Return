@@ -14,7 +14,7 @@ async function checkConnection() {
     document.getElementById('sqlite-version').textContent = data.sqlite_version;
     document.getElementById('schema-version').textContent = data.schema_version;
     document.getElementById('repairs-module').textContent = data.modules?.repairs
-      ? `版本 ${data.modules.repairs}（送修基本流程）` : '未安裝';
+      ? `版本 ${data.modules.repairs}（SQLite 離線功能驗收版）` : '未安裝';
     document.getElementById('initialized-at').textContent = data.initialized_at;
     status.textContent = 'Python 服務正常，SQLite 已連線。';
     status.dataset.state = 'ok';

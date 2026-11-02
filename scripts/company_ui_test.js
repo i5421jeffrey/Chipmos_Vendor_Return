@@ -20,6 +20,13 @@ class TestNode {
   close() {this.open = false;}
   focus() {}
   reportValidity() {return true;}
+  get elements() {
+    if (this._elements) return this._elements;
+    const result = [];
+    function walk(node) {for (const child of node.children) {if (['input','select','textarea','button'].includes(child.tag)) result.push(child); walk(child);}}
+    walk(this); return result;
+  }
+  set elements(value) {this._elements = value;}
 }
 class Option extends TestNode {
   constructor(text, value) {super('option'); this.textContent = text; this.value = value;}
@@ -30,6 +37,7 @@ class URLSearchParams {
   toString() {return Object.entries(this.values).map(([key, value]) => encodeURIComponent(key) + '=' + encodeURIComponent(value)).join('&');}
 }
 const nodes = Object.fromEntries(pageIds.map(id => [id, new TestNode()]));
+nodes['operations-form'].append(nodes['operations-fields']);
 for (const id of ['machine','board','failure-tag','repair-type','record-status','status-filter']) nodes[id].tag = 'select';
 nodes['is-opened'].type = 'checkbox';
 nodes['records-view'].hidden = true;
@@ -44,12 +52,16 @@ class FormData {
 }
 const navigation = pageStatuses.map(status => {const node = new TestNode('button'); node.dataset.status = status; return node;});
 const counters = pageCounters.map(count => {const node = new TestNode(); node.dataset.count = count; return node;});
+const workspaces = pageWorkspaces.map(kind => {const node = new TestNode('button'); node.dataset.workspace = kind; return node;});
+const window = {confirm:()=>true};
 const document = {
   getElementById(id) {if (!nodes[id]) throw Error('HTML is missing id: ' + id); return nodes[id];},
   createElement(tag) {return new TestNode(tag);},
+  createElementNS(ns, tag) {return new TestNode(tag);},
   querySelectorAll(selector) {
     if (selector === '[data-status]') return navigation;
     if (selector === '[data-count]') return counters;
+    if (selector === '[data-workspace]') return workspaces;
     throw Error('Unmocked selector: ' + selector);
   }
 };
@@ -59,9 +71,19 @@ async function fetch(path, options = {}) {
   requests.push({path:String(path), options});
   let data;
   if (options.method === 'PUT') return {ok:false, json:async()=>({error:'此紀錄已被其他人修改'})};
-  if (String(path).includes('/catalog')) data = {machines:[{machine_code:'F45', model:'T5377S'}], boards:[{model:'T5377S', board_name:'HVDR PE', board_part_code:'BPR-030837'}], statuses:['待送修','已送修','取回驗證'], repair_types:['板修','合約'], failure_tags:['RTE']};
+  if (options.method === 'POST' && path === '/api/repairs/dbn') return {ok:true,json:async()=>({data:{id:'new-dbn'}})};
+  if (options.method === 'POST' && path === '/api/repairs/mappings/impact') return {ok:true,json:async()=>({repair_count:1,dbn_count:0,token:'impact-token'})};
+  if (options.method === 'POST' && path === '/api/repairs/mappings') return {ok:true,json:async()=>({data:{serial_no:'002850948'}})};
+  if (String(path) === '/api/repairs/catalog') data = {machines:[{machine_code:'F45', model:'T5377S'}], boards:[{model:'T5377S', board_name:'HVDR PE', board_part_code:'BPR-030837'}], statuses:['待送修','已送修','取回驗證'], repair_types:['板修','合約'], failure_tags:['RTE']};
   else if (String(path).includes('/serial-mapping')) data = {data:{serial_no:'002850948', board_name:'HVDR PE', board_part_code:'BPR-030837'}};
-  else if (String(path).includes('/history')) data = {data:[{operation:'INSERT', changed_at:'2026-11-02T00:00:00Z', serial_no:testRecord.serial_no, board_name:testRecord.description}]};
+  else if (String(path).includes('/history')) data = {data:[{operation:'INSERT', source_table:'repair_records', changes:{description:{old:null,new:'HVDR PE'}}, changed_at:'2026-11-02T00:00:00Z', serial_no:testRecord.serial_no, board_name:testRecord.description}],total:1,page:1};
+  else if (String(path).includes('/attachment')) data = {data:null};
+  else if (String(path).includes('/chain')) data = {data:[{...testRecord,attachment:null}]};
+  else if (String(path).includes('/dbn/catalog')) data = {customers:['AB','VB'],combinations:[{customer_code:'AB',product_code:'JAA118',station_code:'CP1'}],sockets:[]};
+  else if (String(path).startsWith('/api/repairs/dbn?')) data = {data:[], total:0, page:1, page_size:20};
+  else if (String(path).startsWith('/api/repairs/mappings?')) data = {data:[{serial_no:'002850948',board_name:'HVDR PE',board_part_code:'BPR-030837',version:1}],total:1,page:1,page_size:20};
+  else if (String(path).startsWith('/api/repairs/statistics?')) data = {frequency:{'2026-11':1},amounts_cents:{'2026-11':{'板修':0,'外修':0,'合約':0,'保固':0}},ranking:[{machine:'F45',count:1}],missing_amounts:0};
+  else if (String(path).startsWith('/api/repairs/masters')) data = {machines:[{machine_code:'F45',model:'T5377S'}],boards:[{model:'T5377S',board_name:'HVDR PE',board_part_code:'BPR-030837'}],prices:[{model:'T5377S',board_name:'HVDR PE',board_part_code:'BPR-030837',board_repair_cents:0}],token:'master-token'};
   else if (String(path).startsWith('/api/repairs/records?')) data = {data:[{...testRecord}], total:1, page:1, page_size:20, status_counts:{'待送修':1}};
   else if (String(path).endsWith('/record-1')) data = {data:{...testRecord}};
   else throw Error('Unexpected API path: ' + path);
@@ -101,6 +123,37 @@ function assert(ok, message) {if (!ok) throw Error(message);}
   assert(nodes.editor.open && nodes['failure-description'].value === '保留未儲存描述', 'Conflict preserves entered data');
   assert(nodes['form-message'].textContent.includes('此紀錄已被其他人修改'), 'Conflict is shown');
   assert(!nodes.save.disabled && nodes.board.disabled, 'Controls recover and mapped board stays locked');
+  nodes.editor.close();
+  await openWorkspace('dbn');
+  assert(!nodes['workspace-view'].hidden && nodes['records-view'].hidden, 'DBN workspace opens');
+  await openWorkspace('mappings');
+  assert(nodes['workspace-content'].textContent.includes('BPR-030837'), 'S/N master list renders');
+  await openWorkspace('history');
+  assert(nodes['workspace-content'].textContent.includes('INSERT'), 'Global audit list renders');
+  nodes['stats-mode'].value = 'year';
+  await openWorkspace('statistics');
+  assert(nodes['workspace-content'].textContent.includes('F45'), 'Statistics chart/table/ranking render');
+  await openWorkspace('masters');
+  assert(nodes['workspace-content'].textContent.includes('HVDR PE'), 'Reference and price tables render');
+  await editDbn();
+  assert(nodes['operations-modal'].open, 'DBN create dialog opens');
+  const dbnInputs = nodes['operations-fields'].elements;
+  dbnInputs[0].value = '2850948'; dbnInputs[1].value = 'F45';
+  dbnInputs[1].listeners.change[0](); dbnInputs[2].value = 'HVDR PE'; dbnInputs[2].listeners.change[0]();
+  dbnInputs[4].value = 'AB'; dbnInputs[4].listeners.change[0]();
+  dbnInputs[5].value = 'JAA118'; dbnInputs[5].listeners.change[0](); dbnInputs[6].value = 'CP1';
+  dbnInputs[7].value = 'RTE'; dbnInputs[7].listeners.change[0](); dbnInputs[9].value = 'DBN test';
+  await nodes['operations-form'].listeners.submit[0]({preventDefault(){}});
+  const dbnWrite = requests.find(request => request.path === '/api/repairs/dbn' && request.options.method === 'POST');
+  assert(dbnWrite && JSON.parse(dbnWrite.options.body).board_part_code === 'BPR-030837', 'DBN form submits local validated context');
+  assert(!nodes['operations-modal'].open, 'Successful DBN write closes dialog');
+  await editMapping({serial_no:'002850948',board_name:'HVDR PE',board_part_code:'BPR-030837',version:1});
+  await nodes['operations-form'].listeners.submit[0]({preventDefault(){}});
+  const mappingWrite = requests.find(request => request.path === '/api/repairs/mappings' && request.options.method === 'POST');
+  assert(mappingWrite && JSON.parse(mappingWrite.options.body).impact_token === 'impact-token', 'S/N write uses preview token');
+  assert(JSON.parse(mappingWrite.options.body).sync_history === true, 'History synchronization is explicitly confirmed');
+  setView(true);
+  assert(nodes['workspace-view'].hidden && !nodes['quick-view'].hidden, 'Navigation leaves management workspace');
   assert(requests.every(request => request.path.startsWith('/api/')), 'All UI data requests are local');
   globalThis.companyUiDone = true;
 })().catch(error => {globalThis.companyUiFailure = String(error.stack || error);});

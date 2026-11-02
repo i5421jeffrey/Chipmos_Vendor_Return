@@ -41,8 +41,10 @@ def audit(connection, source, record_id, operation, before, after):
 
 def catalog(path):
     with connect(path) as connection:
+        connection.execute('BEGIN')
         return {"machines": [dict(row) for row in connection.execute("SELECT * FROM repair_machine_models ORDER BY machine_code")],
                 "boards": [dict(row) for row in connection.execute("SELECT * FROM repair_model_boards ORDER BY model, board_name")],
+                "prices": [dict(row) for row in connection.execute('SELECT * FROM repair_board_prices ORDER BY model,board_name')],
                 "statuses": list(ACTIVE_STATUSES), "failure_tags": list(FAILURE_TAGS), "repair_types": list(PRICE_COLUMNS)}
 
 
@@ -76,6 +78,13 @@ def list_records(path, query):
             raise APIError("狀態無效")
         where.append("current_status=?")
         arguments.append(status)
+    for field, allowed in (('failure_tag', FAILURE_TAGS), ('repair_type', PRICE_COLUMNS)):
+        value = query.get(field, [''])[0]
+        if value:
+            if value not in allowed:
+                raise APIError('篩選條件無效')
+            where.append(field + '=?')
+            arguments.append(value)
     condition = " WHERE " + " AND ".join(where) if where else ""
     with connect(path) as connection:
         # Keep the count and the page in the same read snapshot.
@@ -86,7 +95,11 @@ def list_records(path, query):
         page = min(page, max(1, (total + 19) // 20))
         rows = connection.execute("SELECT * FROM repair_records" + condition + " ORDER BY occurred_on DESC, created_at DESC, id LIMIT 20 OFFSET ?",
                                   [*arguments, (page - 1) * 20]).fetchall()
-        return {"data": [public_record(row) for row in rows], "total": total, "page": page, "page_size": 20,
+        data = []
+        for row in rows:
+            count = connection.execute('SELECT count(*) FROM dbn_records WHERE serial_no=?', (row['serial_no'],)).fetchone()[0]
+            data.append({**public_record(row), 'dbn_count': count})
+        return {"data": data, "total": total, "page": page, "page_size": 20,
                 "status_counts": counts}
 
 
@@ -161,6 +174,9 @@ def validate(connection, payload):
 def save_record(path, payload, record_id=None):
     payload = dict(payload)
     expected = payload.pop("expected_version", None)
+    attachment = payload.pop('attachment', None)
+    if record_id and attachment is not None:
+        raise APIError('編輯附件請使用附件操作')
     with connect(path) as connection:
         connection.execute("BEGIN IMMEDIATE")
         previous = None
@@ -171,9 +187,18 @@ def save_record(path, payload, record_id=None):
             previous = public_record(row)
             if type(expected) is not int or expected != row["version"]:
                 raise APIError("此紀錄已被其他人修改，請先重新載入；尚未儲存你的變更", 409)
-            if row["current_status"] not in ACTIVE_STATUSES:
-                raise APIError("此階段不編輯已結案紀錄", 409)
+            if row['current_status'] not in ACTIVE_STATUSES:
+                if payload.get('current_status') != row['current_status']:
+                    raise APIError('已結案案件不能從編輯表單重新開啟', 409)
+                # Validate dates/context using the final active state, then retain closure.
+                payload['current_status'] = '取回驗證'
         values = validate(connection, payload)
+        if previous and previous['current_status'] not in ACTIVE_STATUSES:
+            values['current_status'] = previous['current_status']
+            if not previous['closed_on']:
+                raise APIError('此舊案缺少結案日期，請先核對來源，不會自動補日期', 409)
+            if values['returned_on'] > previous['closed_on']:
+                raise APIError('回修日期不得晚於結案日期')
         if not record_id and values["current_status"] != "待送修":
             raise APIError("新增案件須從待送修開始")
         now = utc_now()
@@ -182,7 +207,7 @@ def save_record(path, payload, record_id=None):
         if mapping and (mapping["board_name"] != values["description"] or mapping["board_part_code"] != values["board_part_code"]):
             raise APIError("S/N 主檔與板名／Part Number 衝突；不會覆寫主檔或歷史紀錄", 409)
         if not mapping:
-            connection.execute("INSERT INTO serial_board_mappings VALUES (?,?,?,?,?)",
+            connection.execute("INSERT INTO serial_board_mappings (serial_no,board_name,board_part_code,created_at,updated_at) VALUES (?,?,?,?,?)",
                                (serial, values["description"], values["board_part_code"], now, now))
             audit(connection, "serial_board_mappings", serial, "INSERT", None,
                   {"serial_no": serial, "board_name": values["description"], "board_part_code": values["board_part_code"]})
@@ -199,6 +224,10 @@ def save_record(path, payload, record_id=None):
             connection.execute(f"INSERT INTO repair_records ({columns}) VALUES ({placeholders})", list(values.values()))
         current = public_record(connection.execute("SELECT * FROM repair_records WHERE id=?", (record_id,)).fetchone())
         audit(connection, "repair_records", record_id, "UPDATE" if previous else "INSERT", previous, current)
+        if attachment is not None:
+            from . import attachments
+            meta = attachments.insert(connection, record_id, attachment)
+            audit(connection, 'repair_attachments', meta['id'], 'INSERT', None, {**meta, 'serial_no': current['serial_no']})
         return {"data": current}
 
 

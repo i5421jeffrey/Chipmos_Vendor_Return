@@ -27,9 +27,10 @@ def migrate(path, backup_required=True):
     root = Path(__file__).resolve().parent
     with connect(path) as connection:
         exists = connection.execute("SELECT 1 FROM sqlite_master WHERE name='spms_module_migrations'").fetchone()
-        if exists and connection.execute(
-            "SELECT 1 FROM spms_module_migrations WHERE module='repairs' AND version=1"
-        ).fetchone():
+        versions = {row[0] for row in connection.execute("SELECT version FROM spms_module_migrations WHERE module='repairs'")} if exists else set()
+        if versions - {1, 2}:
+            raise ValueError("Database is newer than this program; do not downgrade")
+        if versions == {1, 2}:
             return
         # SQLite backup includes committed WAL contents. Never overwrite a backup.
         if backup_required:
@@ -42,18 +43,31 @@ def migrate(path, backup_required=True):
         connection.execute("""CREATE TABLE IF NOT EXISTS spms_module_migrations (
             module TEXT NOT NULL, version INTEGER NOT NULL, applied_at TEXT NOT NULL,
             PRIMARY KEY (module, version))""")
-        if connection.execute("SELECT 1 FROM spms_module_migrations WHERE module='repairs' AND version=1").fetchone():
-            return
-        # Execute DDL inside this transaction, not executescript's implicit commit.
-        for statement in (root / "modules/repairs/schema.sql").read_text(encoding="utf-8").split(";"):
-            if statement.strip():
-                connection.execute(statement)
-        catalog = json.loads((root / "modules/repairs/catalog.json").read_text(encoding="utf-8"))
-        connection.executemany("INSERT INTO repair_machine_models VALUES (:machine_code, :model)", catalog["machines"])
-        connection.executemany("INSERT INTO repair_model_boards VALUES (:model, :board_name, :board_part_code)", catalog["boards"])
-        amount_columns = ("board_repair_amount", "external_repair_amount", "contract_repair_amount", "warranty_repair_amount")
-        for price in catalog["prices"]:
-            amounts = [None if price[key] is None else int(Decimal(str(price[key])) * 100) for key in amount_columns]
-            connection.execute("INSERT INTO repair_board_prices VALUES (?,?,?,?,?,?,?)",
-                               [price["model"], price["board_name"], price["board_part_code"], *amounts])
-        connection.execute("INSERT INTO spms_module_migrations VALUES ('repairs', 1, ?)", (utc_now(),))
+        versions = {row[0] for row in connection.execute("SELECT version FROM spms_module_migrations WHERE module='repairs'")}
+        if 1 not in versions:
+            run_schema(connection, root / 'modules/repairs/schema.sql')
+            catalog = json.loads((root / "modules/repairs/catalog.json").read_text(encoding="utf-8"))
+            connection.executemany("INSERT INTO repair_machine_models VALUES (:machine_code, :model)", catalog["machines"])
+            connection.executemany("INSERT INTO repair_model_boards VALUES (:model, :board_name, :board_part_code)", catalog["boards"])
+            amount_columns = ("board_repair_amount", "external_repair_amount", "contract_repair_amount", "warranty_repair_amount")
+            for price in catalog["prices"]:
+                amounts = [None if price[key] is None else int(Decimal(str(price[key])) * 100) for key in amount_columns]
+                connection.execute("INSERT INTO repair_board_prices VALUES (?,?,?,?,?,?,?)",
+                                   [price["model"], price["board_name"], price["board_part_code"], *amounts])
+            connection.execute("INSERT INTO spms_module_migrations VALUES ('repairs', 1, ?)", (utc_now(),))
+        if 2 not in versions:
+            run_schema(connection, root / 'modules/repairs/schema_v2.sql')
+            catalog = json.loads((root / 'modules/repairs/dbn_catalog.json').read_text(encoding='utf-8'))
+            connection.executemany('INSERT INTO dbn_customers VALUES (?)', [(code,) for code in catalog['customers']])
+            connection.executemany('INSERT INTO dbn_valid_combinations VALUES (:customer_code,:product_code,:station_code)', catalog['combinations'])
+            for row in catalog['sockets']:
+                connection.execute('INSERT INTO dbn_socket_files VALUES (?,?,?,?,?)',
+                                   (row['id'], row['product_code'], row['source_filename'], row['dut_count'], json.dumps(row['dut_pins'])))
+            connection.execute("INSERT INTO spms_module_migrations VALUES ('repairs', 2, ?)", (utc_now(),))
+
+
+def run_schema(connection, path):
+    # Reviewed local DDL only; never execute user-supplied SQL.
+    for statement in path.read_text(encoding='utf-8').split(';'):
+        if statement.strip():
+            connection.execute(statement)

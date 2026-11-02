@@ -6,6 +6,7 @@
   <title>SPMS 公司版 — 備品管理</title>
   <link rel="stylesheet" href="/repairs/style.css">
   <script src="/repairs/app.js" defer></script>
+  <script src="/repairs/features.js" defer></script>
 </head>
 <body>
 <div class="app">
@@ -22,26 +23,34 @@
       <button class="nav-item" data-status="結案（PASS）" type="button"><span aria-hidden="true">✓</span>PASS<span class="count" data-count="結案（PASS）">0</span></button>
       <button class="nav-item" data-status="結案（FAIL）" type="button"><span aria-hidden="true">×</span>FAIL<span class="count" data-count="結案（FAIL）">0</span></button>
     </nav>
-    <div class="nav-label">尚未移植</div>
-    <nav class="pending-nav" aria-label="尚未移植的功能"><button class="nav-item" disabled>DBN 紀錄</button><button class="nav-item" disabled>S/N 主檔維護</button><button class="nav-item" disabled>統計資料</button><button class="nav-item" disabled>全站異動紀錄</button><button class="nav-item" disabled>機台管理</button></nav>
+    <div class="nav-label">管理與查詢</div>
+    <nav class="management-nav" aria-label="管理與查詢"><button class="nav-item" data-workspace="dbn">DBN 紀錄</button><button class="nav-item" data-workspace="mappings">S/N 主檔維護</button><button class="nav-item" data-workspace="statistics">統計資料</button><button class="nav-item" data-workspace="history">全站異動紀錄</button><button class="nav-item" data-workspace="masters">機台／板件／價格對應</button><button class="nav-item" disabled>機台保養模組（未安裝）</button></nav>
     <a class="environment-link" href="/">SQLite 環境檢查</a>
   </aside>
   <main class="content">
     <p class="local-badge">本機驗證版 · 不連接 Supabase</p>
-    <div class="notice">介面分段還原中：DBN／Socket、附件、結案／再次送修、完整主檔維護與統計尚未移植；舊資料未匯入，內附基礎對應仍須核對。本版只限本機驗收，尚未開放內網。</div>
+    <div class="notice">SQLite 離線功能驗收版。舊資料尚未匯入，內附機台、價格及 Socket 基礎對應仍須核對；不是正式上線／像素一致性驗收。僅限本機，登入權限及公司內網部署待 IT 核准。</div>
     <section id="quick-view" class="quick-search-view">
       <h1>SPMS</h1><p class="quick-intro">Enter a board S/N to quickly view related repair records.</p>
       <form id="quick-form"><label for="quick-query">板件 S/N</label><div class="quick-controls"><input id="quick-query" type="search" placeholder="001234567" maxlength="64" required autocomplete="off"><button type="submit">Search</button></div></form>
-      <p id="quick-message" role="status" aria-live="polite">輸入 S/N 查詢本機送修紀錄；DBN 查詢尚未移植。</p>
+      <p id="quick-message" role="status" aria-live="polite">輸入 S/N 查詢本機送修與 DBN 紀錄。</p>
       <div id="quick-results"></div>
     </section>
     <section id="records-view" hidden>
       <div class="title-row"><div><h1 id="view-title">全部送修</h1><p>追蹤送修狀態、開單資訊及異常描述</p></div><button id="create" type="button" disabled>＋ 新增送修</button></div>
       <form id="search-form" class="toolbar"><input id="query" type="search" placeholder="搜尋板件、S/N、機台或異常描述…" aria-label="搜尋"><select id="status-filter" aria-label="狀態"><option value="">所有狀態</option><option>待送修</option><option>已送修</option><option>取回驗證</option><option>結案（PASS）</option><option>結案（FAIL）</option></select><button type="submit">查詢</button></form>
+      <div class="toolbar"><select id="tag-filter" aria-label="異常類別篩選"></select><select id="type-filter" aria-label="維修分類篩選"></select></div>
       <p id="message" class="list-count" role="status" aria-live="polite">正在載入…</p>
-      <div class="list-heading"><span>項目</span><span>目前狀態</span><span>標籤</span><span>DBN</span><span>機台</span><span>損壞日期</span></div>
+      <div class="list-heading"><span>項目</span><span>目前狀態</span><span>標籤</span><span>DBN</span><span>機台</span><span id="date-heading">損壞日期</span></div>
       <div id="records" class="rows" aria-label="送修清單"></div>
       <div class="pager"><button id="previous" type="button" disabled>上一頁</button><span id="page"></span><button id="next" type="button" disabled>下一頁</button></div>
+    </section>
+    <section id="workspace-view" hidden>
+      <div class="title-row"><div><h1 id="workspace-title"></h1><p id="workspace-description"></p></div><div id="workspace-actions" class="actions"></div></div>
+      <form id="workspace-search" class="toolbar"><input id="workspace-query" type="search" placeholder="搜尋 S/N、板名或相關資訊" aria-label="管理清單搜尋"><button>查詢</button></form>
+      <div id="stats-controls" class="toolbar" hidden><select id="stats-mode" aria-label="統計模式"><option value="year">各月份（指定年度）</option><option value="month">各年度（指定月份）</option></select><input id="stats-period" aria-label="年度或月份" value="2026" maxlength="4"><button id="stats-load" type="button">更新統計</button><select id="ranking-sort" aria-label="機台損壞排序"><option value="desc">次數多到少</option><option value="asc">次數少到多</option></select></div>
+      <p id="workspace-message" role="status" aria-live="polite"></p><div id="workspace-content"></div>
+      <div class="pager" id="workspace-pager"><button id="workspace-previous" type="button">上一頁</button><span id="workspace-page"></span><button id="workspace-next" type="button">下一頁</button></div>
     </section>
   </main>
 </div>
@@ -60,12 +69,14 @@
       <label>Part Number<input name="board_part_code" id="part" readonly required></label>
       <label>異常類別<select name="failure_tag" id="failure-tag" required></select></label>
       <label>維修分類<select name="repair_type" id="repair-type" required></select></label>
+      <p id="repair-amount-preview" class="wide hint" role="status"></p>
       <label class="wide">異常描述<textarea name="failure_description" id="failure-description" maxlength="10000" required></textarea></label>
       <label>狀態<select name="current_status" id="record-status" required></select></label>
       <label class="check"><input type="checkbox" name="is_opened" id="is-opened">已開單</label>
       <label>損壞日期<input type="date" name="occurred_on" id="occurred-on" required></label>
       <label>送修日期<input type="date" name="sent_on" id="sent-on"></label>
       <label>回修日期<input type="date" name="returned_on" id="returned-on"></label>
+      <label id="create-attachment-field" class="wide">Fail Log（新增時選填）<input type="file" id="create-attachment" accept=".txt,.asc"><span class="hint">每筆限一個非空 .txt／.asc，最大 5 MB；編輯附件請至詳細資料。</span></label>
       <p class="hint">金額依本機板件價格及維修分類自動帶入；空白保留未設定，0 為零元。</p>
     </div>
     <p id="form-message" role="status" aria-live="polite"></p>
@@ -73,5 +84,6 @@
   </form>
   <details id="history-section" hidden><summary>此筆異動紀錄</summary><ol id="history"></ol></details>
 </dialog>
+<dialog id="operations-modal" aria-labelledby="operations-title"><div class="dialog-head"><h2 id="operations-title"></h2><button id="operations-close" type="button" aria-label="關閉操作視窗">×</button></div><form id="operations-form"><div id="operations-fields" class="fields"></div><p id="operations-message" role="status" aria-live="polite"></p><div class="actions"><button id="operations-cancel" type="button">取消</button><button id="operations-save" type="submit">儲存</button></div></form></dialog>
 </body>
 </html>
