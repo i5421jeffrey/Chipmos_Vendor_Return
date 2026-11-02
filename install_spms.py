@@ -55,6 +55,9 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             '- 異動紀錄提供資料類型、操作、開始／結束日期篩選及舊值／新值六欄表格；日期依台北時區、包含結束日，搜尋包含異動內容並將 '
                                             '`%`／`_` 視為文字。以每頁 20 個事件分頁，同一事件的變更欄位一併顯示（不同於原版每頁 10 '
                                             '個欄位）；新增／刪除也保留各欄細節，不隱藏來源紀錄。尚非具名人員稽核。\n'
+                                            '- 詳細資料的連續送修歷史逐輪顯示日期、狀態、維修分類、金額、異常類別、描述與該輪附件；標示目前案件，可點選切換，不將同 '
+                                            'S/N 的其他獨立送修混入本鏈。只有單筆未結案時顯示「尚無連續送修紀錄」。S/N 主檔表單提供獨立唯讀 PN '
+                                            '預覽。此輪畫面仍未經 Windows／視覺驗收。\n'
                                             '- 離線 JSON 匯入、SQLite '
                                             '備份驗證與復原到新檔工具已提供（下方）。**真實舊資料尚未匯入**：仍須提供公司核准的匯出檔，先審核轉換與核對筆數；程式不會讀雲端取得資料。\n'
                                             '- **尚未實作登入／角色權限、正式內網部署與排程／異地備份；尚未完成 Windows '
@@ -283,7 +286,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             '產生；公司版程式更新後必須重新產生。\n'
                                             '安裝測試：`python -m unittest discover -s scripts -p '
                                             '"test_company_installer.py" -v`。\n',
-                                 'sha256': 'f2b1e465df8639d7511f9210c3f5bf61a149bb5b3d9d20d1eda0a7ab8140df1f'},
+                                 'sha256': '8d721b4a1626fb03f97057db1ec8d6773cfc2ae8720fc3ab835b50e8a60a6036'},
            'company/database.py': {'content': '"""Shared SQLite connections and additive, backed-up module '
                                               'migrations."""\n'
                                               'import json\n'
@@ -5317,6 +5320,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   'event => {\n'
                                                   '  event.preventDefault(); if (operationsSaving || '
                                                   '!operationsSubmit) return;\n'
+                                                  "  if (!byId('operations-form').reportValidity()) return;\n"
                                                   '  operationsSaving = true;\n'
                                                   "  const inputs = [...byId('operations-form').elements];\n"
                                                   '  const disabled = inputs.map(input => input.disabled);\n'
@@ -5911,7 +5915,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '\n'
                                                   'async function editMapping(record = null) {\n'
                                                   "  if (!catalogs) throw new Error('板件對應尚未載入');\n"
-                                                  '  let number, board;\n'
+                                                  '  let number, board, part;\n'
                                                   '  const pairs = [...new Map(catalogs.boards.map(row => '
                                                   '[JSON.stringify([row.board_name, row.board_part_code]), '
                                                   'row])).entries()];\n'
@@ -5945,7 +5949,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '  });\n'
                                                   "  number = formField('S/N', 'text', record?.serial_no); "
                                                   'number.maxLength = 64;\n'
-                                                  "  board = formField('板件名稱／Part Number', 'select');\n"
+                                                  "  board = formField('板件名稱', 'select');\n"
                                                   "  board.replaceChildren(new Option('請選板件', ''));\n"
                                                   '  for (const [key, row] of pairs) board.add(new '
                                                   'Option(`${row.board_name} — ${row.board_part_code}`, '
@@ -5953,6 +5957,17 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '  if (record) board.value = '
                                                   'JSON.stringify([record.board_name, '
                                                   'record.board_part_code]);\n'
+                                                  '  board.disabled = !pairs.length;\n'
+                                                  "  part = formField('Part Number'); part.readOnly = true; "
+                                                  'part.required = false;\n'
+                                                  '  const preview = () => {\n'
+                                                  '    const selected = pairs.find(([key]) => key === '
+                                                  'board.value);\n'
+                                                  "    part.value = selected?.[1].board_part_code || '';\n"
+                                                  "    part.placeholder = '選擇板件後自動帶入';\n"
+                                                  '  };\n'
+                                                  "  board.addEventListener('change', preview); preview(); "
+                                                  'number.focus();\n'
                                                   '}\n'
                                                   '\n'
                                                   'async function editMaster(kind) {\n'
@@ -6072,23 +6087,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '    }));\n'
                                                   '  }\n'
                                                   '  container.append(fileSection);\n'
-                                                  "  const history = element('section', 'detail-section'); "
-                                                  "history.append(element('h3', '', '連續送修紀錄'));\n"
-                                                  '  for (const row of chainResult.data) {\n'
-                                                  '    history.append(action(`${row.occurred_on} · '
-                                                  '${row.current_status} · ${row.repair_type} · '
-                                                  "${row.repair_amount ?? '未設定'}`, () => openDetail(row.id), "
-                                                  "'quick-card'), element('p', 'detail-text', "
-                                                  'row.failure_description));\n'
-                                                  '    if (row.attachment) {\n'
-                                                  "      const link = element('a', '', "
-                                                  'row.attachment.filename); link.href = '
-                                                  "'/api/repairs/attachments/' + "
-                                                  "encodeURIComponent(row.attachment.id) + '?download=1'; "
-                                                  'history.append(link);\n'
-                                                  '    }\n'
-                                                  '  }\n'
-                                                  "  container.append(history, action('查看此 S/N 的 DBN', () => "
+                                                  '  container.append(renderRepairChain(record, '
+                                                  "chainResult.data), action('查看此 S/N 的 DBN', () => "
                                                   "{detail.close(); return openWorkspace('dbn', "
                                                   'record.serial_no);}));\n'
                                                   "  if (record.current_status === '取回驗證') {\n"
@@ -6118,6 +6118,53 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '    detail.close(); selectedRecord = null; await '
                                                   'refreshFeatures();\n'
                                                   '  }));\n'
+                                                  '}\n'
+                                                  '\n'
+                                                  'function renderRepairChain(record, rows) {\n'
+                                                  "  const section = element('section', 'detail-section');\n"
+                                                  "  section.append(element('h3', '', "
+                                                  '`連續送修紀錄（${record.serial_no}）`));\n'
+                                                  '  if (rows.length < 2 && !rows.some(row => '
+                                                  "['結案（PASS）','結案（FAIL）'].includes(row.current_status))) {\n"
+                                                  "    section.append(element('p', 'history-empty', "
+                                                  "'尚無連續送修紀錄')); return section;\n"
+                                                  '  }\n'
+                                                  "  const list = element('div', 'history-list');\n"
+                                                  '  for (const [index, row] of rows.entries()) {\n'
+                                                  "    const entry = element('div', 'history-entry'), button "
+                                                  "= action('', () => openDetail(row.id), 'history-item');\n"
+                                                  "    button.setAttribute('aria-label', `查看第 ${index + 1} "
+                                                  '輪送修，${row.current_status}`);\n'
+                                                  '    if (row.id === record.id) '
+                                                  "button.setAttribute('aria-current', 'true');\n"
+                                                  "    const date = element('span', '', row.occurred_on || "
+                                                  "'未記錄'); date.title = '損壞日期';\n"
+                                                  '    const pill = statusPill(row.current_status);\n'
+                                                  "    const amount = row.repair_amount == null ? '未設定' : "
+                                                  "row.repair_amount.toLocaleString('zh-TW') + ' 元';\n"
+                                                  '    const summary = `第 ${index + 1} 輪 · ${row.description '
+                                                  "|| '送修案件'} · ${row.repair_type} · 金額 ${amount} · "
+                                                  "${row.failure_tag || '未分類'}`;\n"
+                                                  "    const description = element('span', "
+                                                  "'history-description', summary); description.title = "
+                                                  'summary;\n'
+                                                  '    button.append(date, pill, description);\n'
+                                                  "    const content = element('div', "
+                                                  "'history-entry-detail');\n"
+                                                  "    content.append(element('div', "
+                                                  "'history-failure-description', '異常描述：' + "
+                                                  "(row.failure_description || '未提供')));\n"
+                                                  '    if (row.attachment) {\n'
+                                                  "      const link = element('a', 'history-log-link', 'Fail "
+                                                  "Log：' + row.attachment.filename);\n"
+                                                  "      link.href = '/api/repairs/attachments/' + "
+                                                  "encodeURIComponent(row.attachment.id) + '?download=1'; "
+                                                  'content.append(link);\n'
+                                                  "    } else content.append(element('div', 'history-empty', "
+                                                  "'本次未附 Fail Log'));\n"
+                                                  '    entry.append(button, content); list.append(entry);\n'
+                                                  '  }\n'
+                                                  '  section.append(list); return section;\n'
                                                   '}\n'
                                                   '\n'
                                                   'function retryRepair(record) {\n'
@@ -6298,7 +6345,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '= index + 1; last = row.count; return [rank, row.machine, '
                                                   'row.count];}))); container.append(rankingCard);\n'
                                                   '}\n',
-                                       'sha256': 'ab3a225d3a8a56da11ef6e31956cceb742b0bf0516080fe5337ac03bcc3b75a6'},
+                                       'sha256': '3c5e1585a1da4f882ab71ed8aa05592a86204cb76cda023e828d9d886fbee2a0'},
            'company/web/index.html': {'content': '<!doctype html>\n'
                                                  '<html lang="zh-Hant">\n'
                                                  '<head>\n'
@@ -6759,6 +6806,16 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  'td:nth-child(6){white-space:pre-wrap;overflow-wrap:anywhere;max-width:340px}\n'
                                                  '.history-table td:first-child{white-space:nowrap;font:11px '
                                                  'ui-monospace,monospace}\n'
+                                                 '.history-list .history-item{grid-template-columns:78px '
+                                                 'auto minmax(0,1fr);padding:8px 9px;font-size:11px}\n'
+                                                 '.history-item[aria-current=true]{border-color:var(--accent)}\n'
+                                                 '.history-item '
+                                                 '.status-pill{font-size:11px;white-space:nowrap;gap:5px}\n'
+                                                 '.history-entry-detail .history-empty{margin-top:6px}\n'
+                                                 '@media(max-width:600px){.history-list '
+                                                 '.history-item{grid-template-columns:78px '
+                                                 'minmax(0,1fr)}.history-item '
+                                                 '.history-description{grid-column:1/-1}}\n'
                                                  '.brand-mark{border:0;border-radius:0;background:transparent}\n'
                                                  '.brand-mark '
                                                  'img{display:block;width:36px;height:36px;object-fit:contain;filter:invert(1)}\n'
@@ -6844,7 +6901,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  'nav{display:flex}.local-information{font-size:10px}.content{padding:19px '
                                                  '12px 40px}.quick-search-view{margin:8px auto '
                                                  '0}.issue-copy{gap:8px}.issue-open-status{gap:3px}.stats-card{padding:13px}.stats-controls{gap:6px}}\n',
-                                      'sha256': '20fd1207bbdcef92bd11c8efc7ce8008e3b2ea974a3aa0d59566c33bb1be04bc'},
+                                      'sha256': 'e5fea42849b54d16f073ec8bb74160111864a68ed116137ce95178d8fb8683d4'},
            'company/web/repairs.css': {'content': ':root{color-scheme:dark;font-family:"Segoe '
                                                   'UI",sans-serif;background:#101113;color:#e7e7e8;font-size:14px}\n'
                                                   '*{box-sizing:border-box}body{margin:0}header{display:flex;gap:36px;align-items:center;background:#191a1c;border-bottom:1px '
@@ -7840,7 +7897,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                 '@media(max-width:600px){main{margin:25px auto;padding:0 '
                                                 '16px}h1{font-size:22px}section{padding:18px}dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:10px}}\n',
                                      'sha256': '064406c8758be5620dfe7440f59d59ec1de5f6307e74f5bad85dd03e018c0769'}},
- 'version': '2026-11-02-history-filters'}
+ 'version': '2026-11-02-detail-history'}
 
 
 def check_local_path(path):

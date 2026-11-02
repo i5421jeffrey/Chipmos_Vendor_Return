@@ -3,6 +3,11 @@
 .history-filters label{font-size:11px}.history-filters input,.history-filters select{height:36px}
 .history-table td:nth-child(5),.history-table td:nth-child(6){white-space:pre-wrap;overflow-wrap:anywhere;max-width:340px}
 .history-table td:first-child{white-space:nowrap;font:11px ui-monospace,monospace}
+.history-list .history-item{grid-template-columns:78px auto minmax(0,1fr);padding:8px 9px;font-size:11px}
+.history-item[aria-current=true]{border-color:var(--accent)}
+.history-item .status-pill{font-size:11px;white-space:nowrap;gap:5px}
+.history-entry-detail .history-empty{margin-top:6px}
+@media(max-width:600px){.history-list .history-item{grid-template-columns:78px minmax(0,1fr)}.history-item .history-description{grid-column:1/-1}}
 .brand-mark{border:0;border-radius:0;background:transparent}
 .brand-mark img{display:block;width:36px;height:36px;object-fit:contain;filter:invert(1)}
 .sidebar{gap:10px}.sidebar .system-switcher{margin-bottom:8px}

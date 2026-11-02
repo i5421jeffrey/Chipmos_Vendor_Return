@@ -55,6 +55,7 @@ byId('operations-cancel').addEventListener('click', closeOperations);
 operationsDialog.addEventListener('cancel', event => event.preventDefault());
 byId('operations-form').addEventListener('submit', async event => {
   event.preventDefault(); if (operationsSaving || !operationsSubmit) return;
+  if (!byId('operations-form').reportValidity()) return;
   operationsSaving = true;
   const inputs = [...byId('operations-form').elements];
   const disabled = inputs.map(input => input.disabled);
@@ -367,7 +368,7 @@ async function editDbn(record = null) {
 
 async function editMapping(record = null) {
   if (!catalogs) throw new Error('板件對應尚未載入');
-  let number, board;
+  let number, board, part;
   const pairs = [...new Map(catalogs.boards.map(row => [JSON.stringify([row.board_name, row.board_part_code]), row])).entries()];
   openOperations(record ? '修改 S/N 對應' : '新增 S/N 對應', async freeze => {
     if (!board.value) throw new Error('請選板件');
@@ -384,10 +385,18 @@ async function editMapping(record = null) {
     operationsDialog.close(); await refreshFeatures();
   });
   number = formField('S/N', 'text', record?.serial_no); number.maxLength = 64;
-  board = formField('板件名稱／Part Number', 'select');
+  board = formField('板件名稱', 'select');
   board.replaceChildren(new Option('請選板件', ''));
   for (const [key, row] of pairs) board.add(new Option(`${row.board_name} — ${row.board_part_code}`, key));
   if (record) board.value = JSON.stringify([record.board_name, record.board_part_code]);
+  board.disabled = !pairs.length;
+  part = formField('Part Number'); part.readOnly = true; part.required = false;
+  const preview = () => {
+    const selected = pairs.find(([key]) => key === board.value);
+    part.value = selected?.[1].board_part_code || '';
+    part.placeholder = '選擇板件後自動帶入';
+  };
+  board.addEventListener('change', preview); preview(); number.focus();
 }
 
 async function editMaster(kind) {
@@ -452,14 +461,7 @@ async function renderDetailFeatures(record, container, stillCurrent) {
     }));
   }
   container.append(fileSection);
-  const history = element('section', 'detail-section'); history.append(element('h3', '', '連續送修紀錄'));
-  for (const row of chainResult.data) {
-    history.append(action(`${row.occurred_on} · ${row.current_status} · ${row.repair_type} · ${row.repair_amount ?? '未設定'}`, () => openDetail(row.id), 'quick-card'), element('p', 'detail-text', row.failure_description));
-    if (row.attachment) {
-      const link = element('a', '', row.attachment.filename); link.href = '/api/repairs/attachments/' + encodeURIComponent(row.attachment.id) + '?download=1'; history.append(link);
-    }
-  }
-  container.append(history, action('查看此 S/N 的 DBN', () => {detail.close(); return openWorkspace('dbn', record.serial_no);}));
+  container.append(renderRepairChain(record, chainResult.data), action('查看此 S/N 的 DBN', () => {detail.close(); return openWorkspace('dbn', record.serial_no);}));
   if (record.current_status === '取回驗證') {
     const resolve = element('section', 'detail-section'); resolve.append(element('h3', '', '驗證結果'));
     if (record.repair_amount == null) resolve.append(element('p', 'hint', '金額未設定，請先補齊價格並編輯案件，再結案。'));
@@ -475,6 +477,34 @@ async function renderDetailFeatures(record, container, stillCurrent) {
     await api('/api/repairs/records/' + encodeURIComponent(record.id), 'DELETE', {expected_version:record.version});
     detail.close(); selectedRecord = null; await refreshFeatures();
   }));
+}
+
+function renderRepairChain(record, rows) {
+  const section = element('section', 'detail-section');
+  section.append(element('h3', '', `連續送修紀錄（${record.serial_no}）`));
+  if (rows.length < 2 && !rows.some(row => ['結案（PASS）','結案（FAIL）'].includes(row.current_status))) {
+    section.append(element('p', 'history-empty', '尚無連續送修紀錄')); return section;
+  }
+  const list = element('div', 'history-list');
+  for (const [index, row] of rows.entries()) {
+    const entry = element('div', 'history-entry'), button = action('', () => openDetail(row.id), 'history-item');
+    button.setAttribute('aria-label', `查看第 ${index + 1} 輪送修，${row.current_status}`);
+    if (row.id === record.id) button.setAttribute('aria-current', 'true');
+    const date = element('span', '', row.occurred_on || '未記錄'); date.title = '損壞日期';
+    const pill = statusPill(row.current_status);
+    const amount = row.repair_amount == null ? '未設定' : row.repair_amount.toLocaleString('zh-TW') + ' 元';
+    const summary = `第 ${index + 1} 輪 · ${row.description || '送修案件'} · ${row.repair_type} · 金額 ${amount} · ${row.failure_tag || '未分類'}`;
+    const description = element('span', 'history-description', summary); description.title = summary;
+    button.append(date, pill, description);
+    const content = element('div', 'history-entry-detail');
+    content.append(element('div', 'history-failure-description', '異常描述：' + (row.failure_description || '未提供')));
+    if (row.attachment) {
+      const link = element('a', 'history-log-link', 'Fail Log：' + row.attachment.filename);
+      link.href = '/api/repairs/attachments/' + encodeURIComponent(row.attachment.id) + '?download=1'; content.append(link);
+    } else content.append(element('div', 'history-empty', '本次未附 Fail Log'));
+    entry.append(button, content); list.append(entry);
+  }
+  section.append(list); return section;
 }
 
 function retryRepair(record) {

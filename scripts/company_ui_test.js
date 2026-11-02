@@ -93,6 +93,7 @@ async function fetch(path, options = {}) {
   else if (String(path).startsWith('/api/repairs/masters')) data = {machines:[{machine_code:'F45',model:'T5377S'}],boards:[{model:'T5377S',board_name:'HVDR PE',board_part_code:'BPR-030837'}],prices:[{model:'T5377S',board_name:'HVDR PE',board_part_code:'BPR-030837',board_repair_cents:0}],token:'master-token'};
   else if (String(path).startsWith('/api/repairs/records?')) data = {data:[{...testRecord}], total:1, page:1, page_size:20, status_counts:{'待送修':1}};
   else if (String(path).endsWith('/record-1')) data = {data:{...testRecord}};
+  else if (String(path).endsWith('/retry-2')) data = {data:{...testRecord,id:'retry-2'}};
   else throw Error('Unexpected API path: ' + path);
   return {ok:true, json:async()=>data};
 }
@@ -122,6 +123,21 @@ function assert(ok, message) {if (!ok) throw Error(message);}
   assert(nodes['record-detail'].open, 'Right-side detail opens');
   assert(nodes['detail-content'].textContent.includes('0'), 'Zero price is not replaced by unset');
   assert(nodes['detail-content'].textContent.includes('維修時程'), 'Original repair timeline appears');
+  assert(nodes['detail-content'].textContent.includes('尚無連續送修紀錄'), 'Single open repair is not presented as a retry history');
+  const chain = renderRepairChain(testRecord, [
+    {...testRecord,current_status:'結案（FAIL）',attachment:{id:'log/1',filename:'<log>.asc'}},
+    {...testRecord,id:'retry-2',repair_amount:null,failure_description:'<script>second round</script>',attachment:null}
+  ]);
+  assert(chain.textContent.includes('第 1 輪') && chain.textContent.includes('第 2 輪'), 'History shows each repair round');
+  assert(chain.textContent.includes('金額 0 元') && chain.textContent.includes('金額 未設定'), 'Round history distinguishes zero and unset amounts');
+  assert(chain.textContent.includes('<script>second round</script>') && chain.textContent.includes('本次未附 Fail Log'), 'Round descriptions and missing attachments remain independent');
+  const entries = chain.children[1].children;
+  assert(entries[0].children[0].attributes['aria-current'] === 'true', 'Currently viewed repair is marked');
+  assert(entries[0].children[1].children[1].href.includes('log%2F1'), 'Round attachment IDs are encoded');
+  await entries[1].children[0].listeners.click[0]();
+  assert(requests.some(request => request.path === '/api/repairs/records/retry-2'), 'Selecting a round requests that record, not all serial matches');
+  assert(selectedRecord.id === 'retry-2', 'Selecting a round opens its details successfully');
+  await openDetail(testRecord.id);
   await nodes['edit-detail'].listeners.click[0]();
   assert(!nodes['record-detail'].open && nodes.editor.open, 'Detail transitions to edit dialog');
   assert(nodes.board.disabled && nodes.part.value === 'BPR-030837', 'Serial mapping locks board and PN');
@@ -176,6 +192,13 @@ function assert(ok, message) {if (!ok) throw Error(message);}
   assert(dbnWrite && JSON.parse(dbnWrite.options.body).board_part_code === 'BPR-030837', 'DBN form submits local validated context');
   assert(!nodes['operations-modal'].open, 'Successful DBN write closes dialog');
   await editMapping({serial_no:'002850948',board_name:'HVDR PE',board_part_code:'BPR-030837',version:1});
+  const mappingFields = nodes['operations-fields'].elements;
+  const partPreview = mappingFields.find(input => input.readOnly);
+  assert(partPreview?.value === 'BPR-030837', 'S/N master shows independent readonly Part Number');
+  const boardSelect = mappingFields.find(input => input.tag === 'select');
+  boardSelect.value = ''; boardSelect.listeners.change[0]();
+  assert(partPreview.value === '', 'Clearing board clears PN preview');
+  boardSelect.value = JSON.stringify(['HVDR PE','BPR-030837']); boardSelect.listeners.change[0]();
   await nodes['operations-form'].listeners.submit[0]({preventDefault(){}});
   const mappingWrite = requests.find(request => request.path === '/api/repairs/mappings' && request.options.method === 'POST');
   assert(mappingWrite && JSON.parse(mappingWrite.options.body).impact_token === 'impact-token', 'S/N write uses preview token');
