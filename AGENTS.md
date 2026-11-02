@@ -10,7 +10,8 @@
 - Whenever modifying a Markdown file, commit that Markdown change to Git. Stage only the intended Markdown file(s); do not include unrelated files in the commit.
 - Do not invent project commands or architecture; update this file when the repository provides verifiable development guidance.
 
-## Company-local phase one
+## Company-local staged migration
 
-- `company/server.py` is a standard-library-only Python/SQLite environment check; it has no business-data migration or Supabase connection. Run `python company/server.py` from the repository root and open `http://127.0.0.1:8765`. It intentionally binds to localhost only, not the company LAN.
+- `company/server.py` uses only Python's standard library and local SQLite, with no Supabase connection. Run `python company/server.py` from the repository root. `/` is the environment check; `/repairs/` is the basic spare-parts repair module. Machine maintenance is reserved, not installed. It intentionally binds to localhost only, not the company LAN; authentication and production deployment are not implemented.
 - Test with `python -m unittest discover -s company -p "test_*.py" -v`. Windows setup and verification steps are in `company/README.md`. Runtime SQLite files in `company/data/` must not be committed.
+- Shared SQLite migration/backup code is in `company/database.py`, and repair business logic is in `company/modules/repairs/`. Existing databases are backed up before additive module migration; do not delete/rebuild the database to update code. Offline catalog generation: `python scripts/build_company_catalog.py`; JS syntax smoke test on macOS: `swift scripts/test_company_ui.swift`.
