@@ -27,7 +27,7 @@ class LocalServiceTests(unittest.TestCase):
         self.base = f"http://127.0.0.1:{self.server.server_port}"
 
     def test_home_assets_and_headers(self):
-        for path in ("/", "/index.html", "/style.css", "/app.js"):
+        for path in ("/", "/index.html", "/style.css", "/app.js", "/repairs/", "/repairs/style.css", "/repairs/app.js"):
             with urlopen(self.base + path, timeout=5) as response:
                 self.assertEqual(response.status, 200)
                 self.assertEqual(response.headers["Cache-Control"], "no-store")
@@ -64,7 +64,7 @@ class LocalServiceTests(unittest.TestCase):
         request = Request(self.base + "/api/health", data=b"{}", method="POST")
         with self.assertRaises(HTTPError) as caught:
             urlopen(request, timeout=5)
-        self.assertEqual(caught.exception.code, 501)
+        self.assertEqual(caught.exception.code, 403)
         caught.exception.close()
 
     def test_head(self):

@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SPMS 公司版 — 備品管理</title>
+  <link rel="stylesheet" href="/repairs/style.css">
+  <script src="/repairs/app.js" defer></script>
+</head>
+<body>
+<header><strong>SPMS 公司版</strong><nav><a href="/">環境檢查</a><a href="/repairs/" aria-current="page">備品管理</a><span>機台管理（尚未移植）</span></nav></header>
+<main>
+  <div class="title-row"><div><h1>備品管理</h1><p>SQLite 本機移植驗證版 · 送修基本流程</p></div><button id="create" type="button" disabled>＋ 新增送修</button></div>
+  <aside>目前只開放本機驗證。DBN／Socket、附件、結案／再次送修、完整主檔維護與統計尚未移植；舊資料尚未匯入。機台／板件／價格為 Git 儲存庫內的基礎對應，正式使用前需核對。</aside>
+  <form id="search-form" class="toolbar"><input id="query" type="search" placeholder="搜尋 S/N、板件名稱、機台或異常描述" aria-label="搜尋"><select id="status-filter" aria-label="狀態"><option value="">所有狀態</option><option>待送修</option><option>已送修</option><option>取回驗證</option><option>結案（PASS）</option><option>結案（FAIL）</option></select><button type="submit">查詢</button></form>
+  <p id="message" role="status" aria-live="polite">正在載入…</p>
+  <div class="table-wrap"><table><thead><tr><th>S/N－板件名稱</th><th>機台／機型</th><th>狀態</th><th>異常類別</th><th>維修分類／金額</th><th>損壞日期</th><th>操作</th></tr></thead><tbody id="records"></tbody></table></div>
+  <div class="pager"><button id="previous" type="button" disabled>上一頁</button><span id="page"></span><button id="next" type="button" disabled>下一頁</button></div>
+</main>
+<dialog id="editor" aria-labelledby="editor-title">
+  <div class="dialog-head"><h2 id="editor-title">新增送修</h2><button id="close" type="button" aria-label="關閉">×</button></div>
+  <form id="record-form">
+    <div class="fields">
+      <label>S/N<input name="serial_no" id="serial" maxlength="64" autocomplete="off" required></label>
+      <label>機台<select name="machine_code" id="machine" required></select></label>
+      <p id="mapping-hint" class="wide hint" role="status"></p>
+      <label>板件名稱<select name="description" id="board" required></select></label>
+      <label>Part Number<input name="board_part_code" id="part" readonly required></label>
+      <label>異常類別<select name="failure_tag" id="failure-tag" required></select></label>
+      <label>維修分類<select name="repair_type" id="repair-type" required></select></label>
+      <label class="wide">異常描述<textarea name="failure_description" id="failure-description" maxlength="10000" required></textarea></label>
+      <label>狀態<select name="current_status" id="record-status" required></select></label>
+      <label class="check"><input type="checkbox" name="is_opened" id="is-opened">已開單</label>
+      <label>損壞日期<input type="date" name="occurred_on" id="occurred-on" required></label>
+      <label>送修日期<input type="date" name="sent_on" id="sent-on"></label>
+      <label>回修日期<input type="date" name="returned_on" id="returned-on"></label>
+      <p class="hint">金額依本機板件價格及維修分類自動帶入；空白保留未設定，0 為零元。</p>
+    </div>
+    <p id="form-message" role="status" aria-live="polite"></p>
+    <div class="actions"><button id="cancel" type="button">取消</button><button id="save" type="submit">儲存</button></div>
+  </form>
+  <details id="history-section" hidden><summary>此筆異動紀錄</summary><ol id="history"></ol></details>
+</dialog>
+</body>
+</html>

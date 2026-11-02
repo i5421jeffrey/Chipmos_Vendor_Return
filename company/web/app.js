@@ -4,7 +4,7 @@ async function checkConnection() {
   button.disabled = true;
   status.textContent = '正在檢查…';
   status.dataset.state = '';
-  for (const id of ['sqlite-version', 'schema-version', 'initialized-at']) {
+  for (const id of ['sqlite-version', 'schema-version', 'initialized-at', 'repairs-module']) {
     document.getElementById(id).textContent = '—';
   }
   try {
@@ -13,6 +13,8 @@ async function checkConnection() {
     if (!response.ok || data.status !== 'ok') throw new Error('連線檢查失敗');
     document.getElementById('sqlite-version').textContent = data.sqlite_version;
     document.getElementById('schema-version').textContent = data.schema_version;
+    document.getElementById('repairs-module').textContent = data.modules?.repairs
+      ? `版本 ${data.modules.repairs}（送修基本流程）` : '未安裝';
     document.getElementById('initialized-at').textContent = data.initialized_at;
     status.textContent = 'Python 服務正常，SQLite 已連線。';
     status.dataset.state = 'ok';

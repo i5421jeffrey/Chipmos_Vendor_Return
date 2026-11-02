@@ -1,0 +1,978 @@
+{
+  "sources": [
+    {
+      "file": "supabase/repair_board_mapping_refresh_20261005.sql",
+      "sha256": "7e371ee76789a09af5d4737d7a731407c0fcc19c65551575ece726a5056bddd3"
+    },
+    {
+      "file": "supabase/repair_board_prices_20261012_migration.sql",
+      "sha256": "65a253a494cad4019d529e184a06d02ace73c67d3d7f117bbf06f6feba242a40"
+    }
+  ],
+  "machines": [
+    {
+      "machine_code": "F45",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F46",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F47",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F48",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F49",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F50",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F51",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F52",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F53",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F54",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F55",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F56",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F57",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F58",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F30",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F79",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F78",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F07",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F32",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F13",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F08",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F09",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F16",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F11",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F10",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F35",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F12",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F36",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F22",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F66",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F65",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F64",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F63",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F67",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F68",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F31",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F23",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F38",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F44",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F24",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F15",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F26",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F70",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F69",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F33",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F25",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F29",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F37",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F72",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F71",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F77",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F76",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F75",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F74",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F73",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F18",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F17",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F34",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F06",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F27",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "R02",
+      "model": "T5377"
+    },
+    {
+      "machine_code": "R03",
+      "model": "T5377"
+    },
+    {
+      "machine_code": "R21",
+      "model": "T5377"
+    },
+    {
+      "machine_code": "F19",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F42",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F41",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F14",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F62",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F40",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F39",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F59",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F60",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F61",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F20",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F28",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "F21",
+      "model": "T5377S"
+    },
+    {
+      "machine_code": "R05",
+      "model": "T5377"
+    },
+    {
+      "machine_code": "R07",
+      "model": "T5377"
+    },
+    {
+      "machine_code": "R09",
+      "model": "T5377"
+    }
+  ],
+  "boards": [
+    {
+      "model": "T5377",
+      "board_name": "CAL SIG",
+      "board_part_code": "BGR-026746X02"
+    },
+    {
+      "model": "T5377",
+      "board_name": "DR PE",
+      "board_part_code": "BIR-026805"
+    },
+    {
+      "model": "T5377",
+      "board_name": "PDS",
+      "board_part_code": "BIR-026380"
+    },
+    {
+      "model": "T5377",
+      "board_name": "DPU I/F",
+      "board_part_code": "BGR-026901"
+    },
+    {
+      "model": "T5377",
+      "board_name": "I/O PE",
+      "board_part_code": "BIR-030083"
+    },
+    {
+      "model": "T5377",
+      "board_name": "FMRA",
+      "board_part_code": "BGR-030182X02"
+    },
+    {
+      "model": "T5377",
+      "board_name": "PPS",
+      "board_part_code": "BIR-026903"
+    },
+    {
+      "model": "T5377",
+      "board_name": "DC",
+      "board_part_code": "BGR-026902"
+    },
+    {
+      "model": "T5377",
+      "board_name": "TP6B CPU",
+      "board_part_code": "WBL-H3610207CPU"
+    },
+    {
+      "model": "T5377",
+      "board_name": "FAIL MUX",
+      "board_part_code": "BGR-026384X02"
+    },
+    {
+      "model": "T5377",
+      "board_name": "FM CONT",
+      "board_part_code": "BGR-030181"
+    },
+    {
+      "model": "T5377",
+      "board_name": "PM",
+      "board_part_code": "BIR-026383"
+    },
+    {
+      "model": "T5377",
+      "board_name": "ALPG",
+      "board_part_code": "BIR-030349"
+    },
+    {
+      "model": "T5377",
+      "board_name": "TH IF",
+      "board_part_code": "BGR-026378X04"
+    },
+    {
+      "model": "T5377",
+      "board_name": "PS MONITOR",
+      "board_part_code": "BGR-026815X02"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "HVDR PE",
+      "board_part_code": "BPR-030837"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "FAIL MUX",
+      "board_part_code": "BGR-026384X02"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "FM CONT X02",
+      "board_part_code": "BGR-030181X02"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "PM",
+      "board_part_code": "BIR-026383"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "ALPG",
+      "board_part_code": "BIR-030349"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "PDS",
+      "board_part_code": "BIR-026380"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "FMRA",
+      "board_part_code": "BGR-030182X02"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "TH IF",
+      "board_part_code": "BGR-026378X04"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "TP6B CPU",
+      "board_part_code": "WBL-H3610207CPU"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "PPS",
+      "board_part_code": "BIR-026903"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "CAL SIG",
+      "board_part_code": "BGR-026746X02"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "I/O PE",
+      "board_part_code": "BIR-030083"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "SYSTEM MONITOR",
+      "board_part_code": "BGR-031566"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "PS MONITOR",
+      "board_part_code": "BGR-031487"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "DC",
+      "board_part_code": "BGR-026902"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "2G MODULE",
+      "board_part_code": "BGD-030184X02"
+    },
+    {
+      "model": "T5377",
+      "board_name": "1G MODULE",
+      "board_part_code": "BGD-030184"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "BLADE1500",
+      "board_part_code": "-"
+    },
+    {
+      "model": "T5377",
+      "board_name": "BLADE1500",
+      "board_part_code": "-"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "BLADE150",
+      "board_part_code": "-"
+    },
+    {
+      "model": "T5377",
+      "board_name": "BLADE150",
+      "board_part_code": "-"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "Main AC",
+      "board_part_code": "-"
+    },
+    {
+      "model": "T5377",
+      "board_name": "Main AC",
+      "board_part_code": "WBL_H371329X06CONT"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "Mother Board X04",
+      "board_part_code": "H7-0760X04"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "Mother Board X05",
+      "board_part_code": "H7-0760X05"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "Mother Board X06",
+      "board_part_code": "H7-0760X06"
+    },
+    {
+      "model": "T5377S",
+      "board_name": "Mother Board X07",
+      "board_part_code": "H7-0760X07"
+    },
+    {
+      "model": "T5377",
+      "board_name": "Mother Board X04",
+      "board_part_code": "H7-0760X04"
+    },
+    {
+      "model": "T5377",
+      "board_name": "Mother Board X05",
+      "board_part_code": "H7-0760X05"
+    },
+    {
+      "model": "T5377",
+      "board_name": "Mother Board X06",
+      "board_part_code": "H7-0760X06"
+    },
+    {
+      "model": "T5377",
+      "board_name": "Mother Board X07",
+      "board_part_code": "H7-0760X07"
+    }
+  ],
+  "prices": [
+    {
+      "model": "T5377",
+      "board_name": "1G MODULE",
+      "board_part_code": "BGD-030184",
+      "board_repair_amount": 274000.0,
+      "external_repair_amount": 274000.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "ALPG",
+      "board_part_code": "BIR-030349",
+      "board_repair_amount": null,
+      "external_repair_amount": null,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "BLADE150",
+      "board_part_code": "-",
+      "board_repair_amount": null,
+      "external_repair_amount": null,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "BLADE1500",
+      "board_part_code": "-",
+      "board_repair_amount": 95000.0,
+      "external_repair_amount": 95000.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "CAL SIG",
+      "board_part_code": "BGR-026746X02",
+      "board_repair_amount": 39000.0,
+      "external_repair_amount": 39000.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "DC",
+      "board_part_code": "BGR-026902",
+      "board_repair_amount": 50987.0,
+      "external_repair_amount": 50987.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "DPU I/F",
+      "board_part_code": "BGR-026901",
+      "board_repair_amount": null,
+      "external_repair_amount": null,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "DR PE",
+      "board_part_code": "BIR-026805",
+      "board_repair_amount": 50987.0,
+      "external_repair_amount": 50987.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "FAIL MUX",
+      "board_part_code": "BGR-026384X02",
+      "board_repair_amount": null,
+      "external_repair_amount": null,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "FM CONT",
+      "board_part_code": "BGR-030181",
+      "board_repair_amount": 50987.0,
+      "external_repair_amount": 50987.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "FMRA",
+      "board_part_code": "BGR-030182X02",
+      "board_repair_amount": 50987.0,
+      "external_repair_amount": 50987.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "I/O PE",
+      "board_part_code": "BIR-030083",
+      "board_repair_amount": 50987.0,
+      "external_repair_amount": 50987.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "Main AC",
+      "board_part_code": "WBL_H371329X06CONT",
+      "board_repair_amount": 58500.0,
+      "external_repair_amount": 58500.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "Mother Board X04",
+      "board_part_code": "H7-0760X04",
+      "board_repair_amount": 50000.0,
+      "external_repair_amount": 50000.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "Mother Board X05",
+      "board_part_code": "H7-0760X05",
+      "board_repair_amount": 50000.0,
+      "external_repair_amount": 50000.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "Mother Board X06",
+      "board_part_code": "H7-0760X06",
+      "board_repair_amount": 50000.0,
+      "external_repair_amount": 50000.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "Mother Board X07",
+      "board_part_code": "H7-0760X07",
+      "board_repair_amount": 50000.0,
+      "external_repair_amount": 50000.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "PDS",
+      "board_part_code": "BIR-026380",
+      "board_repair_amount": 50987.0,
+      "external_repair_amount": 50987.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "PM",
+      "board_part_code": "BIR-026383",
+      "board_repair_amount": null,
+      "external_repair_amount": null,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "PPS",
+      "board_part_code": "BIR-026903",
+      "board_repair_amount": 50987.0,
+      "external_repair_amount": 50987.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "PS MONITOR",
+      "board_part_code": "BGR-026815X02",
+      "board_repair_amount": 35000.0,
+      "external_repair_amount": 35000.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "TH IF",
+      "board_part_code": "BGR-026378X04",
+      "board_repair_amount": 50987.0,
+      "external_repair_amount": 50987.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377",
+      "board_name": "TP6B CPU",
+      "board_part_code": "WBL-H3610207CPU",
+      "board_repair_amount": 33800.0,
+      "external_repair_amount": 33800.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "2G MODULE",
+      "board_part_code": "BGD-030184X02",
+      "board_repair_amount": 50987.0,
+      "external_repair_amount": 50987.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "ALPG",
+      "board_part_code": "BIR-030349",
+      "board_repair_amount": null,
+      "external_repair_amount": null,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "BLADE150",
+      "board_part_code": "-",
+      "board_repair_amount": null,
+      "external_repair_amount": null,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "BLADE1500",
+      "board_part_code": "-",
+      "board_repair_amount": 95000.0,
+      "external_repair_amount": 95000.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "CAL SIG",
+      "board_part_code": "BGR-026746X02",
+      "board_repair_amount": 39000.0,
+      "external_repair_amount": 39000.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "DC",
+      "board_part_code": "BGR-026902",
+      "board_repair_amount": 50987.0,
+      "external_repair_amount": 50987.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "FAIL MUX",
+      "board_part_code": "BGR-026384X02",
+      "board_repair_amount": null,
+      "external_repair_amount": null,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "FM CONT X02",
+      "board_part_code": "BGR-030181X02",
+      "board_repair_amount": 50987.0,
+      "external_repair_amount": 50987.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "FMRA",
+      "board_part_code": "BGR-030182X02",
+      "board_repair_amount": 50987.0,
+      "external_repair_amount": 50987.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "HVDR PE",
+      "board_part_code": "BPR-030837",
+      "board_repair_amount": 50987.0,
+      "external_repair_amount": 50987.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "I/O PE",
+      "board_part_code": "BIR-030083",
+      "board_repair_amount": 50987.0,
+      "external_repair_amount": 50987.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "Main AC",
+      "board_part_code": "-",
+      "board_repair_amount": 58500.0,
+      "external_repair_amount": 58500.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "Mother Board X04",
+      "board_part_code": "H7-0760X04",
+      "board_repair_amount": 50000.0,
+      "external_repair_amount": 50000.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "Mother Board X05",
+      "board_part_code": "H7-0760X05",
+      "board_repair_amount": 50000.0,
+      "external_repair_amount": 50000.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "Mother Board X06",
+      "board_part_code": "H7-0760X06",
+      "board_repair_amount": 50000.0,
+      "external_repair_amount": 50000.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "Mother Board X07",
+      "board_part_code": "H7-0760X07",
+      "board_repair_amount": 50000.0,
+      "external_repair_amount": 50000.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "PDS",
+      "board_part_code": "BIR-026380",
+      "board_repair_amount": 50987.0,
+      "external_repair_amount": 50987.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "PM",
+      "board_part_code": "BIR-026383",
+      "board_repair_amount": null,
+      "external_repair_amount": null,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "PPS",
+      "board_part_code": "BIR-026903",
+      "board_repair_amount": 50987.0,
+      "external_repair_amount": 50987.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "PS MONITOR",
+      "board_part_code": "BGR-031487",
+      "board_repair_amount": 35000.0,
+      "external_repair_amount": 35000.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "SYSTEM MONITOR",
+      "board_part_code": "BGR-031566",
+      "board_repair_amount": null,
+      "external_repair_amount": null,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "TH IF",
+      "board_part_code": "BGR-026378X04",
+      "board_repair_amount": 50987.0,
+      "external_repair_amount": 50987.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    },
+    {
+      "model": "T5377S",
+      "board_name": "TP6B CPU",
+      "board_part_code": "WBL-H3610207CPU",
+      "board_repair_amount": 33800.0,
+      "external_repair_amount": 33800.0,
+      "contract_repair_amount": 0.0,
+      "warranty_repair_amount": 0.0
+    }
+  ]
+}

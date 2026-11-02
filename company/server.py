@@ -1,4 +1,4 @@
-"""Phase-one local-only SPMS service. Python standard library only."""
+"""Local SPMS service. Python standard library only; no cloud connections."""
 
 import argparse
 import json
@@ -6,7 +6,11 @@ import sqlite3
 from contextlib import closing
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlsplit
+from urllib.parse import parse_qs, urlsplit
+
+from database import migrate
+from errors import APIError
+from modules.repairs import service as repairs
 
 
 ROOT = Path(__file__).resolve().parent
@@ -15,10 +19,14 @@ ASSETS = {
     "/index.html": ("index.html", "text/html; charset=utf-8"),
     "/style.css": ("style.css", "text/css; charset=utf-8"),
     "/app.js": ("app.js", "text/javascript; charset=utf-8"),
+    "/repairs/": ("repairs.html", "text/html; charset=utf-8"),
+    "/repairs/app.js": ("repairs.js", "text/javascript; charset=utf-8"),
+    "/repairs/style.css": ("repairs.css", "text/css; charset=utf-8"),
 }
 
 
 def initialize_database(path):
+    existed = path.exists()
     path.parent.mkdir(parents=True, exist_ok=True)
     with closing(sqlite3.connect(path, timeout=5)) as connection, connection:
         connection.execute("PRAGMA journal_mode=WAL")
@@ -32,6 +40,7 @@ def initialize_database(path):
         connection.execute(
             "INSERT OR IGNORE INTO spms_schema_version (version) VALUES (1)"
         )
+    migrate(path, backup_required=existed)
 
 
 def database_status(path):
@@ -46,8 +55,9 @@ def database_status(path):
             "sqlite_version": sqlite3.sqlite_version,
             "schema_version": version,
             "initialized_at": created_at,
-            "phase": 1,
+            "phase": 2,
             "access": "localhost-only",
+            "modules": {"repairs": 1, "machines": None},
         }
 
 
@@ -60,6 +70,20 @@ class LocalServer(ThreadingHTTPServer):
 
 
 class Handler(BaseHTTPRequestHandler):
+    def allowed_host(self):
+        return self.headers.get("Host") in (
+            f"127.0.0.1:{self.server.server_port}", f"localhost:{self.server.server_port}")
+
+    def send_json(self, status, payload, head=False):
+        self.send_content(status, json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                          "application/json; charset=utf-8", head)
+
+    def api_error(self, error):
+        if isinstance(error, APIError):
+            self.send_json(error.status, {"error": str(error)})
+        else:
+            self.send_json(503, {"error": "本機資料庫暫時無法使用，請稍後重試；若持續失敗請保留資料庫並聯絡維護人員"})
+
     def send_content(self, status, body, content_type, head=False):
         self.send_response(status)
         self.send_header("Content-Type", content_type)
@@ -83,7 +107,11 @@ class Handler(BaseHTTPRequestHandler):
         self.serve(head=True)
 
     def serve(self, head=False):
-        path = urlsplit(self.path).path
+        if not self.allowed_host():
+            self.send_json(403, {"error": "不允許此主機名稱"}, head)
+            return
+        parsed = urlsplit(self.path)
+        path = parsed.path
         if path == "/api/health":
             try:
                 payload = database_status(self.server.database)
@@ -92,12 +120,83 @@ class Handler(BaseHTTPRequestHandler):
                 payload, status = {"status": "error", "message": "SQLite unavailable"}, 503
             self.send_content(status, json.dumps(payload).encode("utf-8"),
                               "application/json; charset=utf-8", head)
+        elif path.startswith("/api/"):
+            try:
+                query = parse_qs(parsed.query)
+                if path == "/api/modules":
+                    payload = {"repairs": {"installed": True, "url": "/repairs/", "stage": "basic-validation"},
+                               "machines": {"installed": False, "url": None}}
+                elif path == "/api/repairs/catalog":
+                    payload = repairs.catalog(self.server.database)
+                elif path == "/api/repairs/serial-mapping":
+                    payload = repairs.serial_mapping(self.server.database, query.get("serial", [""])[0])
+                elif path == "/api/repairs/records":
+                    payload = repairs.list_records(self.server.database, query)
+                elif path.startswith("/api/repairs/records/"):
+                    record_id = path.removeprefix("/api/repairs/records/")
+                    if record_id.endswith("/history"):
+                        payload = repairs.list_history(self.server.database, record_id.removesuffix("/history"))
+                    else:
+                        payload = repairs.record_detail(self.server.database, record_id)
+                else:
+                    raise APIError("找不到此功能", 404)
+                self.send_json(200, payload, head)
+            except (APIError, sqlite3.Error) as error:
+                if head:
+                    self.send_content(getattr(error, "status", 503), b"", "application/json", True)
+                else:
+                    self.api_error(error)
         elif path in ASSETS:
             filename, content_type = ASSETS[path]
             self.send_content(200, (ROOT / "web" / filename).read_bytes(), content_type, head)
         else:
             # Serve only explicit UI assets, never database/source/attachment paths.
             self.send_content(404, b"Not found", "text/plain; charset=utf-8", head)
+
+    def do_POST(self):
+        self.write_record()
+
+    def do_PUT(self):
+        self.write_record()
+
+    def write_record(self):
+        try:
+            origins = (f"http://127.0.0.1:{self.server.server_port}", f"http://localhost:{self.server.server_port}")
+            if not self.allowed_host() or self.headers.get("Origin", origins[0]) not in origins:
+                raise APIError("不允許跨網站寫入", 403)
+            if self.headers.get("X-SPMS-Request") != "1":
+                raise APIError("缺少本機操作驗證標頭", 403)
+            if self.headers.get_content_type() != "application/json":
+                raise APIError("請使用 JSON 格式", 415)
+            if self.headers.get("Transfer-Encoding"):
+                raise APIError("不支援此傳輸格式", 400)
+            try:
+                length = int(self.headers.get("Content-Length", "0"))
+            except ValueError:
+                raise APIError("內容長度錯誤")
+            if not 0 < length <= 65536:
+                raise APIError("內容大小超過限制或為空", 413)
+            self.connection.settimeout(10)
+            try:
+                raw = self.rfile.read(length)
+                if len(raw) != length:
+                    raise ValueError()
+                payload = json.loads(raw)
+            except (ValueError, UnicodeDecodeError, TimeoutError):
+                raise APIError("JSON 內容錯誤或傳輸逾時")
+            if not isinstance(payload, dict):
+                raise APIError("JSON 須為物件")
+            path = urlsplit(self.path).path
+            if self.command == "POST" and path == "/api/repairs/records":
+                result = repairs.save_record(self.server.database, payload)
+                self.send_json(201, result)
+            elif self.command == "PUT" and path.startswith("/api/repairs/records/") and path.removeprefix("/api/repairs/records/") and "/" not in path.removeprefix("/api/repairs/records/"):
+                result = repairs.save_record(self.server.database, payload, path.removeprefix("/api/repairs/records/"))
+                self.send_json(200, result)
+            else:
+                raise APIError("此端點不支援寫入", 405)
+        except (APIError, sqlite3.Error) as error:
+            self.api_error(error)
 
 
 def main():
@@ -109,7 +208,7 @@ def main():
     database = ROOT / "data" / "spms.sqlite3"
     initialize_database(database)
     with LocalServer(("127.0.0.1", args.port), database) as server:
-        print(f"SPMS phase 1: http://127.0.0.1:{args.port}", flush=True)
+        print(f"SPMS local: http://127.0.0.1:{args.port}", flush=True)
         print(f"SQLite: {database}", flush=True)
         print("Local computer only. Stop with Ctrl+C.", flush=True)
         try:
