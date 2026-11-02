@@ -107,6 +107,16 @@ def list_dbn(path, query):
         return paginate(connection, 'dbn_records', query, ('serial_no', 'board_name', 'machine_code', 'customer_code', 'product_code', 'issue_description'), 'created_at DESC,id', public_dbn)
 
 
+def serial_summary(path, number):
+    number = serial(number)
+    with connect(path) as connection:
+        connection.execute('BEGIN')
+        rows = connection.execute('SELECT machine_code,model FROM repair_records WHERE serial_no=? UNION SELECT machine_code,model FROM dbn_records WHERE serial_no=?', (number, number)).fetchall()
+        mapping = connection.execute('SELECT board_name,board_part_code FROM serial_board_mappings WHERE serial_no=?', (number,)).fetchone()
+        return dict(serial_no=number, mapping=dict(mapping) if mapping else None,
+                    machines=sorted({row['machine_code'] for row in rows}), models=sorted({row['model'] for row in rows}))
+
+
 def validate_issue(payload, socket=None, previous=None):
     kind = payload.get('issue_type')
     if kind not in ('Group', 'Single Dut', 'RTE', 'Other'):

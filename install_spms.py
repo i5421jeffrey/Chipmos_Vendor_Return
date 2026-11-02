@@ -27,6 +27,10 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             '主檔、機台／板件／價格對應、年／月統計。\n'
                                             '- 沿用原版左側導覽、狀態清單、S/N '
                                             '快速搜尋、六欄送修列表、右側詳細資料及深色配色。新增管理表單以本機功能為主，尚未完成與原版逐畫面／像素一致性驗收，不能稱為外觀一模一樣。機台保養模組仍未安裝。\n'
+                                            '- 介面第二段：離線封裝原版 Logo 與 CSS；DBN／S/N 改回欄列清單、快速搜尋改回板件摘要與送修／DBN '
+                                            '分區、統計改回年度／月份選單及卡片／分類金額圖例、詳細資料有三階段維修時程。Model 與金額唯讀顯示，DBN '
+                                            '依類型隱藏不適用欄位。Logo JSON 為安裝封裝用途，不直接對外提供；只有明確 PNG 路由可讀取圖片。沒有搬入原版雲端 '
+                                            'JS 或前端硬編碼密碼，不宣稱已完成登入權限。\n'
                                             '- 快速搜尋以正規化後的完整 S/N 精確查詢，不混入「包含相同字串」的其他序號；狀態導覽筆數由 SQLite '
                                             '實際紀錄取得。\n'
                                             '- S/N 主檔只存 S/N、板名與 '
@@ -137,7 +141,14 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             '8766\n'
                                             '```\n'
                                             '\n'
-                                            '## 驗收\n'
+                                            '## 公司端驗證狀態\n'
+                                            '\n'
+                                            '使用者回報基本流程、DBN／Socket、附件及第一輪 '
+                                            'FAIL→再次送修測試完成。之後要求跳過所有公司端驗證並繼續移植，故第二輪 '
+                                            'PASS、統計、主檔歷史同步、人工備份／復原及本次畫面一致性仍屬**未驗收**；不得將略過記為通過，也不以此宣稱正式上線。開發機自動測試照常執行，但不能取代 '
+                                            'Windows／真實資料驗收。\n'
+                                            '\n'
+                                            '## 驗收參考程序（保留供後續，不作為目前移植的前置要求）\n'
                                             '\n'
                                             '1. 頁面顯示 SQLite 已連線及版本，結構版本為 1。\n'
                                             '2. 按「重新檢查」仍成功。\n'
@@ -260,12 +271,16 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             '這只產生封裝檔，不會更新已安裝 SQLite 的主檔，正式主檔變更須另行審閱遷移。\n'
                                             'DBN 基礎對應：`python scripts/build_company_dbn_catalog.py`（從明確 Git '
                                             'SQL VALUES／Socket JSON 擷取，不執行 PostgreSQL 或連雲端）。\n'
+                                            '原版外觀資源：`python scripts/build_company_ui_assets.py`，產生 '
+                                            '`company/web/original.css` 與純文字 `branding.json`；另以 `parity.css` '
+                                            '適配本機 DOM。原版 CSS 有變更時須重新產生，再重建安裝檔。資源重現測試：`python -m unittest '
+                                            'discover -s scripts -p "test_company_ui_assets.py" -v`。\n'
                                             '\n'
                                             '單檔安裝程式由 `python scripts/build_company_installer.py` '
                                             '產生；公司版程式更新後必須重新產生。\n'
                                             '安裝測試：`python -m unittest discover -s scripts -p '
                                             '"test_company_installer.py" -v`。\n',
-                                 'sha256': '8bf8e41aa6d8bf9b490119ba0b2ab11f3673474b8619d82d3efe66afadf8ee8a'},
+                                 'sha256': 'ff0788d00eb29534c17435fda52a1719a5b1d3ea81782fe133af8f5c26846fff'},
            'company/database.py': {'content': '"""Shared SQLite connections and additive, backed-up module '
                                               'migrations."""\n'
                                               'import json\n'
@@ -2086,6 +2101,29 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                                 'public_dbn)\n'
                                                                 '\n'
                                                                 '\n'
+                                                                'def serial_summary(path, number):\n'
+                                                                '    number = serial(number)\n'
+                                                                '    with connect(path) as connection:\n'
+                                                                "        connection.execute('BEGIN')\n"
+                                                                "        rows = connection.execute('SELECT "
+                                                                'machine_code,model FROM repair_records '
+                                                                'WHERE serial_no=? UNION SELECT '
+                                                                'machine_code,model FROM dbn_records WHERE '
+                                                                "serial_no=?', (number, number)).fetchall()\n"
+                                                                '        mapping = '
+                                                                "connection.execute('SELECT "
+                                                                'board_name,board_part_code FROM '
+                                                                "serial_board_mappings WHERE serial_no=?', "
+                                                                '(number,)).fetchone()\n'
+                                                                '        return dict(serial_no=number, '
+                                                                'mapping=dict(mapping) if mapping else '
+                                                                'None,\n'
+                                                                '                    '
+                                                                "machines=sorted({row['machine_code'] for "
+                                                                "row in rows}), models=sorted({row['model'] "
+                                                                'for row in rows}))\n'
+                                                                '\n'
+                                                                '\n'
                                                                 'def validate_issue(payload, socket=None, '
                                                                 'previous=None):\n'
                                                                 "    kind = payload.get('issue_type')\n"
@@ -2843,7 +2881,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                                 "identity, 'UPDATE' if old else 'INSERT', "
                                                                 'dict(old) if old else None, after)\n'
                                                                 "        return {'data': after}\n",
-                                                     'sha256': 'f94011656359b79df75750dfd94af15c3062eba9a946b435c6c8421ed902a2c5'},
+                                                     'sha256': '79088969105fe2697ae7ef045b42036a36b9f53a1d02127d77d07f3e4ee36620'},
            'company/modules/repairs/schema.sql': {'content': 'CREATE TABLE repair_machine_models (\n'
                                                              '    machine_code TEXT PRIMARY KEY,\n'
                                                              '    model TEXT NOT NULL\n'
@@ -3104,11 +3142,15 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                              '        text = "%" + text.replace("\\\\", '
                                                              '"\\\\\\\\").replace("%", "\\\\%").replace("_", '
                                                              '"\\\\_") + "%"\n'
-                                                             '        where.append("(serial_no LIKE ? ESCAPE '
-                                                             "'\\\\' OR description LIKE ? ESCAPE '\\\\' OR "
-                                                             "machine_code LIKE ? ESCAPE '\\\\' OR "
-                                                             'failure_description LIKE ? ESCAPE \'\\\\\')")\n'
-                                                             '        arguments.extend([text] * 4)\n'
+                                                             "        fields = ('serial_no', 'description', "
+                                                             "'machine_code', 'model', "
+                                                             "'failure_description', 'failure_tag', "
+                                                             "'repair_type')\n"
+                                                             "        where.append('(' + ' OR '.join(field + "
+                                                             '" LIKE ? ESCAPE \'\\\\\'" for field in fields) '
+                                                             "+ ')')\n"
+                                                             '        arguments.extend([text] * '
+                                                             'len(fields))\n'
                                                              '    if status:\n'
                                                              '        if status not in (*ACTIVE_STATUSES, '
                                                              '"結案（PASS）", "結案（FAIL）"):\n'
@@ -3395,11 +3437,12 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                              'json.loads(entry["changes"])\n'
                                                              '            result.append(entry)\n'
                                                              '        return {"data": result}\n',
-                                                  'sha256': 'cf7f628c295818e27f6f87349c3fd5b12047979dee896c39ba0395980ae1dbd4'},
+                                                  'sha256': '400b60c6374697155688f624cd2e4b3455e5fa1bd0e88d2844cfac694379309f'},
            'company/server.py': {'content': '"""Local SPMS service. Python standard library only; no cloud '
                                             'connections."""\n'
                                             '\n'
                                             'import argparse\n'
+                                            'import base64\n'
                                             'import json\n'
                                             'import sqlite3\n'
                                             'from contextlib import closing\n'
@@ -3426,6 +3469,10 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             '    "/repairs/style.css": ("repairs.css", "text/css; '
                                             'charset=utf-8"),\n'
                                             '    "/repairs/features.js": ("features.js", "text/javascript; '
+                                            'charset=utf-8"),\n'
+                                            '    "/repairs/original.css": ("original.css", "text/css; '
+                                            'charset=utf-8"),\n'
+                                            '    "/repairs/parity.css": ("parity.css", "text/css; '
                                             'charset=utf-8"),\n'
                                             '}\n'
                                             '\n'
@@ -3562,6 +3609,10 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             '                    payload = '
                                             'repairs.serial_mapping(self.server.database, '
                                             'query.get("serial", [""])[0])\n'
+                                            "                elif path == '/api/repairs/serial-summary':\n"
+                                            '                    payload = '
+                                            'operations.serial_summary(self.server.database, '
+                                            "query.get('serial', [''])[0])\n"
                                             '                elif path == "/api/repairs/records":\n'
                                             '                    payload = '
                                             'repairs.list_records(self.server.database, query)\n'
@@ -3624,6 +3675,12 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             '503), b"", "application/json", True)\n'
                                             '                else:\n'
                                             '                    self.api_error(error)\n'
+                                            "        elif path == '/repairs/ghost-logo.png':\n"
+                                            '            branding = json.loads((ROOT / '
+                                            "'web/branding.json').read_text(encoding='utf-8'))\n"
+                                            '            self.send_content(200, '
+                                            "base64.b64decode(branding['content_base64'], validate=True), "
+                                            "'image/png', head)\n"
                                             '        elif path in ASSETS:\n'
                                             '            filename, content_type = ASSETS[path]\n'
                                             '            self.send_content(200, (ROOT / "web" / '
@@ -3754,7 +3811,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             '\n'
                                             'if __name__ == "__main__":\n'
                                             '    main()\n',
-                                 'sha256': '7d105abe79a94b0fa5fae8f4e2b69f9c94f0c22e4d1c480d123247fe6ccc71ee'},
+                                 'sha256': '0a40557b2e94fb30ef3f0a476d2eaf1a651e2d10fa74d4b127cd9d8afccd5bf5'},
            'company/test_features.py': {'content': 'import base64\n'
                                                    'import concurrent.futures\n'
                                                    'import json\n'
@@ -3824,6 +3881,27 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    "customer_code='VB', product_code=None, "
                                                    "station_code=None))['data']\n"
                                                    "        self.assertIsNone(row['socket_file_id'])\n"
+                                                   '\n'
+                                                   '    def '
+                                                   'test_quick_summary_covers_all_pages_and_model_tag_search(self):\n'
+                                                   '        for index in range(21):\n'
+                                                   '            service.save_record(self.path, '
+                                                   "example(machine_code='F45' if index < 20 else 'F46'))\n"
+                                                   '        ops.save_dbn(self.path, dbn())\n'
+                                                   '        summary = ops.serial_summary(self.path, '
+                                                   "'2850948')\n"
+                                                   "        self.assertEqual(summary['machines'], "
+                                                   "['F45','F46'])\n"
+                                                   "        self.assertEqual(summary['models'], ['T5377S'])\n"
+                                                   '        '
+                                                   "self.assertEqual(summary['mapping']['board_name'], 'HVDR "
+                                                   "PE')\n"
+                                                   '        self.assertEqual(service.list_records(self.path, '
+                                                   "{'q':['T5377S']})['total'], 21)\n"
+                                                   '        self.assertEqual(service.list_records(self.path, '
+                                                   "{'q':['RTE']})['total'], 21)\n"
+                                                   '        self.assertEqual(service.list_records(self.path, '
+                                                   "{'q':['板修']})['total'], 21)\n"
                                                    '\n'
                                                    '    def test_dbn_snapshot_is_historical(self):\n'
                                                    "        row = ops.save_dbn(self.path, dbn())['data']\n"
@@ -4341,6 +4419,9 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    "self.assertEqual(self.request('/api/repairs/mappings')[1]['total'], "
                                                    '1)\n'
                                                    '        '
+                                                   "self.assertEqual(self.request('/api/repairs/serial-summary?serial=2850948')[1]['models'], "
+                                                   "['T5377S'])\n"
+                                                   '        '
                                                    "self.assertGreater(self.request('/api/repairs/history')[1]['total'], "
                                                    '1)\n'
                                                    '        '
@@ -4381,7 +4462,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    '\n'
                                                    "if __name__ == '__main__':\n"
                                                    '    unittest.main()\n',
-                                        'sha256': '4efdc2f3496600c6592c7df92a18e341fb97e74c680f9045b06d12c681924e7f'},
+                                        'sha256': 'a2844bdc48c8d9d7f53d81714aa73898b8597d93bae6dcb0ea6969898de2bbb3'},
            'company/test_import_data.py': {'content': 'import json\n'
                                                       'import sqlite3\n'
                                                       'import unittest\n'
@@ -4920,7 +5001,9 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  '    def test_home_assets_and_headers(self):\n'
                                                  '        for path in ("/", "/index.html", "/style.css", '
                                                  '"/app.js", "/repairs/", "/repairs/style.css", '
-                                                 '"/repairs/app.js"):\n'
+                                                 '"/repairs/app.js", "/repairs/features.js", '
+                                                 '"/repairs/original.css", "/repairs/parity.css", '
+                                                 '"/repairs/ghost-logo.png"):\n'
                                                  '            with urlopen(self.base + path, timeout=5) as '
                                                  'response:\n'
                                                  '                self.assertEqual(response.status, 200)\n'
@@ -4961,7 +5044,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  '\n'
                                                  '    def test_private_paths_not_served(self):\n'
                                                  '        for path in ("/data/spms.sqlite3", "/server.py", '
-                                                 '"/../server.py", "/%2e%2e/server.py", "/api/unknown"):\n'
+                                                 '"/../server.py", "/%2e%2e/server.py", "/api/unknown", '
+                                                 '"/repairs/branding.json"):\n'
                                                  '            with self.assertRaises(HTTPError) as caught:\n'
                                                  '                urlopen(self.base + path, timeout=5)\n'
                                                  '            self.assertEqual(caught.exception.code, 404)\n'
@@ -5008,7 +5092,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  '\n'
                                                  'if __name__ == "__main__":\n'
                                                  '    unittest.main()\n',
-                                      'sha256': 'c230dd1a55f3f8921e7c56cbfa86dd19beb38f773c4c80a46ab89cf91040e9f0'},
+                                      'sha256': 'ff01e5a46cba886343d55db148c15ac572eac0e979088499897f84cadf196373'},
            'company/web/app.js': {'content': 'async function checkConnection() {\n'
                                              "  const status = document.getElementById('status');\n"
                                              "  const button = document.getElementById('refresh');\n"
@@ -5049,12 +5133,24 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                              'checkConnection);\n'
                                              'checkConnection();\n',
                                   'sha256': '5638337313579f6c3f2ad606761e87e027cd225aa0e5f9fb7933b943f525a8de'},
+           'company/web/branding.json': {'content': '{\n'
+                                                    '  "source": "docs/repairs/ghost-logo.png",\n'
+                                                    '  "sha256": '
+                                                    '"b17592bfa36c45ce9504cf5dfa7963a8c6ecced9f885848f0af4fb38226d0829",\n'
+                                                    '  "content_base64": '
+                                                    '"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"\n'
+                                                    '}\n',
+                                         'sha256': '775e8468932993d3883c8f3b6af282d7d551fc8d9391cf5a24b4a38b4234f727'},
            'company/web/features.js': {'content': '/* Local-only feature workspaces. Untrusted values are '
                                                   'always text, never HTML. */\n'
                                                   "let workspace = '', workspacePage = 1, workspaceSerial = "
                                                   "'', workspaceRequest = 0;\n"
                                                   'let operationsSaving = false, operationsSubmit = null, '
                                                   'masterData = null;\n'
+                                                  "let statisticsMode = 'year', statisticsYear = String(new "
+                                                  'Date().getFullYear()), statisticsMonth = String(new '
+                                                  "Date().getMonth() + 1).padStart(2, '0');\n"
+                                                  'const fieldContainers = new WeakMap();\n'
                                                   "const workspaceTitles = {dbn:'DBN 紀錄', mappings:'S/N "
                                                   "主檔維護', history:'全站異動紀錄', statistics:'統計資料', "
                                                   "masters:'機台／板件／價格對應'};\n"
@@ -5065,7 +5161,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   "statistics:'首輪損壞頻率與機台排行；依結案日期加總各輪已知金額。', "
                                                   "masters:'修改只影響後續選擇與儲存，不自動改寫既有案件、S/N 或價格快照。'};\n"
                                                   '\n'
-                                                  "function action(label, handler, className = '') {\n"
+                                                  "function action(label, handler, className = 'button') {\n"
                                                   "  const button = element('button', className, label); "
                                                   "button.type = 'button';\n"
                                                   "  button.addEventListener('click', async () => {\n"
@@ -5119,6 +5215,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   "  if (kind === 'file') input.accept = '.txt,.asc';\n"
                                                   '  wrapper.append(input); '
                                                   "byId('operations-fields').append(wrapper);\n"
+                                                  '  fieldContainers.set(input, wrapper);\n'
                                                   '  return input;\n'
                                                   '}\n'
                                                   '\n'
@@ -5202,16 +5299,34 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '=> {workspacePage--; loadWorkspace();});\n'
                                                   "byId('workspace-next').addEventListener('click', () => "
                                                   '{workspacePage++; loadWorkspace();});\n'
-                                                  "byId('stats-load').addEventListener('click', "
-                                                  'loadWorkspace);\n'
                                                   "byId('ranking-sort').addEventListener('change', "
                                                   'loadWorkspace);\n'
-                                                  "byId('stats-period').value = String(new "
-                                                  'Date().getFullYear());\n'
-                                                  "byId('stats-mode').addEventListener('change', () => "
-                                                  "{byId('stats-period').value = byId('stats-mode').value "
-                                                  "=== 'year' ? String(new Date().getFullYear()) : "
-                                                  "String(new Date().getMonth() + 1).padStart(2, '0');});\n"
+                                                  'for (let month = 1; month <= 12; month++) '
+                                                  "byId('stats-month').add(new Option(`${month} 月`, "
+                                                  "String(month).padStart(2, '0')));\n"
+                                                  "byId('stats-month').value = statisticsMonth;\n"
+                                                  "byId('stats-year').add(new Option(statisticsYear, "
+                                                  'statisticsYear));\n'
+                                                  "byId('stats-year').addEventListener('change', () => "
+                                                  "{statisticsYear = byId('stats-year').value; "
+                                                  'loadWorkspace();});\n'
+                                                  "byId('stats-month').addEventListener('change', () => "
+                                                  "{statisticsMonth = byId('stats-month').value; "
+                                                  'loadWorkspace();});\n'
+                                                  'function setStatisticsMode(mode) {\n'
+                                                  '  statisticsMode = mode;\n'
+                                                  "  byId('stats-mode-year').setAttribute('aria-pressed', "
+                                                  "String(mode === 'year'));\n"
+                                                  "  byId('stats-mode-month').setAttribute('aria-pressed', "
+                                                  "String(mode === 'month'));\n"
+                                                  "  byId('stats-year').hidden = mode !== 'year'; "
+                                                  "byId('stats-month').hidden = mode !== 'month';\n"
+                                                  '  return loadWorkspace();\n'
+                                                  '}\n'
+                                                  "byId('stats-mode-year').addEventListener('click', () => "
+                                                  "setStatisticsMode('year'));\n"
+                                                  "byId('stats-mode-month').addEventListener('click', () => "
+                                                  "setStatisticsMode('month'));\n"
                                                   '\n'
                                                   'async function loadWorkspace() {\n'
                                                   '  const request = ++workspaceRequest, kind = workspace;\n'
@@ -5225,8 +5340,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   "    if (workspaceSerial) query.set('serial', "
                                                   'workspaceSerial);\n'
                                                   "    if (kind === 'statistics') {query.set('mode', "
-                                                  "byId('stats-mode').value); query.set('period', "
-                                                  "byId('stats-period').value);}\n"
+                                                  "statisticsMode); query.set('period', statisticsMode === "
+                                                  "'year' ? statisticsYear : statisticsMonth);}\n"
                                                   "    const result = await api('/api/repairs/' + kind + '?' "
                                                   '+ query);\n'
                                                   '    if (request !== workspaceRequest || kind !== '
@@ -5248,16 +5363,24 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   "'主檔不自動改寫歷史案件。'; return;\n"
                                                   '    }\n'
                                                   '    workspacePage = result.page;\n'
+                                                  "    if (kind === 'dbn') "
+                                                  "content.append(workspaceHeading(['S/N','板件名稱','機台','客戶','產品','站點','紀錄日期','操作'], "
+                                                  "'dbn-heading'));\n"
+                                                  "    if (kind === 'mappings') "
+                                                  "content.append(workspaceHeading(['S/N','板件名稱','Part "
+                                                  "Number','操作'], 'serial-map-heading'));\n"
                                                   '    for (const row of result.data) {\n'
                                                   "      if (kind === 'dbn') "
-                                                  'content.append(renderDbnCard(row));\n'
+                                                  'content.append(renderDbnRow(row));\n'
                                                   "      else if (kind === 'mappings') {\n"
-                                                  "        const card = element('section', "
-                                                  "'quick-summary');\n"
-                                                  "        card.append(element('strong', '', row.serial_no), "
-                                                  "element('p', '', `${row.board_name} · "
-                                                  "${row.board_part_code}`), action('修改', () => "
-                                                  'editMapping(row)));\n'
+                                                  "        const card = element('div', 'serial-map-row');\n"
+                                                  "        const actions = element('span', "
+                                                  "'serial-map-actions'); actions.dataset.label = '操作'; "
+                                                  "actions.append(action('修改', () => editMapping(row)));\n"
+                                                  "        card.append(labeledCell('S/N', row.serial_no, "
+                                                  "'serial-map-serial'), labeledCell('板件名稱', "
+                                                  "row.board_name), labeledCell('Part Number', "
+                                                  'row.board_part_code), actions);\n'
                                                   '        content.append(card);\n'
                                                   '      } else {\n'
                                                   "        const card = element('section', "
@@ -5276,6 +5399,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '        content.append(card);\n'
                                                   '      }\n'
                                                   '    }\n'
+                                                  "    if (!result.total) content.append(element('p', "
+                                                  "'serial-map-empty', '沒有符合條件的紀錄。'));\n"
                                                   "    byId('workspace-message').textContent = "
                                                   "`${workspaceSerial ? 'S/N ' + workspaceSerial + ' · ' : "
                                                   "''}共 ${result.total} 筆`;\n"
@@ -5294,7 +5419,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '}\n'
                                                   '\n'
                                                   'function pinDetails(record) {\n'
-                                                  "  const result = element('details', 'pin-details');\n"
+                                                  "  const result = element('details', 'pin-details "
+                                                  "dbn-pin-details');\n"
                                                   "  result.append(element('summary', '', `DUT ${record.dut} "
                                                   '· PIN`));\n'
                                                   '  const snapshot = record.dut_pin_snapshot || {}, rows = '
@@ -5304,46 +5430,174 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '=> pins?.length)\n'
                                                   '    ? rows[0][1].filter(pin => rows.every(([, pins]) => '
                                                   'pins.includes(pin))) : [];\n'
-                                                  "  if (common.length) result.append(element('p', "
-                                                  "'detail-text', '共用 PIN：' + [...new Set(common)].join(', "
-                                                  "')));\n"
+                                                  '  function pinLine(label, content, shared = false) {\n'
+                                                  "    const line = element('div', 'dut-pin-line' + (shared "
+                                                  "? ' dut-pin-common' : ''));\n"
+                                                  "    line.append(element('strong', '', label), "
+                                                  "element('span', '', content)); return line;\n"
+                                                  '  }\n'
+                                                  "  if (common.length) result.append(pinLine('共用PIN:', "
+                                                  "[...new Set(common)].join(', '), true));\n"
                                                   '  for (const [dut, pins] of rows) {\n'
                                                   '    const remaining = pins?.filter(pin => '
                                                   '!common.includes(pin));\n'
-                                                  "    result.append(element('p', 'detail-text', "
-                                                  "`DUT${dut}：${pins ? (remaining.length ? remaining.join(', "
-                                                  "') : '無額外 PIN') : '尚無對應'}`));\n"
+                                                  '    result.append(pinLine(`DUT${dut}:`, pins ? '
+                                                  "(remaining.length ? remaining.join(', ') : '無額外 PIN') : "
+                                                  "'尚無對應'));\n"
                                                   '  }\n'
                                                   "  if (!record.socket_file_id) result.append(element('p', "
                                                   "'hint', '此產品沒有 Socket 對應；不推測 PIN。'));\n"
                                                   '  return result;\n'
                                                   '}\n'
                                                   '\n'
-                                                  'function renderDbnCard(record) {\n'
-                                                  "  const card = element('section', 'quick-summary');\n"
-                                                  "  card.append(element('strong', '', `${record.serial_no} "
-                                                  '· ${record.board_name}`),\n'
-                                                  "    element('p', '', `${record.machine_code} · "
-                                                  '${record.customer_code}／${record.product_code || '
-                                                  "'—'}／${record.station_code || '—'} · "
-                                                  '${record.issue_type}`),\n'
-                                                  "    element('p', 'hint', new "
-                                                  "Date(record.created_at).toLocaleString('zh-TW', "
-                                                  "{timeZone:'Asia/Taipei'})));\n"
-                                                  '  if (record.dut) card.append(pinDetails(record));\n'
-                                                  "  if (record.issue_description) card.append(element('p', "
+                                                  'function workspaceHeading(labels, className) {\n'
+                                                  "  const row = element('div', 'list-heading ' + "
+                                                  'className);\n'
+                                                  "  for (const label of labels) row.append(element('span', "
+                                                  "'', label)); return row;\n"
+                                                  '}\n'
+                                                  '\n'
+                                                  "function labeledCell(label, value, className = '') {\n"
+                                                  "  const cell = element('span', className, value ?? '—'); "
+                                                  'cell.dataset.label = label; return cell;\n'
+                                                  '}\n'
+                                                  '\n'
+                                                  'function renderDbnRow(record) {\n'
+                                                  "  const row = element('div', 'dbn-row'), board = "
+                                                  "labeledCell('板件名稱', record.board_name);\n"
+                                                  "  board.append(element('div', 'dbn-issue-type', "
+                                                  'record.issue_type));\n'
+                                                  '  if (record.dut) board.append(pinDetails(record));\n'
+                                                  "  if (record.issue_description) board.append(element('p', "
                                                   "'detail-text', record.issue_description));\n"
-                                                  "  const actions = element('div', 'actions');\n"
-                                                  "  actions.append(action('編輯', () => editDbn(record)), "
-                                                  "action('刪除', async () => {\n"
+                                                  "  const controls = labeledCell('操作', '', 'dbn-actions');\n"
+                                                  '  const edit = () => '
+                                                  "controls.replaceChildren(action('修改內容', () => "
+                                                  "editDbn(record), 'button primary'), action('刪除', async () "
+                                                  '=> {\n'
                                                   '    if (!window.confirm(`永久刪除這筆 '
                                                   'DBN（${record.serial_no}）？送修案件不受影響。`)) return;\n'
                                                   "    await api('/api/repairs/dbn/' + "
                                                   "encodeURIComponent(record.id), 'DELETE', "
-                                                  '{expected_version:record.version});\n'
-                                                  '    await refreshFeatures();\n'
-                                                  '  }));\n'
-                                                  '  card.append(actions); return card;\n'
+                                                  '{expected_version:record.version}); await '
+                                                  'refreshFeatures();\n'
+                                                  "  }, 'button danger'), action('取消', reset));\n"
+                                                  '  const reset = () => '
+                                                  "controls.replaceChildren(action('編輯', edit)); reset();\n"
+                                                  "  row.append(labeledCell('S/N', record.serial_no, "
+                                                  "'dbn-serial'), board, labeledCell('機台', "
+                                                  'record.machine_code),\n'
+                                                  "    labeledCell('客戶', record.customer_code), "
+                                                  "labeledCell('產品', record.product_code || '-'), "
+                                                  "labeledCell('站點', record.station_code || '-'),\n"
+                                                  "    labeledCell('紀錄日期', new "
+                                                  "Date(record.created_at).toLocaleDateString('zh-TW', "
+                                                  "{timeZone:'Asia/Taipei'}), 'dbn-date'), controls);\n"
+                                                  '  return row;\n'
+                                                  '}\n'
+                                                  '\n'
+                                                  'function repairTimeline(record) {\n'
+                                                  "  const section = element('section', 'detail-section'); "
+                                                  "section.append(element('h3', '', '維修時程'));\n"
+                                                  "  const timeline = element('div', 'repair-timeline');\n"
+                                                  "  const stages = [['損壞', record.occurred_on], ['送修', "
+                                                  "record.sent_on], ['回修', record.returned_on]];\n"
+                                                  '  stages.forEach(([label, date], index) => {\n'
+                                                  '    if (index) {\n'
+                                                  '      const before = stages[index - 1][1], days = before '
+                                                  '&& date ? Math.round((Date.parse(date) - '
+                                                  "Date.parse(before)) / 86400000) + ' 天' : '—';\n"
+                                                  "      const link = element('div', 'timeline-link'); "
+                                                  "link.append(element('span', 'timeline-days', days)); "
+                                                  'timeline.append(link);\n'
+                                                  '    }\n'
+                                                  "    const step = element('div', 'timeline-step');\n"
+                                                  "    step.append(element('span', 'timeline-dot'), "
+                                                  "element('div', 'timeline-label', label), element('div', "
+                                                  "'timeline-date', date || '未記錄')); timeline.append(step);\n"
+                                                  '  });\n'
+                                                  '  section.append(timeline); return section;\n'
+                                                  '}\n'
+                                                  '\n'
+                                                  'function renderQuickResults(summary, records, dbn, '
+                                                  'container) {\n'
+                                                  "  const board = element('section', "
+                                                  "'quick-board-summary'), heading = element('div', "
+                                                  "'quick-summary-heading'), title = element('div');\n"
+                                                  "  title.append(element('h2', 'quick-summary-title', "
+                                                  'summary.mapping?.board_name || '
+                                                  'records.data[0]?.description || dbn.data[0]?.board_name '
+                                                  "|| '—'), element('div', 'quick-summary-serial', 'S/N ' + "
+                                                  'summary.serial_no));\n'
+                                                  "  heading.append(title, element('div', "
+                                                  "'quick-summary-count', `${records.total} 筆送修 · "
+                                                  '${dbn.total} 筆 DBN`)); board.append(heading);\n'
+                                                  "  const grid = element('div', 'quick-summary-grid');\n"
+                                                  "  for (const [label, value] of [['Part "
+                                                  "Number',summary.mapping?.board_part_code || '—'], "
+                                                  "['Model',summary.models.join('、') || '—'], "
+                                                  "['機台',summary.machines.join('、') || '—'], "
+                                                  "['板件資料',summary.mapping ? '已關聯' : '—']]) {\n"
+                                                  "    const field = element('div', 'quick-summary-field'); "
+                                                  "field.append(element('label', '', label), element('div', "
+                                                  "'', value)); grid.append(field);\n"
+                                                  '  }\n'
+                                                  '  board.append(grid); container.append(board);\n'
+                                                  '  function group(title, result) {\n'
+                                                  "    const section = element('section', "
+                                                  "'quick-result-section'), head = element('div', "
+                                                  "'quick-section-heading'), list = element('div', "
+                                                  "'quick-result-list');\n"
+                                                  "    head.append(element('h2', '', title), element('span', "
+                                                  "'quick-section-count', `${result.total} 筆${result.total > "
+                                                  "20 ? '（目前顯示前 20 筆）' : ''}`));\n"
+                                                  "    if (!result.total) list.append(element('p', "
+                                                  "'quick-empty', `沒有此 S/N 的${title}。`));\n"
+                                                  '    section.append(head, list); '
+                                                  'container.append(section); return list;\n'
+                                                  '  }\n'
+                                                  "  const repairList = group('送修紀錄', records);\n"
+                                                  '  for (const row of records.data) {\n'
+                                                  "    const card = element('article', 'quick-record-card'), "
+                                                  "top = element('div', 'quick-record-top');\n"
+                                                  '    top.append(statusPill(row.current_status), '
+                                                  "element('span', 'failure-tag-pill', `${row.repair_type} · "
+                                                  "${row.repair_amount == null ? '金額未填' : "
+                                                  "row.repair_amount.toLocaleString('zh-TW') + ' 元'}`),\n"
+                                                  "      element('span', 'failure-tag-pill', "
+                                                  "row.failure_tag), element('span', 'quick-record-date', "
+                                                  "`損壞 ${row.occurred_on}${row.sent_on ? ' · 送修 ' + "
+                                                  "row.sent_on : ''}${row.returned_on ? ' · 回修 ' + "
+                                                  "row.returned_on : ''}`));\n"
+                                                  "    const meta = element('div', 'quick-record-meta'); "
+                                                  "meta.append(element('span', '', row.machine_code), "
+                                                  "element('span', '', row.model), element('span', '', "
+                                                  "row.is_opened ? '已開單' : '未開單'));\n"
+                                                  "    const controls = element('div', "
+                                                  "'quick-record-actions'); controls.append(action('查看送修詳情', "
+                                                  '() => openDetail(row.id)));\n'
+                                                  "    card.append(top, meta, element('div', "
+                                                  "'quick-record-description', row.failure_description), "
+                                                  'controls); repairList.append(card);\n'
+                                                  '  }\n'
+                                                  "  const dbnList = group('DBN 紀錄', dbn);\n"
+                                                  '  for (const row of dbn.data) {\n'
+                                                  "    const card = element('article', "
+                                                  "'quick-record-card');\n"
+                                                  "    card.append(element('div', 'quick-record-date', new "
+                                                  "Date(row.created_at).toLocaleString('zh-TW', "
+                                                  "{timeZone:'Asia/Taipei'})),\n"
+                                                  "      element('div', 'quick-record-meta', "
+                                                  '`機台：${row.machine_code} · ${row.model}`),\n'
+                                                  "      element('div', 'quick-dbn-tags', "
+                                                  "`客戶：${row.customer_code} · 產品：${row.product_code || '-'} "
+                                                  "· 站點：${row.station_code || '-'}`), element('p', '', "
+                                                  'row.issue_type));\n'
+                                                  '    if (row.dut) card.append(pinDetails(row)); if '
+                                                  "(row.issue_description) card.append(element('p', "
+                                                  "'detail-text', row.issue_description)); "
+                                                  'dbnList.append(card);\n'
+                                                  '  }\n'
                                                   '}\n'
                                                   '\n'
                                                   'async function refreshFeatures() {\n'
@@ -5401,13 +5655,24 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   "description:formField('異常描述（RTE／Other 必填）', 'textarea', "
                                                   'record?.issue_description)\n'
                                                   '  };\n'
+                                                  "  inputs.model = formField('Model'); "
+                                                  'inputs.model.readOnly = true; inputs.model.required = '
+                                                  'false;\n'
+                                                  '  const order = '
+                                                  "['machine','model','board','part','serial','customer','product','station','kind','dut','description'];\n"
+                                                  '  for (const key of order) {inputs[key].dataset.field = '
+                                                  'key; '
+                                                  "byId('operations-fields').append(fieldContainers.get(inputs[key]));}\n"
                                                   '  inputs.serial.maxLength = 64; inputs.part.readOnly = '
                                                   'true;\n'
+                                                  "  const mappingHint = element('p', 'wide hint'); "
+                                                  "byId('operations-fields').append(mappingHint);\n"
                                                   "  const preview = element('div', 'wide hint'); "
                                                   "byId('operations-fields').append(preview);\n"
                                                   '  function boards(preferred = inputs.board.value) {\n'
                                                   '    const model = catalogs.machines.find(row => '
                                                   'row.machine_code === inputs.machine.value)?.model;\n'
+                                                  "    inputs.model.value = model || '';\n"
                                                   '    const choices = catalogs.boards.filter(row => '
                                                   'row.model === model && (!localMapping || (row.board_name '
                                                   '=== localMapping.board_name && row.board_part_code === '
@@ -5421,8 +5686,9 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '    inputs.part.value = choices.find(row => '
                                                   'row.board_name === inputs.board.value)?.board_part_code '
                                                   "|| '';\n"
-                                                  '    if (localMapping) preview.textContent = `S/N 已鎖定 '
-                                                  '${localMapping.board_name}／${localMapping.board_part_code}，請選相容機台。`;\n'
+                                                  '    mappingHint.textContent = localMapping ? `S/N 已鎖定 '
+                                                  '${localMapping.board_name}／${localMapping.board_part_code}，請選相容機台。` '
+                                                  ": '輸入 S/N 後查詢主檔；新增 DBN 不會建立送修案件。';\n"
                                                   '  }\n'
                                                   '  function products() {\n'
                                                   '    fillSelect(inputs.product, [...new '
@@ -5432,6 +5698,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '    inputs.product.required = '
                                                   'dbnCatalog.combinations.some(row => row.customer_code === '
                                                   'inputs.customer.value);\n'
+                                                  '    inputs.product.disabled = !inputs.product.required;\n'
                                                   '    stations();\n'
                                                   '  }\n'
                                                   '  function stations() {\n'
@@ -5441,15 +5708,22 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   'row.station_code);\n'
                                                   "    fillSelect(inputs.station, choices, '請選擇站點'); "
                                                   'inputs.station.required = inputs.product.required;\n'
+                                                  '    inputs.station.disabled = !choices.length;\n'
                                                   '    issue();\n'
                                                   '  }\n'
                                                   '  function issue() {\n'
                                                   "    const usesDut = ['Group', 'Single "
                                                   "Dut'].includes(inputs.kind.value);\n"
+                                                  "    const usesDescription = ['RTE', "
+                                                  "'Other'].includes(inputs.kind.value);\n"
                                                   '    inputs.dut.required = usesDut; inputs.dut.disabled = '
                                                   '!usesDut;\n'
-                                                  '    inputs.description.required = !usesDut; '
-                                                  'inputs.description.disabled = usesDut;\n'
+                                                  '    inputs.description.required = usesDescription; '
+                                                  'inputs.description.disabled = !usesDescription;\n'
+                                                  '    fieldContainers.get(inputs.dut).hidden = !usesDut;\n'
+                                                  '    fieldContainers.get(inputs.description).hidden = '
+                                                  '!usesDescription;\n'
+                                                  '    preview.hidden = !usesDut;\n'
                                                   '    preview.replaceChildren();\n'
                                                   '    if (!usesDut || !inputs.dut.value) return;\n'
                                                   '    const match = '
@@ -5468,6 +5742,9 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '`${first}-${last}`;\n'
                                                   '    const same = record && record.product_code === '
                                                   'inputs.product.value && record.dut === canonical;\n'
+                                                  '    if (!same && socket && last > socket.dut_count) '
+                                                  "{preview.textContent = 'DUT 超出此 Socket File 範圍'; "
+                                                  'return;}\n'
                                                   '    const snapshot = same ? record.dut_pin_snapshot : '
                                                   'Object.fromEntries(Array.from({length:last-first+1}, (_, '
                                                   'index) => [String(first+index), '
@@ -5737,6 +6014,16 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '  });\n'
                                                   "  type = formField('下一筆維修分類', 'select', "
                                                   'record.repair_type, catalogs.repair_types);\n'
+                                                  "  const amount = formField('金額（依目前本機價目）'); "
+                                                  'amount.readOnly = true; amount.required = false;\n'
+                                                  '  function previewAmount() {\n'
+                                                  '    const cents = repairPrice(record.model, '
+                                                  'record.description, record.board_part_code, type.value);\n'
+                                                  "    amount.value = cents == null ? '未設定' : "
+                                                  "(cents/100).toLocaleString('zh-TW') + ' 元';\n"
+                                                  '  }\n'
+                                                  "  type.addEventListener('change', previewAmount); "
+                                                  'previewAmount();\n'
                                                   "  description = formField('本次異常描述', 'textarea'); file = "
                                                   "formField('本次 Fail Log（不自動複製前一筆）', 'file');\n"
                                                   '}\n'
@@ -5765,33 +6052,52 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '    if (label !== undefined) node.textContent = label; '
                                                   'return node;\n'
                                                   '  }\n'
-                                                  "  const svg = svgNode('svg', {viewBox:'0 0 920 270', "
-                                                  "role:'img', 'aria-label':amounts ? '各維修分類結案金額' : '故障頻率', "
-                                                  "class:'stats-chart'});\n"
-                                                  '  const entries = Object.entries(groups), maximum = '
-                                                  'Math.max(1, ...entries.map(([, value]) => amounts ? '
+                                                  "  const svg = svgNode('svg', {viewBox:'0 0 920 286', "
+                                                  "role:'img', 'aria-label':amounts ? '各維修分類結案金額' : "
+                                                  "'故障頻率'});\n"
+                                                  '  const entries = Object.entries(groups), rawMaximum = '
+                                                  'Math.max(0, ...entries.map(([, value]) => amounts ? '
                                                   'Object.values(value).reduce((sum, amount) => sum + '
                                                   'amount, 0) : value));\n'
+                                                  '  const maximum = amounts ? Math.max(100, rawMaximum) : '
+                                                  'Math.max(4, Math.ceil(rawMaximum / 4) * 4);\n'
                                                   '  const slot = 840 / Math.max(1, entries.length), width = '
                                                   'Math.min(48, slot * .6), colors = '
-                                                  "['#8b8df8','#d7906c','#78bcba','#a2bf7c'];\n"
+                                                  "['#8b8df8','#50c5d2','#e3b341','#65c98a'];\n"
+                                                  '  for (let index = 0; index <= 4; index++) {\n'
+                                                  '    const value = maximum * index / 4, y = 230 - index * '
+                                                  '50;\n'
+                                                  "    svg.append(svgNode('line', {x1:60, y1:y, x2:906, "
+                                                  "y2:y, class:'stats-gridline'}),\n"
+                                                  "      svgNode('text', {x:52, y:y + 4, "
+                                                  "'text-anchor':'end', class:'stats-axis'}, (amounts ? "
+                                                  "value / 100 : value).toLocaleString('zh-TW', "
+                                                  '{maximumFractionDigits:2})));\n'
+                                                  '  }\n'
                                                   '  entries.forEach(([key, values], index) => {\n'
                                                   '    let stacked = 0;\n'
                                                   '    const pairs = amounts ? Object.entries(values) : '
                                                   "[['次數', values]];\n"
                                                   '    pairs.forEach(([label, value], color) => {\n'
                                                   '      const height = value / maximum * 200;\n'
-                                                  "      const rect = svgNode('rect', {x:60 + index * slot, "
-                                                  'y:220 - stacked - height, width, height, '
-                                                  'fill:colors[color]});\n'
+                                                  "      const rect = svgNode('rect', {x:60 + index * slot + "
+                                                  '(slot-width)/2, y:230 - stacked - height, width, height, '
+                                                  "fill:colors[color], class:'stats-bar'});\n"
                                                   "      rect.append(svgNode('title', {}, `${key} "
                                                   '${label}：${amounts ? value / 100 : value}`)); '
                                                   'svg.append(rect); stacked += height;\n'
+                                                  "      if (!amounts && value) svg.append(svgNode('text', "
+                                                  '{x:60 + index*slot + slot/2, y:Math.max(25, 225 - '
+                                                  "height), 'text-anchor':'middle', class:'stats-axis'}, "
+                                                  'value));\n'
                                                   '    });\n'
-                                                  "    svg.append(svgNode('text', {x:60 + index * slot, "
-                                                  "y:250, fill:'#929398', 'font-size':10}, key));\n"
+                                                  "    svg.append(svgNode('text', {x:60 + index * slot + "
+                                                  "slot/2, y:272, 'text-anchor':'middle', "
+                                                  "class:'stats-axis'}, statisticsMode === 'year' ? "
+                                                  "Number(key.slice(5)) + '月' : key.slice(0,4)));\n"
                                                   '  });\n'
-                                                  '  return svg;\n'
+                                                  "  const wrapper = element('div', 'stats-chart'); "
+                                                  'wrapper.append(svg); return wrapper;\n'
                                                   '}\n'
                                                   '\n'
                                                   'function renderStatistics(result, container) {\n'
@@ -5805,25 +6111,69 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   "  byId('workspace-message').textContent = `損壞 ${total} 次 "
                                                   "· 已知結案金額 ${(amount / 100).toLocaleString('zh-TW')} 元 · "
                                                   '金額未設定 ${result.missing_amounts} 筆（不視為零元）`;\n'
-                                                  "  container.append(element('h2', '', '故障發生頻率'), "
-                                                  "chart(result.frequency), table(['期間','首輪損壞次數'], "
-                                                  'Object.entries(result.frequency)));\n'
-                                                  "  container.append(element('h2', '', '結案金額'), "
-                                                  "chart(result.amounts_cents, true), table(['期間', "
-                                                  '...labels], '
+                                                  '  const years = [...new Set([statisticsYear, '
+                                                  '...(result.years || [])])].sort().reverse();\n'
+                                                  "  fillSelect(byId('stats-year'), years); "
+                                                  "byId('stats-year').value = statisticsYear;\n"
+                                                  '  function card(title, description, value) {\n'
+                                                  "    const section = element('section', 'stats-card'), "
+                                                  "head = element('div', 'stats-card-head'), copy = "
+                                                  "element('div');\n"
+                                                  "    copy.append(element('h2', '', title), element('div', "
+                                                  "'stats-card-subtitle', description)); head.append(copy, "
+                                                  "element('div', 'stats-total', value)); "
+                                                  'section.append(head); return section;\n'
+                                                  '  }\n'
+                                                  "  const grid = element('div', 'stats-grid');\n"
+                                                  "  const frequencyCard = card('故障發生頻率', "
+                                                  "'依損壞日期；同一段連續維修只計一次', `${total} 次`);\n"
+                                                  '  frequencyCard.append(chart(result.frequency));\n'
+                                                  "  const frequencyTable = element('details', "
+                                                  "'stats-data'); frequencyTable.append(element('summary', "
+                                                  "'', '查看統計明細'), table(['期間','首輪損壞次數'], "
+                                                  'Object.entries(result.frequency))); '
+                                                  'frequencyCard.append(frequencyTable);\n'
+                                                  "  const amountCard = card('維修金額', '依結案日期；每筆案件皆計入，包含 "
+                                                  "FAIL', (amount / 100).toLocaleString('zh-TW') + ' 元');\n"
+                                                  '  amountCard.append(chart(result.amounts_cents, true));\n'
+                                                  "  const legend = element('div', 'stats-legend');\n"
+                                                  '  for (const [index, label] of labels.entries()) {\n'
+                                                  '    const sum = '
+                                                  'Object.values(result.amounts_cents).reduce((sum, values) '
+                                                  "=> sum + values[label], 0), entry = element('div', "
+                                                  "'stats-legend-item');\n"
+                                                  "    const name = element('div', 'stats-legend-label'); "
+                                                  "name.append(element('span', 'stats-swatch repair-color-' "
+                                                  "+ index), element('span', '', label));\n"
+                                                  "    entry.append(name, element('div', "
+                                                  "'stats-legend-value', (sum/100).toLocaleString('zh-TW')), "
+                                                  "element('div', 'stats-legend-share', (amount ? "
+                                                  "sum/amount*100 : 0).toFixed(1) + '%')); "
+                                                  'legend.append(entry);\n'
+                                                  '  }\n'
+                                                  '  amountCard.append(legend);\n'
+                                                  "  const amountsTable = element('details', 'stats-data'); "
+                                                  "amountsTable.append(element('summary', '', '查看金額明細'), "
+                                                  "table(['期間', ...labels], "
                                                   'Object.entries(result.amounts_cents).map(([period, '
                                                   'amounts]) => [period, ...labels.map(label => '
-                                                  "(amounts[label] / 100).toLocaleString('zh-TW'))])));\n"
+                                                  "(amounts[label] / 100).toLocaleString('zh-TW'))]))); "
+                                                  'amountCard.append(amountsTable);\n'
+                                                  '  grid.append(frequencyCard, amountCard); '
+                                                  'container.append(grid);\n'
                                                   "  const ranking = byId('ranking-sort').value === 'asc' ? "
                                                   '[...result.ranking].sort((a,b) => a.count - b.count || '
                                                   'a.machine.localeCompare(b.machine)) : result.ranking;\n'
                                                   '  let rank = 0, last = null;\n'
-                                                  "  container.append(element('h2', '', '機台損壞排行'), "
-                                                  "table(['排名','機台','次數'], ranking.map((row, index) => {if "
-                                                  '(row.count !== last) rank = index + 1; last = row.count; '
-                                                  'return [rank, row.machine, row.count];})));\n'
+                                                  "  const rankingCard = card('機台損壞次數排名', "
+                                                  "'依損壞日期；同一段連續維修只計一次', `共 ${ranking.length} 台機台`);\n"
+                                                  "  rankingCard.className = 'stats-card machine-ranking';\n"
+                                                  "  rankingCard.append(table(['排名','機台','次數'], "
+                                                  'ranking.map((row, index) => {if (row.count !== last) rank '
+                                                  '= index + 1; last = row.count; return [rank, row.machine, '
+                                                  'row.count];}))); container.append(rankingCard);\n'
                                                   '}\n',
-                                       'sha256': '43d41d6b9bb92618c4af4b4a93acc81c952e992fea4594b930f5fc1d35465c3a'},
+                                       'sha256': 'cef089e8f8b0953b719534a33f117bb7272ff8125a40410b18cc48105f632d01'},
            'company/web/index.html': {'content': '<!doctype html>\n'
                                                  '<html lang="zh-Hant">\n'
                                                  '<head>\n'
@@ -5866,6 +6216,502 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  '</body>\n'
                                                  '</html>\n',
                                       'sha256': 'e3f833145f438ba46b30c72f729db17042a12276b0de9f41ef2976facfec9571'},
+           'company/web/original.css': {'content': '/* Original SPMS CSS from docs/repairs/index.html; '
+                                                   'generated by scripts/build_company_ui_assets.py. */\n'
+                                                   ':root{color-scheme:dark;--bg:#101113;--side:#151618;--panel:#191a1c;--raised:#202124;--line:#292a2d;--text:#e7e7e8;--muted:#88898d;--soft:#b5b6ba;--accent:#8b8df8;--green:#65c98a;--yellow:#e3b341;--red:#ef7777;--purple:#bd91f4}\n'
+                                                   '    '
+                                                   '*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:13px/1.5 '
+                                                   '-apple-system,BlinkMacSystemFont,"Segoe '
+                                                   'UI",sans-serif}button,input,select{font:inherit;color:inherit}button{cursor:pointer}\n'
+                                                   '    '
+                                                   '.app{min-height:100vh;display:grid;grid-template-columns:218px '
+                                                   'minmax(0,1fr)}.sidebar{background:var(--side);border-right:1px '
+                                                   'solid var(--line);padding:17px '
+                                                   '11px;display:flex;flex-direction:column;gap:20px}.brand{display:flex;align-items:center;gap:10px;padding:2px '
+                                                   '8px '
+                                                   '8px}.brand-mark{width:32px;height:32px;display:grid;place-items:center;flex:none}.brand-mark '
+                                                   'img{display:block;width:32px;height:32px;object-fit:contain;filter:invert(1)}.brand-title{font-weight:600;font-size:13px}.nav-label{font-size:10px;font-weight:600;letter-spacing:.08em;color:#707176;text-transform:uppercase;padding:0 '
+                                                   '9px '
+                                                   '5px}.nav{display:grid;gap:2px}.nav-item{width:100%;border:0;background:transparent;text-align:left;color:#aaaab0;border-radius:5px;padding:7px '
+                                                   '9px;display:flex;align-items:center;gap:9px}.nav-item:hover{background:#202124;color:var(--text)}.nav-item[aria-current="page"]{background:#28292c;color:#f2f2f3}.nav-icon{width:15px;text-align:center;color:#85868c;font-size:13px}.nav-name{flex:1}.count{font:11px '
+                                                   'ui-monospace,SFMono-Regular,Menlo,monospace;color:#77787e}\n'
+                                                   '    .main{min-width:0}.public-tag{border:1px solid '
+                                                   '#4e452a;background:#201c12;color:#e1c676;border-radius:4px;padding:3px '
+                                                   '7px;font-size:10px}.content{max-width:1180px;margin:0 '
+                                                   'auto;padding:28px 25px '
+                                                   '60px}.page-title-row{display:flex;align-items:flex-start;justify-content:space-between;gap:20px;margin:0 '
+                                                   '0 '
+                                                   '20px}.page-title{font-size:20px;font-weight:600;letter-spacing:-.02em;margin:0 '
+                                                   '0 '
+                                                   '4px}.page-subtitle{color:var(--muted);font-size:12px}.notice{margin:0 '
+                                                   '0 13px;padding:8px 10px;border:1px solid '
+                                                   '#3d3828;background:#1b1913;color:#c8b989;border-radius:5px;font-size:11px}.notice.error{border-color:#613535;background:#211616;color:#f0adad}\n'
+                                                   '    '
+                                                   '.list-toolbar{display:flex;align-items:center;gap:8px;padding:0 '
+                                                   '0 '
+                                                   '12px}.search-wrap{position:relative;flex:1;max-width:360px}.search-icon{position:absolute;left:10px;top:8px;color:#77787e}.search{width:100%;height:32px;background:#17181a;border:1px '
+                                                   'solid var(--line);border-radius:5px;padding:0 10px 0 '
+                                                   '30px;outline:none}.search::placeholder{color:#707176}.order-select{height:32px;background:#17181a;border:1px '
+                                                   'solid var(--line);border-radius:5px;padding:0 26px 0 '
+                                                   '9px;color:#aaaab0;outline:none}.search:focus,.order-select:focus{border-color:#6869b4}.list-count{margin-left:auto;color:var(--muted);font-size:11px}.list-heading{display:grid;grid-template-columns:minmax(230px,2.2fr) '
+                                                   'minmax(125px,1fr) minmax(105px,.8fr) '
+                                                   'minmax(120px,.9fr);gap:12px;padding:8px '
+                                                   '12px;color:#73747a;font-size:10px;text-transform:uppercase;letter-spacing:.06em;border-bottom:1px '
+                                                   'solid var(--line)}.rows{border-bottom:1px solid '
+                                                   'var(--line)}.issue-row{width:100%;display:grid;grid-template-columns:minmax(230px,2.2fr) '
+                                                   'minmax(125px,1fr) minmax(105px,.8fr) '
+                                                   'minmax(120px,.9fr);gap:12px;align-items:center;text-align:left;border:0;border-bottom:1px '
+                                                   'solid #222326;background:transparent;padding:10px '
+                                                   '12px;min-height:56px}.issue-row:last-child{border-bottom:0}.issue-row:hover{background:#191a1c}.issue-row.selected{background:#202124;box-shadow:inset '
+                                                   '2px 0 '
+                                                   'var(--accent)}.issue-main{display:flex;align-items:center;gap:10px;min-width:0}.state-dot{width:8px;height:8px;border:1.5px '
+                                                   'solid '
+                                                   '#85868c;border-radius:50%;flex:none}.state-dot.pending{border-color:#85868c;background:#85868c}.state-dot.closed{background:var(--green);border-color:var(--green)}.state-dot.failed{background:var(--red);border-color:var(--red)}.state-dot.sent{border-color:var(--red);background:var(--red)}.state-dot.verify{border-color:var(--yellow);background:var(--yellow)}.issue-copy{min-width:0}.issue-title{font-size:12px;color:#dedee0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.issue-sub{font:10px '
+                                                   'ui-monospace,SFMono-Regular,Menlo,monospace;color:#77787e;margin:2px '
+                                                   '0 0 '
+                                                   '14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.machine-label{color:#c3c3ff;font:11px '
+                                                   'ui-monospace,SFMono-Regular,Menlo,monospace;white-space:nowrap}.pill{display:inline-flex;align-items:center;gap:5px;width:max-content;max-width:100%;border:1px '
+                                                   'solid '
+                                                   '#343539;border-radius:4px;color:#b9b9bd;padding:2px '
+                                                   '6px;font-size:10px;white-space:nowrap}.pill:before{content:"";width:5px;height:5px;border-radius:50%;background:#888}.pill.pending{color:#c2c2c7;border-color:#424348}.pill.pending:before{background:#85868c}.pill.sent{color:#f0a0a0;border-color:#613535}.pill.sent:before{background:var(--red)}.pill.verify{color:#e0c477;border-color:#514525}.pill.verify:before{background:var(--yellow)}.pill.closed{color:#8fcaa0;border-color:#2e4b37}.pill.closed:before{background:var(--green)}.pill.failed{color:#f0a0a0;border-color:#613535}.pill.failed:before{background:var(--red)}.row-date{color:#929398;font-size:11px;white-space:nowrap}.empty{padding:28px;text-align:center;color:var(--muted);border-bottom:1px '
+                                                   'solid var(--line)}\n'
+                                                   '    '
+                                                   '.detail-backdrop{position:fixed;inset:0;background:#0008;z-index:5;display:none}.detail{position:fixed;z-index:6;right:0;top:0;bottom:0;width:min(430px,94vw);background:#151618;border-left:1px '
+                                                   'solid #333438;box-shadow:-12px 0 40px '
+                                                   '#0005;transform:translateX(102%);transition:transform '
+                                                   '.18s '
+                                                   'ease;overflow:auto}.detail.open{transform:translateX(0)}.detail-backdrop.open{display:block}.detail-head{position:sticky;top:0;background:#151618ee;backdrop-filter:blur(8px);border-bottom:1px '
+                                                   'solid var(--line);padding:13px '
+                                                   '17px;display:flex;justify-content:space-between;align-items:center;z-index:1}.detail-head-label{font-size:11px;color:var(--muted)}.icon-button,.button{border:1px '
+                                                   'solid '
+                                                   'var(--line);background:transparent;color:#b9b9bd;border-radius:5px;padding:6px '
+                                                   '9px}.icon-button:hover,.button:hover{background:var(--raised);color:white}.button.primary{background:#353569;border-color:#45457b;color:#e5e5ff}.button.danger{color:#ffaaaa;border-color:#603838}.detail-content{padding:20px '
+                                                   '20px 36px}.detail-id{font:11px '
+                                                   'ui-monospace,SFMono-Regular,Menlo,monospace;color:#8a8b91;margin-bottom:8px}.detail-title{font-size:18px;line-height:1.35;margin:0 '
+                                                   '0 '
+                                                   '12px;overflow-wrap:anywhere}.detail-statuses{display:flex;gap:7px;flex-wrap:wrap;margin-bottom:15px}.detail-section{border-top:1px '
+                                                   'solid var(--line);padding:15px 0}.detail-section '
+                                                   'h3{font-size:10px;font-weight:600;color:#85868c;letter-spacing:.07em;text-transform:uppercase;margin:0 '
+                                                   '0 '
+                                                   '11px}.detail-grid{display:grid;grid-template-columns:1fr '
+                                                   '1fr;gap:13px 10px}.detail-field '
+                                                   'label{display:block;font-size:10px;color:#77787e;margin-bottom:3px}.detail-field '
+                                                   'div{font-size:12px;color:#d2d2d4;overflow-wrap:anywhere}.detail-text{font-size:12px;color:#c5c5c8;white-space:pre-wrap;overflow-wrap:anywhere}.control-row{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:10px '
+                                                   '0}.control-row '
+                                                   'label{font-size:11px;color:#aaaab0}.status-select{background:#1b1c1e;border:1px '
+                                                   'solid var(--line);border-radius:5px;padding:6px '
+                                                   '8px;min-width:145px}.checkbox-line{display:flex;align-items:center;gap:8px;color:#d0d0d3;font-size:12px}.checkbox-line '
+                                                   'input{accent-color:var(--accent);width:15px;height:15px}.raw-order{color:var(--muted);font-size:11px;margin-top:8px;overflow-wrap:anywhere}.attachment-box{border:1px '
+                                                   'solid '
+                                                   'var(--line);border-radius:6px;background:#111214;padding:11px}.attachment-actions{display:flex;align-items:center;gap:7px;flex-wrap:wrap}.file-name{font:11px '
+                                                   'ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere;color:#c7c7ff}.file-meta{color:var(--muted);font-size:10px;margin:4px '
+                                                   '0 '
+                                                   '9px}.file-preview{max-height:220px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;border-top:1px '
+                                                   'solid var(--line);padding-top:9px;margin:10px 0 '
+                                                   '0;color:#c0c1c5;font:11px/1.5 '
+                                                   'ui-monospace,SFMono-Regular,Menlo,monospace}.file-hint{font-size:10px;color:var(--muted);margin-top:8px}.error-text{color:#ff9999;font-size:11px;margin-top:8px}.mobile-nav{display:none}[hidden]{display:none!important}\n'
+                                                   '    '
+                                                   '.detail-actions{display:flex;justify-content:flex-end;margin:-5px '
+                                                   '0 13px}.detail-actions '
+                                                   '.button{white-space:nowrap}.history-list{display:grid;gap:6px}.history-item{display:grid;grid-template-columns:72px '
+                                                   'auto '
+                                                   'minmax(0,1fr);align-items:center;gap:9px;width:100%;text-align:left;background:#111214;border:1px '
+                                                   'solid var(--line);border-radius:5px;padding:8px '
+                                                   '9px;color:#c9c9cc}.history-item:hover{background:var(--raised)}.history-description{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--muted);font-size:11px}.title-actions{display:flex;align-items:center;gap:9px}.title-actions '
+                                                   '.button{white-space:nowrap}.modal-backdrop{position:fixed;inset:0;z-index:20;background:#000b;display:grid;place-items:center;padding:18px}.modal{width:min(720px,100%);max-height:92vh;overflow:auto;background:#17181a;border:1px '
+                                                   'solid #393a3f;border-radius:10px;box-shadow:0 24px 80px '
+                                                   '#0009}.modal-head{position:sticky;top:0;z-index:1;background:#17181aee;backdrop-filter:blur(8px);border-bottom:1px '
+                                                   'solid var(--line);padding:15px '
+                                                   '18px;display:flex;align-items:center;justify-content:space-between}.modal-head '
+                                                   'h2{font-size:15px;margin:0;font-weight:600}.record-form{padding:17px '
+                                                   '18px '
+                                                   '18px}.form-grid{display:grid;grid-template-columns:1fr '
+                                                   '1fr;gap:13px '
+                                                   '14px}.form-field{min-width:0}.form-field.wide{grid-column:1/-1}.form-field '
+                                                   'label{display:block;color:#a1a2a6;font-size:11px;margin:0 '
+                                                   '0 5px}.form-field input,.form-field select,.form-field '
+                                                   'textarea{width:100%;background:#101113;border:1px solid '
+                                                   '#343539;border-radius:5px;padding:8px '
+                                                   '9px;outline:none;font:12px/1.45 '
+                                                   '-apple-system,BlinkMacSystemFont,"Segoe '
+                                                   'UI",sans-serif}.form-field input:focus,.form-field '
+                                                   'select:focus,.form-field '
+                                                   'textarea:focus{border-color:#6869b4}.form-field '
+                                                   'textarea{min-height:84px;resize:vertical}.form-static-value{display:flex;align-items:center;min-height:34px;padding:8px '
+                                                   '9px;border:1px solid '
+                                                   '#343539;border-radius:5px;background:#101113;color:#d2d2d4;font-size:12px}.form-check{display:flex;align-items:center;gap:8px;min-height:34px;color:#c6c6c9;font-size:12px}.form-check '
+                                                   'input{width:15px;height:15px;accent-color:var(--accent)}.form-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:17px}.form-message{min-height:18px;color:#ff9999;font-size:11px;margin-top:8px}.form-hint{color:#77787e;font-size:10px;margin-top:4px}\n'
+                                                   '    '
+                                                   '.nav-divider{height:1px;background:var(--line);margin:5px '
+                                                   '7px}.form-field '
+                                                   'select:disabled{color:#77787e;cursor:not-allowed;background:#161719}.dbn-heading{grid-template-columns:1.2fr '
+                                                   '.8fr 1fr .8fr '
+                                                   '1.1fr}.dbn-row{display:grid;grid-template-columns:1.2fr '
+                                                   '.8fr 1fr .8fr '
+                                                   '1.1fr;gap:12px;align-items:center;padding:13px '
+                                                   '12px;border-bottom:1px solid '
+                                                   '#222326;color:#d2d2d4;font-size:12px}.dbn-row:hover{background:#191a1c}.dbn-serial{font:12px '
+                                                   'ui-monospace,SFMono-Regular,Menlo,monospace;color:#c3c3ff}.dbn-date{color:#929398;font-size:11px;white-space:nowrap}\n'
+                                                   '    '
+                                                   '@media(max-width:800px){.app{grid-template-columns:178px '
+                                                   'minmax(0,1fr)}.sidebar{padding-left:8px;padding-right:8px}.content{padding:23px '
+                                                   '15px '
+                                                   '45px}.list-heading,.issue-row{grid-template-columns:minmax(180px,1.7fr) '
+                                                   'minmax(110px,.9fr) '
+                                                   'minmax(95px,.8fr)}.list-heading>*:nth-child(3),.issue-row>*:nth-child(3){display:none}.dbn-heading,.dbn-row{grid-template-columns:1.2fr '
+                                                   '.7fr 1fr .7fr 1fr;gap:7px}}\n'
+                                                   '    '
+                                                   '@media(max-width:600px){.app{display:block}.sidebar{display:none}.mobile-nav{display:flex;gap:4px;overflow:auto;padding:8px '
+                                                   '12px;border-bottom:1px solid '
+                                                   'var(--line);background:var(--side)}.mobile-nav '
+                                                   '.nav-item{width:auto;white-space:nowrap;padding:6px '
+                                                   '9px}.mobile-nav '
+                                                   '.count{margin-left:2px}.content{padding:19px 12px '
+                                                   '40px}.page-title{font-size:18px}.page-title-row{margin-bottom:15px}.list-toolbar{flex-wrap:wrap}.search-wrap{max-width:none;flex-basis:100%}.list-count{margin-left:0}.list-heading{display:none}.issue-row{grid-template-columns:minmax(0,1fr) '
+                                                   'auto;gap:5px 8px;padding:10px '
+                                                   '9px}.issue-row>*:nth-child(2){grid-column:1;grid-row:2;padding-left:18px}.issue-row>*:nth-child(3){display:block;grid-column:2;grid-row:1;justify-self:end}.issue-row>*:nth-child(4){grid-column:2;grid-row:2;justify-self:end;font-size:10px}.issue-main{grid-column:1;grid-row:1}.dbn-heading{display:none}.dbn-row{grid-template-columns:1fr '
+                                                   '1fr;gap:8px;font-size:11px}.dbn-row>span::before{content:attr(data-label);display:block;color:#77787e;font-size:9px}.detail{width:min(430px,100vw)}.detail.open{transform:translateX(0)}.modal-backdrop{padding:8px;align-items:end}.modal{max-height:94vh;border-radius:10px '
+                                                   '10px 0 '
+                                                   '0}.record-form{padding:14px}.form-grid{grid-template-columns:1fr}.form-field.wide{grid-column:auto}.title-actions{gap:5px}}\n'
+                                                   '    '
+                                                   '.repair-timeline{display:grid;grid-template-columns:minmax(0,1fr) '
+                                                   '54px minmax(0,1fr) 54px '
+                                                   'minmax(0,1fr);align-items:start;gap:3px}.timeline-step{text-align:center;min-width:0}.timeline-dot{width:9px;height:9px;border-radius:50%;background:#7778bd;border:2px '
+                                                   'solid #b8b8ff;display:block;margin:3px auto '
+                                                   '7px}.timeline-label{font-size:10px;color:#85868c;white-space:nowrap}.timeline-date{font-size:11px;color:#d2d2d4;margin-top:4px;white-space:nowrap}.timeline-link{text-align:center;font-size:9px;color:#aaaab0;white-space:nowrap;position:relative;padding-top:0}.timeline-link::before{content:"";position:absolute;left:0;right:0;top:7px;height:1px;background:#55566f}.timeline-days{position:relative;display:inline-block;background:#151618;padding:0 '
+                                                   '3px}#delete-record{margin-right:auto}\n'
+                                                   '    '
+                                                   '.failure-filter{height:32px;background:#17181a;border:1px '
+                                                   'solid var(--line);border-radius:5px;padding:0 25px 0 '
+                                                   '9px;color:#aaaab0;outline:none}.failure-filter:focus{border-color:#6869b4}.failure-filter:disabled{opacity:.55;cursor:not-allowed}.failure-tag-pill{display:inline-flex;align-items:center;padding:1px '
+                                                   '5px;border:1px solid '
+                                                   '#555078;border-radius:4px;color:#d0c9ff;font:10px '
+                                                   '-apple-system,BlinkMacSystemFont,"Segoe '
+                                                   'UI",sans-serif;white-space:nowrap}.detail-failure-description{font-size:12px;color:#c5c5c8;white-space:pre-wrap;overflow-wrap:anywhere}.failure-field-hint{margin-top:5px;color:#85868c;font-size:10px}\n'
+                                                   '    '
+                                                   '@media(max-width:600px){.failure-filter{flex:1;min-width:0}}\n'
+                                                   '    '
+                                                   '.dbn-badge{display:inline-flex;align-items:center;gap:3px;margin-left:8px;padding:1px '
+                                                   '5px;border:1px solid '
+                                                   '#45457b;border-radius:4px;color:#c3c3ff;font-size:10px;white-space:nowrap;cursor:pointer}.dbn-badge:hover,.dbn-badge:focus{background:#28284a;outline-color:#9292ff}.dbn-heading,.dbn-row{grid-template-columns:minmax(70px,1fr) '
+                                                   'minmax(100px,1.25fr) minmax(55px,.7fr) '
+                                                   'minmax(55px,.65fr) minmax(75px,.9fr) minmax(55px,.65fr) '
+                                                   'minmax(80px,.9fr)}.dbn-row>span{min-width:0;overflow-wrap:anywhere}\n'
+                                                   '    @media(min-width:601px) and '
+                                                   '(max-width:800px){.dbn-heading,.dbn-row{grid-template-columns:minmax(60px,.9fr) '
+                                                   'minmax(80px,1.1fr) minmax(45px,.6fr) minmax(45px,.6fr) '
+                                                   'minmax(60px,.8fr) minmax(45px,.6fr) '
+                                                   'minmax(60px,.8fr);gap:6px}}\n'
+                                                   '    '
+                                                   '@media(max-width:600px){.dbn-row{grid-template-columns:1fr '
+                                                   '1fr}}\n'
+                                                   '    '
+                                                   '.dbn-heading,.dbn-row{grid-template-columns:minmax(70px,.8fr) '
+                                                   'minmax(100px,1.2fr) minmax(45px,.65fr) minmax(50px,.7fr) '
+                                                   'minmax(50px,.7fr) minmax(50px,.7fr) minmax(75px,.9fr) '
+                                                   'minmax(120px,auto)}.dbn-actions{display:flex;gap:5px;align-items:center;flex-wrap:wrap}.dbn-actions '
+                                                   '.button{padding:4px '
+                                                   '7px;font-size:10px;white-space:nowrap}\n'
+                                                   '    @media(min-width:601px) and '
+                                                   '(max-width:800px){.dbn-heading{display:none}.dbn-row{grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}.dbn-row>span::before{content:attr(data-label);display:block;color:#77787e;font-size:9px}.dbn-actions{flex-wrap:wrap}.dbn-actions::before{width:100%}}\n'
+                                                   '    '
+                                                   '@media(max-width:600px){.dbn-actions{flex-wrap:wrap}.dbn-actions::before{width:100%}}\n'
+                                                   '    .brand-mark{width:36px;height:36px}.brand-mark '
+                                                   'img{width:36px;height:36px}.brand-copy{min-width:0}.brand-title{font-size:22px;font-weight:700;letter-spacing:-.055em;line-height:1.05;color:#f0f0f2}.brand-subtitle{margin-top:4px;color:#77787e;font-size:8px;font-weight:500;letter-spacing:.015em;line-height:1.2;white-space:nowrap}\n'
+                                                   '    '
+                                                   '.upload-empty-state{display:flex;align-items:center;justify-content:space-between;gap:14px;padding:0;border:0;border-radius:0;background:transparent}.upload-empty-copy{display:flex;align-items:center;gap:11px;min-width:0}.upload-symbol{width:34px;height:34px;display:grid;place-items:center;flex:none;border:1px '
+                                                   'solid '
+                                                   '#45457b;border-radius:7px;background:#22213c;color:#c8c7ff;font-size:20px;font-weight:500}.upload-empty-title{font-size:12px;font-weight:600;color:#dedee2}.upload-empty-hint{margin-top:3px;color:#85868c;font-size:10px;line-height:1.45}.upload-trigger{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:38px;flex:none;padding:8px '
+                                                   '13px;border-radius:6px;font-size:12px;font-weight:600;white-space:nowrap;transition:background '
+                                                   '.15s ease,border-color .15s ease,transform .15s '
+                                                   'ease}.button.primary.upload-trigger{background:linear-gradient(135deg,#514fc0,#39386f);border-color:#55539a;color:#f2f1ff}.button.primary.upload-trigger:hover{background:linear-gradient(135deg,#625fe0,#48468d);border-color:#7774cf;transform:translateY(-1px)}.upload-trigger:focus-visible{outline:2px '
+                                                   'solid '
+                                                   '#a3a1ff;outline-offset:2px}.upload-trigger-icon{font-size:17px;line-height:1}.upload-picker{display:flex;align-items:center;gap:10px;flex-wrap:wrap}.upload-file-name{margin:0;color:#85868c;font-size:10px;overflow-wrap:anywhere}\n'
+                                                   '    '
+                                                   '@media(max-width:800px){.brand-title{font-size:20px}.brand-subtitle{font-size:7.5px}}\n'
+                                                   '    '
+                                                   '@media(max-width:600px){.upload-empty-state{align-items:stretch;flex-direction:column}.upload-trigger{width:100%}.upload-empty-copy{align-items:flex-start}.upload-symbol{width:32px;height:32px}}\n'
+                                                   '    '
+                                                   '.list-heading:not(.dbn-heading){color:#81838b;font-size:11px;font-weight:500;letter-spacing:0;text-transform:none;padding:12px '
+                                                   '16px;border-bottom:1px solid #26282c}\n'
+                                                   '    '
+                                                   '.list-heading:not(.dbn-heading),.issue-row{column-gap:12px;grid-template-columns:minmax(0,3fr) '
+                                                   'minmax(0,2fr) minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) '
+                                                   'minmax(0,1fr)}\n'
+                                                   '    .issue-row{min-height:76px;padding:15px '
+                                                   '16px;border-bottom:1px solid '
+                                                   '#25272b;transition:background .15s '
+                                                   'ease}.issue-row:hover{background:#151719}.issue-row.selected{background:#17191c;box-shadow:none}.issue-row>*{min-width:0}\n'
+                                                   '    .issue-main{gap:13px}.issue-main '
+                                                   '.state-dot{width:22px;height:22px;display:grid;place-items:center;flex:none;border:0;border-radius:0;background:transparent;color:#a4a6ad;font-size:19px;font-weight:500;line-height:1}.issue-main '
+                                                   '.state-dot.pending,.issue-main '
+                                                   '.state-dot.closed,.issue-main '
+                                                   '.state-dot.failed,.issue-main '
+                                                   '.state-dot.sent,.issue-main '
+                                                   '.state-dot.verify{border:0;background:transparent}.issue-main '
+                                                   '.state-dot.pending::after{content:"○"}.issue-main '
+                                                   '.state-dot.sent::after{content:"↗"}.issue-main '
+                                                   '.state-dot.verify::after{content:"◎"}.issue-main '
+                                                   '.state-dot.closed::after{content:"✓"}.issue-main '
+                                                   '.state-dot.failed::after{content:"×"}\n'
+                                                   '    .issue-main '
+                                                   '.issue-copy{display:flex;align-items:baseline;gap:10px;min-width:0;width:100%}.issue-line{display:flex;align-items:baseline;gap:12px;flex:1;min-width:0}.issue-title{display:block;min-width:0;flex:0 '
+                                                   '1 '
+                                                   'auto;font-size:14px;font-weight:550;color:#e0e1e5}.issue-sub{display:block;flex:none;max-width:35%;margin:0;color:#858891;font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.issue-open-status{display:inline-flex;align-items:baseline;gap:6px;flex:none;color:#8b8e97;font-size:11px;font-weight:600;white-space:nowrap}.open-separator{color:#777982}\n'
+                                                   '    .issue-status-cell '
+                                                   '.pill{display:inline-flex;align-items:center;gap:9px;width:auto;max-width:100%;border:0;border-radius:0;padding:0;background:transparent;font-size:13px;font-weight:500;color:#c9cbd1}.issue-status-cell '
+                                                   '.pill::before{width:9px;height:9px;flex:none}.issue-status-cell '
+                                                   '.pill.pending{color:#c9cbd1}.issue-status-cell '
+                                                   '.pill.sent,.issue-status-cell '
+                                                   '.pill.failed{color:#dc9999}.issue-status-cell '
+                                                   '.pill.verify{color:#dfc36f}.issue-status-cell '
+                                                   '.pill.closed{color:#79c78b}\n'
+                                                   '    '
+                                                   '.failure-tag-text{display:block;overflow:hidden;text-overflow:ellipsis;color:#c7c9d1;font-size:12px;font-weight:500;white-space:nowrap}.failure-tag-text.unclassified{color:#777982}.issue-tags{display:grid;justify-items:start;gap:4px;min-width:0}.repair-type-pill{display:inline-flex;max-width:100%;padding:0 '
+                                                   '5px;border:1px '
+                                                   'solid;border-radius:4px;font-size:9px;line-height:1.5;white-space:nowrap}.issue-dbn-cell{display:flex;align-items:center;min-width:0}.dbn-badge{margin:0;padding:0;border:0;border-radius:0;color:#e3a05d;font-size:13px;font-weight:500;white-space:nowrap}.dbn-badge:hover,.dbn-badge:focus{background:transparent;color:#ffc17f;text-decoration:underline;outline:none}.dbn-empty{color:#747780;font-size:13px}\n'
+                                                   '    '
+                                                   '.machine-label{display:block;overflow:hidden;text-overflow:ellipsis;font-size:12px}.row-date{display:block;overflow:hidden;text-overflow:ellipsis;font-size:12px;color:#a0a2aa}.list-heading:not(.dbn-heading)>:last-child{text-align:right}.issue-row>.row-date{text-align:right;justify-self:stretch}\n'
+                                                   '    @media(min-width:961px) and '
+                                                   '(max-width:1120px){.list-heading:not(.dbn-heading),.issue-row{grid-template-columns:minmax(150px,3fr) '
+                                                   'minmax(100px,2fr) minmax(90px,2fr) minmax(45px,1fr) '
+                                                   'minmax(55px,1fr) minmax(80px,1fr)}}\n'
+                                                   '    '
+                                                   '@media(max-width:960px){.list-heading:not(.dbn-heading){display:none}.issue-row{grid-template-columns:minmax(0,1fr) '
+                                                   'auto;row-gap:9px;padding:14px '
+                                                   '12px}.issue-row>:nth-child(1){grid-column:1/-1;grid-row:1}.issue-row>:nth-child(2){display:flex;grid-column:1;grid-row:2}.issue-row>:nth-child(3){display:flex;grid-column:2;grid-row:2;justify-self:end}.issue-row>:nth-child(4){display:flex;grid-column:1;grid-row:3;justify-self:start}.issue-row>:nth-child(5){display:flex;grid-column:2;grid-row:3;justify-self:end}.issue-row>:nth-child(6){display:flex;grid-column:1/-1;grid-row:4;justify-content:space-between;text-align:right}.issue-row>[data-label]{align-items:center;gap:6px;min-width:0}.issue-row>[data-label]::before{content:attr(data-label);display:inline;color:#777982;font-size:9px;font-weight:500;flex:none}.issue-row '
+                                                   '.issue-main{min-width:0}.issue-row '
+                                                   '.issue-sub{max-width:35%}}\n'
+                                                   '\n'
+                                                   '    '
+                                                   '.quick-search-view{max-width:820px;margin:clamp(24px,8vh,86px) '
+                                                   'auto 0}.quick-search-intro '
+                                                   'h1{margin:0;font-size:27px;line-height:1.25;font-weight:650;letter-spacing:-.03em}.quick-search-intro '
+                                                   'p{margin:9px 0 '
+                                                   '0;color:var(--muted);font-size:13px}.quick-search-form{margin-top:30px}.quick-search-form>label{display:block;margin-bottom:8px;color:#bcbcc2;font-size:12px;font-weight:550}.quick-search-controls{display:flex;gap:9px}.quick-search-input{flex:1;min-width:0;height:54px;padding:0 '
+                                                   '15px;border:1px solid '
+                                                   '#3b3c42;border-radius:7px;background:#17181a;font-size:17px;letter-spacing:.025em;outline:none}.quick-search-input::placeholder{color:#66676e}.quick-search-input:focus{border-color:#7778cf;box-shadow:0 '
+                                                   '0 0 3px '
+                                                   '#7778cf22}.quick-search-submit{min-width:104px;font-size:13px;font-weight:600}.quick-search-status{margin:12px '
+                                                   '0 '
+                                                   '0;color:#85868c;font-size:11px}.quick-search-results{display:grid;gap:15px;margin-top:20px}.quick-search-warning{padding:10px '
+                                                   '12px;border:1px solid '
+                                                   '#5d4930;border-radius:6px;background:#211b14;color:#d8bc87;font-size:11px}.quick-board-summary,.quick-result-section{border:1px '
+                                                   'solid '
+                                                   'var(--line);border-radius:8px;background:#151618}.quick-board-summary{padding:17px}.quick-summary-heading{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.quick-summary-title{margin:0;font-size:17px;font-weight:600;overflow-wrap:anywhere}.quick-summary-serial{font:11px '
+                                                   'ui-monospace,SFMono-Regular,Menlo,monospace;color:#85868c;margin-top:3px;overflow-wrap:anywhere}.quick-summary-count{flex:none;color:#929398;font-size:11px;text-align:right}.quick-summary-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px '
+                                                   '12px;margin-top:17px;padding-top:15px;border-top:1px '
+                                                   'solid '
+                                                   '#292a2d}.quick-summary-field{min-width:0}.quick-summary-field '
+                                                   'label{display:block;margin-bottom:3px;color:#77787e;font-size:10px}.quick-summary-field '
+                                                   'div{color:#d1d1d5;font-size:12px;overflow-wrap:anywhere}.quick-result-section{overflow:hidden}.quick-section-heading{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px '
+                                                   '15px;border-bottom:1px solid '
+                                                   '#292a2d}.quick-section-heading '
+                                                   'h2{margin:0;font-size:12px;font-weight:600}.quick-section-count{color:#85868c;font-size:10px}.quick-result-list{display:grid}.quick-record-card{padding:13px '
+                                                   '15px;border-bottom:1px solid '
+                                                   '#252629}.quick-record-card:last-child{border-bottom:0}.quick-record-top{display:flex;align-items:center;gap:9px;flex-wrap:wrap}.quick-record-date{margin-left:auto;color:#929398;font-size:11px}.quick-record-meta{display:flex;gap:7px '
+                                                   '14px;flex-wrap:wrap;margin-top:8px;color:#9b9ca2;font-size:11px}.quick-record-description{margin-top:8px;color:#c6c6ca;font-size:12px;white-space:pre-wrap;overflow-wrap:anywhere}.quick-record-actions{margin-top:9px}.quick-record-actions '
+                                                   '.button{padding:4px '
+                                                   '8px;font-size:10px}.quick-empty{padding:16px;color:#85868c;font-size:11px}.quick-nav{margin-top:-8px}.quick-dbn-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:8px}.quick-dbn-tags '
+                                                   'span{border:1px solid '
+                                                   '#343539;border-radius:4px;padding:2px '
+                                                   '6px;color:#b7b7bd;font-size:10px}\n'
+                                                   '    '
+                                                   '@media(max-width:800px){.quick-summary-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}\n'
+                                                   '    '
+                                                   '@media(max-width:600px){.quick-search-view{margin:8px '
+                                                   'auto 0}.quick-search-intro '
+                                                   'h1{font-size:23px}.quick-search-intro '
+                                                   'p{font-size:12px}.quick-search-form{margin-top:23px}.quick-search-controls{gap:8px}.quick-search-input{height:50px;font-size:16px}.quick-search-submit{min-width:78px}.quick-board-summary{padding:14px}.quick-summary-heading{display:block}.quick-summary-count{margin-top:5px;text-align:left}.quick-summary-grid{gap:12px '
+                                                   '9px}.quick-section-heading{padding:11px '
+                                                   '12px}.quick-record-card{padding:12px}.quick-record-date{margin-left:0}}\n'
+                                                   '    .history-entry-detail{margin:-2px 0 2px;padding:8px '
+                                                   '10px;border:1px solid '
+                                                   '#25262a;border-radius:5px;background:#111214;color:#bfc0c5;font-size:11px}.history-failure-description{white-space:pre-wrap;overflow-wrap:anywhere}.history-log-link{display:inline-block;margin-top:6px;color:#b8b8ff;text-decoration:underline;overflow-wrap:anywhere}.history-empty{color:var(--muted)}\n'
+                                                   '    '
+                                                   '.stats-page{max-width:1180px}.stats-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin:18px '
+                                                   '0}.stats-mode{display:flex;gap:4px;padding:3px;border:1px '
+                                                   'solid '
+                                                   'var(--line);border-radius:6px;background:#151618}.stats-mode '
+                                                   'button{border:0;border-radius:4px;background:transparent;color:var(--muted);padding:5px '
+                                                   '10px}.stats-mode '
+                                                   'button[aria-pressed="true"]{background:#303044;color:#eee}.stats-select{height:34px;min-width:105px;background:#17181a;border:1px '
+                                                   'solid var(--line);border-radius:5px;padding:0 '
+                                                   '9px}.stats-grid{display:grid;gap:14px}.stats-card{min-width:0;border:1px '
+                                                   'solid '
+                                                   'var(--line);border-radius:8px;background:#151618;padding:17px}.stats-card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}.stats-card '
+                                                   'h2{margin:0;font-size:14px;font-weight:600}.stats-card-subtitle{margin-top:4px;color:var(--muted);font-size:11px}.stats-total{font-size:18px;font-weight:650;white-space:nowrap}.stats-chart{margin-top:12px;overflow-x:auto}.stats-chart '
+                                                   'svg{display:block;width:100%;min-width:620px;height:auto;overflow:visible}.stats-axis{fill:#85868c;font:11px '
+                                                   '-apple-system,BlinkMacSystemFont,"Segoe '
+                                                   'UI",sans-serif}.stats-gridline{stroke:#292a2d;stroke-width:1}.stats-bar{rx:3}.stats-empty{padding:38px '
+                                                   '12px;text-align:center;color:var(--muted);font-size:12px}.stats-legend{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-top:11px}.stats-legend-item{min-width:0;padding:9px '
+                                                   '10px;border:1px solid '
+                                                   '#292a2d;border-radius:6px;background:#111214}.stats-legend-label{display:flex;align-items:center;gap:6px;color:#a8a9af;font-size:10px}.stats-swatch{width:8px;height:8px;flex:none;border-radius:2px}.stats-legend-value{margin-top:4px;font-size:13px;font-weight:600;overflow-wrap:anywhere}.stats-legend-share{margin-top:2px;color:var(--muted);font-size:10px}.stats-notice{margin:0 '
+                                                   '0 13px;padding:10px 12px;border:1px solid '
+                                                   '#5d4930;border-radius:6px;background:#211b14;color:#d8bc87;font-size:11px}.stats-notice[hidden]{display:none}\n'
+                                                   '    '
+                                                   '@media(max-width:600px){.stats-card{padding:13px}.stats-card-head{display:block}.stats-total{margin-top:7px}.stats-legend{grid-template-columns:repeat(2,minmax(0,1fr))}.stats-chart '
+                                                   'svg{min-width:540px}}\n'
+                                                   '    '
+                                                   '.system-switcher{position:relative}.system-switcher>summary{list-style:none;cursor:pointer}.system-switcher>summary::-webkit-details-marker{display:none}.switcher-trigger{display:flex;align-items:center;gap:10px;width:100%;padding:2px '
+                                                   '8px 8px;border:1px solid '
+                                                   'transparent;border-radius:5px;text-align:left}.switcher-trigger:hover,.system-switcher[open] '
+                                                   '.switcher-trigger{background:#202124}.switcher-trigger '
+                                                   '.brand-mark{flex:none}.switcher-trigger '
+                                                   '.brand-copy{min-width:0;flex:1}.switcher-trigger '
+                                                   '.brand-title{display:block}.switcher-trigger '
+                                                   '.brand-subtitle{display:block}.switcher-chevron{flex:none;color:#77787e;font-size:11px}.switcher-menu{position:absolute;z-index:30;top:calc(100% '
+                                                   '+ 6px);left:0;width:230px;padding:5px;border:1px solid '
+                                                   '#393a3f;border-radius:7px;background:#202124;box-shadow:0 '
+                                                   '14px 38px #0009}.switcher-menu '
+                                                   'a{display:flex;align-items:center;gap:9px;padding:9px;border-radius:5px;color:#c6c6c9;text-decoration:none;font-size:11px}.switcher-menu '
+                                                   'a:hover,.switcher-menu '
+                                                   'a[aria-current="page"]{background:#303135;color:#f2f2f3}.switcher-menu '
+                                                   'small{display:block;color:#85868c;font-size:9px}.switcher-check{margin-left:auto;color:var(--accent)}.sidebar-switcher{display:block}.mobile-app-switcher{display:none}\n'
+                                                   '     '
+                                                   '@media(max-width:600px){.mobile-app-switcher{display:block;padding:5px '
+                                                   '10px;border-bottom:1px solid '
+                                                   'var(--line);background:var(--side)}.mobile-app-switcher '
+                                                   '.switcher-trigger{max-width:320px;padding:2px 8px '
+                                                   '5px}.mobile-app-switcher '
+                                                   '.brand-mark{width:36px;height:36px}.mobile-app-switcher '
+                                                   '.switcher-menu{top:calc(100% + 6px)}}\n'
+                                                   '       '
+                                                   '.list-heading.serial-map-heading,.serial-map-row{display:grid;grid-template-columns:minmax(0,1.1fr) '
+                                                   'minmax(0,.8fr) minmax(0,1.05fr) '
+                                                   'minmax(96px,1.1fr);gap:12px;align-items:center}.list-heading.serial-map-heading{padding:12px '
+                                                   '20px}.serial-map-row{padding:12px 20px;border-bottom:1px '
+                                                   'solid '
+                                                   '#222326;color:#d2d2d4;font-size:12px}.serial-map-row>span{min-width:0;overflow-wrap:anywhere}.serial-map-serial{font:11px '
+                                                   'ui-monospace,SFMono-Regular,Menlo,monospace;color:#c3c3ff}.serial-map-actions{display:flex;gap:5px;justify-content:flex-end}.serial-map-actions '
+                                                   '.button{white-space:nowrap}.serial-map-empty{padding:28px '
+                                                   '12px;text-align:center;color:var(--muted);font-size:11px}\n'
+                                                   '      '
+                                                   '@media(max-width:800px){.serial-map-heading{display:none}.serial-map-row{grid-template-columns:1fr '
+                                                   '1fr;gap:8px;padding:12px}.serial-map-row>span::before{content:attr(data-label);display:block;color:#77787e;font-size:9px}.serial-map-actions{grid-column:1/-1;justify-content:flex-start}.serial-map-actions::before{content:"操作";color:#77787e;font-size:9px;margin-right:5px}}\n'
+                                                   '    '
+                                                   '.machine-ranking{margin-top:14px}.machine-ranking-controls{display:flex;align-items:center;gap:8px;flex-wrap:wrap}.machine-ranking-controls '
+                                                   'label{color:var(--muted);font-size:11px}.machine-ranking-table{width:100%;border-collapse:collapse;margin-top:14px;text-align:left;font-size:12px}.machine-ranking-table '
+                                                   'th{color:var(--muted);font-size:11px;font-weight:500}.machine-ranking-table '
+                                                   'th,.machine-ranking-table td{padding:10px '
+                                                   '8px;border-bottom:1px solid '
+                                                   'var(--line)}.machine-ranking-table '
+                                                   'th:last-child,.machine-ranking-table '
+                                                   'td:last-child{text-align:right}.machine-ranking-table '
+                                                   'td:nth-child(2){font-family:ui-monospace,monospace}.machine-ranking-summary{color:var(--muted);font-size:11px;margin-top:10px}\n'
+                                                   '    '
+                                                   '.dbn-heading>span:nth-child(3),.dbn-row>span[data-label="機台"]{display:none}\n'
+                                                   '    '
+                                                   '@media(min-width:801px){.list-heading.dbn-heading,.dbn-row{grid-template-columns:minmax(85px,.8fr) '
+                                                   'minmax(300px,3fr) minmax(45px,.5fr) minmax(75px,.7fr) '
+                                                   'minmax(45px,.5fr) minmax(80px,.8fr) minmax(90px,.7fr)}}\n'
+                                                   '    '
+                                                   '@media(max-width:600px){.dbn-row{grid-template-columns:repeat(2,minmax(0,1fr))}}\n'
+                                                   '    '
+                                                   '.dut-pin-line{display:flex;gap:10px;align-items:baseline;margin:6px '
+                                                   '0;white-space:normal;overflow-wrap:anywhere;line-height:1.6}\n'
+                                                   '    .dut-pin-line strong{flex-shrink:0}\n'
+                                                   '    '
+                                                   '.dbn-pin-details{margin-top:6px;max-width:100%;overflow-x:auto;font-size:12px;white-space:normal;overflow-wrap:anywhere}\n'
+                                                   '    .dbn-pin-details '
+                                                   '.dut-pin-line{width:max-content;min-width:100%;white-space:nowrap;overflow-wrap:normal}\n'
+                                                   '    .dbn-pin-details '
+                                                   '.dut-pin-common{width:100%;white-space:normal;overflow-wrap:anywhere}\n'
+                                                   '    .dbn-pin-details .dut-pin-common span{min-width:0}\n'
+                                                   '    .dbn-pin-details '
+                                                   'summary{cursor:pointer;color:var(--accent,#5865bc)}\n'
+                                                   '    '
+                                                   '#dbn-dut-pins{max-height:320px;overflow:auto;padding:8px '
+                                                   '0}\n',
+                                        'sha256': 'a013059aa4730821abc3225f4ffe161bafe79a298545c045af9b9905af95a325'},
+           'company/web/parity.css': {'content': '/* Local bindings for the unchanged original SPMS visual '
+                                                 'components. */\n'
+                                                 '.brand-mark{border:0;border-radius:0;background:transparent}\n'
+                                                 '.brand-mark '
+                                                 'img{display:block;width:36px;height:36px;object-fit:contain;filter:invert(1)}\n'
+                                                 '.sidebar{gap:10px}.sidebar '
+                                                 '.system-switcher{margin-bottom:8px}\n'
+                                                 '.sidebar .switcher-menu{width:100%}\n'
+                                                 '.switcher-unavailable{display:block;padding:9px;color:#85868c;font-size:11px}\n'
+                                                 '.switcher-unavailable '
+                                                 'small{display:block;margin-top:4px;font-size:9px}\n'
+                                                 '.local-information{margin:0 0 '
+                                                 '18px;text-align:right;font-size:11px;color:#85868c}\n'
+                                                 '.local-information>summary{cursor:pointer}.local-information '
+                                                 '.notice{text-align:left;margin:10px 0}\n'
+                                                 '.content{padding-top:28px}.quick-search-view '
+                                                 'h1{line-height:1.25}\n'
+                                                 '.quick-search-intro p{margin:9px 0 0;line-height:1.5}\n'
+                                                 '.quick-search-form>label{display:block}.quick-search-controls '
+                                                 'input{background:#17181a;border-radius:7px}\n'
+                                                 '.quick-search-controls button{width:auto;flex:none}\n'
+                                                 '#quick-message{margin:12px 0 '
+                                                 '0}.quick-search-results{display:grid;gap:15px;margin-top:20px}\n'
+                                                 '.quick-summary-field '
+                                                 'label{display:block}.quick-result-section '
+                                                 'h2{font-size:13px;margin:0}\n'
+                                                 '.quick-board-summary p,.quick-record-card p{margin:7px 0}\n'
+                                                 '.quick-record-actions '
+                                                 '.button{width:auto}.quick-record-date{line-height:1.5}\n'
+                                                 '.quick-record-top '
+                                                 '.status-pill{font-size:11px}.quick-record-top{gap:8px}\n'
+                                                 '.list-toolbar{flex-wrap:wrap}.list-toolbar '
+                                                 '.search-wrap{min-width:200px}\n'
+                                                 '.list-toolbar input.search{padding-left:30px}\n'
+                                                 '.list-toolbar select,.list-toolbar '
+                                                 'button{width:auto;flex:none;height:32px;font-size:11px}\n'
+                                                 '.list-toolbar .list-count{margin:0 0 0 '
+                                                 'auto;text-align:right}\n'
+                                                 '.list-toolbar #status-filter{display:none}\n'
+                                                 '.issue-copy{display:flex!important;align-items:baseline;gap:10px;min-width:0;width:100%}\n'
+                                                 '.item-sub{margin:0;font-size:11px;max-width:35%}.item-title{flex:0 '
+                                                 '1 auto}\n'
+                                                 '.issue-line{min-width:0;flex:1}.issue-open-status{font-size:11px}\n'
+                                                 '.status-pill{font-size:13px;gap:9px;font-weight:500}.status-pill::before{width:9px;height:9px}\n'
+                                                 '.repair-tag-0{border-color:#8b8df8;color:#8b8df8}.repair-tag-1{border-color:#50c5d2;color:#50c5d2}\n'
+                                                 '.repair-tag-2{border-color:#e3b341;color:#e3b341}.repair-tag-3{border-color:#65c98a;color:#65c98a}\n'
+                                                 '.dbn-link{display:flex;align-items:center;color:#e3a05d;font-size:13px}\n'
+                                                 '.dbn-link[role=link]{cursor:pointer}.dbn-link[role=link]:hover{color:#ffc17f;text-decoration:underline}\n'
+                                                 '.dbn-link[role=link]:focus-visible{outline:2px solid '
+                                                 'var(--accent);outline-offset:3px}\n'
+                                                 '.dbn-issue-type{margin-top:4px;color:#999ba6;font-size:11px}\n'
+                                                 '.dbn-row .detail-text{margin:5px 0}.dbn-row '
+                                                 '.button,.serial-map-row .button{width:auto}\n'
+                                                 '.dbn-actions{gap:5px}.dbn-actions .button{padding:4px '
+                                                 '7px;font-size:10px}\n'
+                                                 '.dbn-pin-details .detail-text{white-space:pre-wrap}\n'
+                                                 '.dut-pin-line{font-size:12px}.dut-pin-line '
+                                                 'strong{color:#bcbcc2}\n'
+                                                 '.pin-details summary{cursor:pointer;color:var(--accent)}\n'
+                                                 '.serial-map-row .serial-map-actions{display:flex}\n'
+                                                 '.stats-chart{max-height:none;width:100%;overflow:auto;margin-top:12px}\n'
+                                                 '.stats-chart svg{max-height:none}.stats-card '
+                                                 'table{min-width:0}\n'
+                                                 '#workspace-content .stats-card '
+                                                 'h2{margin:0;font-size:14px}\n'
+                                                 '.stats-controls select{width:auto}.stats-mode '
+                                                 'button{padding:5px 10px}\n'
+                                                 '.stats-card{background:#151618}.stats-data{margin-top:14px;color:#929398;font-size:11px}\n'
+                                                 '.stats-data>summary{cursor:pointer}.repair-color-0{background:#8b8df8}\n'
+                                                 '.repair-color-1{background:#50c5d2}.repair-color-2{background:#e3b341}.repair-color-3{background:#65c98a}\n'
+                                                 '.repair-timeline{margin-top:5px}.detail-section '
+                                                 '.repair-timeline{font-size:11px}\n'
+                                                 '.fields output{font-size:12px;min-height:34px}.fields '
+                                                 'label{gap:5px}\n'
+                                                 '.fields input:disabled,.fields '
+                                                 'select:disabled{color:#77787e;background:#161719}\n'
+                                                 '.fields .form-static-value{color:#d2d2d4}.fields '
+                                                 'input[readonly]{color:#989aa4}\n'
+                                                 '.fields .wide.hint{margin:0;line-height:1.6}\n'
+                                                 '@media(max-width:960px){.issue-copy{align-items:baseline}.item-sub{max-width:35%}.dbn-link{grid-column:1;grid-row:3}.issue-row '
+                                                 '.date-cell{grid-column:1/-1}}\n'
+                                                 '@media(max-width:800px){.list-heading.serial-map-heading{display:none}.serial-map-actions{justify-content:flex-start}}\n'
+                                                 '@media(max-width:600px){.sidebar{gap:5px}.sidebar '
+                                                 '.system-switcher{max-width:320px;margin:0 0 3px}.sidebar '
+                                                 'nav{display:flex}.local-information{font-size:10px}.content{padding:19px '
+                                                 '12px 40px}.quick-search-view{margin:8px auto '
+                                                 '0}.issue-copy{gap:8px}.issue-open-status{gap:3px}.stats-card{padding:13px}.stats-controls{gap:6px}}\n',
+                                      'sha256': 'a8db95ff7b96f67ab32c165b930e9d221026454017aff3ae7089bb65976d3116'},
            'company/web/repairs.css': {'content': ':root{color-scheme:dark;font-family:"Segoe '
                                                   'UI",sans-serif;background:#101113;color:#e7e7e8;font-size:14px}\n'
                                                   '*{box-sizing:border-box}body{margin:0}header{display:flex;gap:36px;align-items:center;background:#191a1c;border-bottom:1px '
@@ -6040,18 +6886,32 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    '  <meta name="viewport" content="width=device-width, '
                                                    'initial-scale=1">\n'
                                                    '  <title>SPMS 公司版 — 備品管理</title>\n'
+                                                   '  <meta name="theme-color" content="#101113">\n'
+                                                   '  <link rel="icon" type="image/png" '
+                                                   'href="/repairs/ghost-logo.png">\n'
+                                                   '  <link rel="stylesheet" href="/repairs/original.css">\n'
                                                    '  <link rel="stylesheet" href="/repairs/style.css">\n'
+                                                   '  <link rel="stylesheet" href="/repairs/parity.css">\n'
                                                    '  <script src="/repairs/app.js" defer></script>\n'
                                                    '  <script src="/repairs/features.js" defer></script>\n'
                                                    '</head>\n'
                                                    '<body>\n'
                                                    '<div class="app">\n'
                                                    '  <aside class="sidebar">\n'
-                                                   '    <div class="brand"><span class="brand-mark" '
-                                                   'aria-hidden="true">S</span><div><strong>SPMS</strong><small>Spare '
-                                                   'Parts Management System</small></div></div>\n'
-                                                   '    <div class="system-label">備品管理系統 · 公司 SQLite '
-                                                   '版</div>\n'
+                                                   '    <details class="system-switcher"><summary '
+                                                   'class="switcher-trigger"><span class="brand-mark"><img '
+                                                   'src="/repairs/ghost-logo.png" alt=""></span><span '
+                                                   'class="brand-copy"><span '
+                                                   'class="brand-title">SPMS</span><span '
+                                                   'class="brand-subtitle">Spare Parts Management '
+                                                   'System</span></span><span '
+                                                   'class="switcher-chevron">⌄</span></summary><div '
+                                                   'class="switcher-menu"><a href="/repairs/" '
+                                                   'aria-current="page"><span>▧</span><span>備品管理系統<small>板件送修管理 '
+                                                   '· SQLite</small></span><span '
+                                                   'class="switcher-check">✓</span></a><span '
+                                                   'class="switcher-unavailable">▦ '
+                                                   '機台管理系統<small>預留模組，尚未安裝</small></span></div></details>\n'
                                                    '    <nav aria-label="快速搜尋"><button class="nav-item" '
                                                    'id="nav-quick" type="button" aria-current="page"><span '
                                                    'aria-hidden="true">⌕</span>快速搜尋</button></nav>\n'
@@ -6092,38 +6952,50 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    '環境檢查</a>\n'
                                                    '  </aside>\n'
                                                    '  <main class="content">\n'
-                                                   '    <p class="local-badge">本機驗證版 · 不連接 Supabase</p>\n'
-                                                   '    <div class="notice">SQLite 離線功能驗收版。舊資料尚未匯入，內附機台、價格及 '
-                                                   'Socket 基礎對應仍須核對；不是正式上線／像素一致性驗收。僅限本機，登入權限及公司內網部署待 IT '
-                                                   '核准。</div>\n'
+                                                   '    <details class="local-information"><summary>SQLite '
+                                                   '本機移植版 · 不連接 Supabase</summary><p '
+                                                   'class="notice">公司端略過的驗證仍標為未驗收。舊資料尚未匯入；尚未完成畫面一致性及正式上線驗收。僅限本機，登入權限及公司內網部署待 '
+                                                   'IT 核准。</p></details>\n'
                                                    '    <section id="quick-view" class="quick-search-view">\n'
-                                                   '      <h1>SPMS</h1><p class="quick-intro">Enter a board '
-                                                   'S/N to quickly view related repair records.</p>\n'
-                                                   '      <form id="quick-form"><label for="quick-query">板件 '
-                                                   'S/N</label><div class="quick-controls"><input '
-                                                   'id="quick-query" type="search" placeholder="001234567" '
-                                                   'maxlength="64" required autocomplete="off"><button '
+                                                   '      <div '
+                                                   'class="quick-search-intro"><h1>SPMS</h1><p>Enter a board '
+                                                   'S/N to quickly view related repair and DBN '
+                                                   'records.</p></div>\n'
+                                                   '      <form id="quick-form" '
+                                                   'class="quick-search-form"><label '
+                                                   'for="quick-query">S/N</label><div '
+                                                   'class="quick-search-controls"><input id="quick-query" '
+                                                   'class="quick-search-input" type="search" '
+                                                   'placeholder="001234567" maxlength="64" required '
+                                                   'autocomplete="off" enterkeyhint="search" '
+                                                   'spellcheck="false"><button class="button primary '
+                                                   'quick-search-submit" '
                                                    'type="submit">Search</button></div></form>\n'
                                                    '      <p id="quick-message" role="status" '
                                                    'aria-live="polite">輸入 S/N 查詢本機送修與 DBN 紀錄。</p>\n'
-                                                   '      <div id="quick-results"></div>\n'
+                                                   '      <div id="quick-results" '
+                                                   'class="quick-search-results"></div>\n'
                                                    '    </section>\n'
                                                    '    <section id="records-view" hidden>\n'
                                                    '      <div class="title-row"><div><h1 '
                                                    'id="view-title">全部送修</h1><p>追蹤送修狀態、開單資訊及異常描述</p></div><button '
                                                    'id="create" type="button" disabled>＋ '
                                                    '新增送修</button></div>\n'
-                                                   '      <form id="search-form" class="toolbar"><input '
-                                                   'id="query" type="search" placeholder="搜尋板件、S/N、機台或異常描述…" '
-                                                   'aria-label="搜尋"><select id="status-filter" '
-                                                   'aria-label="狀態"><option '
+                                                   '      <form id="search-form" class="list-toolbar"><div '
+                                                   'class="search-wrap"><span class="search-icon" '
+                                                   'aria-hidden="true">⌕</span><input id="query" '
+                                                   'class="search" type="search" '
+                                                   'placeholder="搜尋板件、S/N、Model、機台、異常描述或標籤…" '
+                                                   'aria-label="搜尋"></div><select id="type-filter" '
+                                                   'class="failure-filter" '
+                                                   'aria-label="維修分類篩選"></select><select id="tag-filter" '
+                                                   'class="failure-filter" '
+                                                   'aria-label="異常類別篩選"></select><select id="status-filter" '
+                                                   'class="failure-filter" aria-label="狀態"><option '
                                                    'value="">所有狀態</option><option>待送修</option><option>已送修</option><option>取回驗證</option><option>結案（PASS）</option><option>結案（FAIL）</option></select><button '
-                                                   'type="submit">查詢</button></form>\n'
-                                                   '      <div class="toolbar"><select id="tag-filter" '
-                                                   'aria-label="異常類別篩選"></select><select id="type-filter" '
-                                                   'aria-label="維修分類篩選"></select></div>\n'
-                                                   '      <p id="message" class="list-count" role="status" '
-                                                   'aria-live="polite">正在載入…</p>\n'
+                                                   'type="submit">查詢</button><span id="message" '
+                                                   'class="list-count" role="status" '
+                                                   'aria-live="polite">正在載入…</span></form>\n'
                                                    '      <div '
                                                    'class="list-heading"><span>項目</span><span>目前狀態</span><span>標籤</span><span>DBN</span><span>機台</span><span '
                                                    'id="date-heading">損壞日期</span></div>\n'
@@ -6143,16 +7015,19 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    'id="workspace-query" type="search" placeholder="搜尋 '
                                                    'S/N、板名或相關資訊" '
                                                    'aria-label="管理清單搜尋"><button>查詢</button></form>\n'
-                                                   '      <div id="stats-controls" class="toolbar" '
-                                                   'hidden><select id="stats-mode" aria-label="統計模式"><option '
-                                                   'value="year">各月份（指定年度）</option><option '
-                                                   'value="month">各年度（指定月份）</option></select><input '
-                                                   'id="stats-period" aria-label="年度或月份" value="2026" '
-                                                   'maxlength="4"><button id="stats-load" '
-                                                   'type="button">更新統計</button><select id="ranking-sort" '
-                                                   'aria-label="機台損壞排序"><option '
-                                                   'value="desc">次數多到少</option><option '
-                                                   'value="asc">次數少到多</option></select></div>\n'
+                                                   '      <div id="stats-controls" class="stats-controls" '
+                                                   'hidden><div class="stats-mode" role="group" '
+                                                   'aria-label="統計期間"><button id="stats-mode-year" '
+                                                   'type="button" aria-pressed="true">年度</button><button '
+                                                   'id="stats-mode-month" type="button" '
+                                                   'aria-pressed="false">月份</button></div><select '
+                                                   'id="stats-year" class="stats-select" '
+                                                   'aria-label="選擇年度"></select><select id="stats-month" '
+                                                   'class="stats-select" aria-label="選擇月份" '
+                                                   'hidden></select><select id="ranking-sort" '
+                                                   'class="stats-select" aria-label="機台損壞排序"><option '
+                                                   'value="desc">最多</option><option '
+                                                   'value="asc">最少</option></select></div>\n'
                                                    '      <p id="workspace-message" role="status" '
                                                    'aria-live="polite"></p><div '
                                                    'id="workspace-content"></div>\n'
@@ -6181,21 +7056,23 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    'type="button" aria-label="關閉">×</button></div>\n'
                                                    '  <form id="record-form">\n'
                                                    '    <div class="fields">\n'
-                                                   '      <label>S/N<input name="serial_no" id="serial" '
-                                                   'maxlength="64" autocomplete="off" required></label>\n'
                                                    '      <label>機台<select name="machine_code" id="machine" '
                                                    'required></select></label>\n'
-                                                   '      <p id="mapping-hint" class="wide hint" '
-                                                   'role="status"></p>\n'
+                                                   '      <label>Model<input id="model" readonly></label>\n'
                                                    '      <label>板件名稱<select name="description" id="board" '
                                                    'required></select></label>\n'
                                                    '      <label>Part Number<input name="board_part_code" '
                                                    'id="part" readonly required></label>\n'
-                                                   '      <label>異常類別<select name="failure_tag" '
-                                                   'id="failure-tag" required></select></label>\n'
+                                                   '      <label>S/N<input name="serial_no" id="serial" '
+                                                   'maxlength="64" autocomplete="off" required></label>\n'
                                                    '      <label>維修分類<select name="repair_type" '
                                                    'id="repair-type" required></select></label>\n'
-                                                   '      <p id="repair-amount-preview" class="wide hint" '
+                                                   '      <label>金額<output id="repair-amount-preview" '
+                                                   'class="form-static-value" '
+                                                   'role="status"></output></label>\n'
+                                                   '      <label>異常類別<select name="failure_tag" '
+                                                   'id="failure-tag" required></select></label>\n'
+                                                   '      <p id="mapping-hint" class="wide hint" '
                                                    'role="status"></p>\n'
                                                    '      <label class="wide">異常描述<textarea '
                                                    'name="failure_description" id="failure-description" '
@@ -6241,7 +7118,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    'type="submit">儲存</button></div></form></dialog>\n'
                                                    '</body>\n'
                                                    '</html>\n',
-                                        'sha256': '31d4d79c1d773b6c6838f9bd72156687e4b383e631663b153be2501c2cdd51e9'},
+                                        'sha256': 'a5dd6b8ab540e545423dbe017c0e44e5878a52a6a90fe70b1c90e4aaa4fb9ee1'},
            'company/web/repairs.js': {'content': 'const byId = id => document.getElementById(id);\n'
                                                  'let catalogs, current = null, mapping = null, '
                                                  'mappingRequest = 0, saving = false;\n'
@@ -6341,21 +7218,33 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  "  const symbol = {'已送修':'↗', '取回驗證':'◎', '結案（PASS）':'✓', "
                                                  "'結案（FAIL）':'×'}[record.current_status] || '○';\n"
                                                  "  const copy = element('span', 'item-copy');\n"
-                                                 "  copy.append(element('strong', 'item-title', "
-                                                 'record.description),\n'
-                                                 "    element('span', 'item-sub', `${record.serial_no} · 開單 "
-                                                 "${record.is_opened ? 'O' : 'X'}`));\n"
+                                                 "  copy.className = 'item-copy issue-copy';\n"
+                                                 "  const line = element('span', 'issue-line');\n"
+                                                 "  line.append(element('strong', 'item-title issue-title', "
+                                                 "record.description), element('span', 'item-sub issue-sub', "
+                                                 'record.serial_no));\n'
+                                                 "  copy.append(line, element('span', 'issue-open-status', "
+                                                 "`開單 ${record.is_opened ? 'O' : 'X'}`));\n"
                                                  "  main.append(element('span', 'state-symbol', symbol), "
                                                  'copy);\n'
                                                  "  const tags = element('span', 'record-tags');\n"
+                                                 '  const typeColor = '
+                                                 "['板修','外修','合約','保固'].indexOf(record.repair_type);\n"
                                                  "  tags.append(element('span', 'failure-tag', "
-                                                 "record.failure_tag), element('span', 'repair-tag', "
-                                                 'record.repair_type));\n'
+                                                 "record.failure_tag), element('span', 'repair-tag "
+                                                 "repair-tag-' + typeColor, record.repair_type));\n"
                                                  "  const dbn = element('span', 'dbn-link', record.dbn_count "
                                                  "? `DBN ${record.dbn_count}` : '—');\n"
-                                                 "  if (record.dbn_count) dbn.addEventListener('click', "
-                                                 "event => {event.stopPropagation(); openWorkspace('dbn', "
-                                                 'record.serial_no);});\n'
+                                                 '  if (record.dbn_count) {\n'
+                                                 "    dbn.setAttribute('role', 'link'); dbn.tabIndex = 0;\n"
+                                                 '    const follow = event => {event.preventDefault(); '
+                                                 "event.stopPropagation(); openWorkspace('dbn', "
+                                                 'record.serial_no);};\n'
+                                                 "    dbn.addEventListener('click', follow);\n"
+                                                 "    dbn.addEventListener('keydown', event => {if "
+                                                 "(event.key === 'Enter' || event.key === ' ') "
+                                                 'follow(event);});\n'
+                                                 '  }\n'
                                                  "  const date = {'已送修':record.sent_on, "
                                                  "'取回驗證':record.returned_on, '結案（PASS）':record.returned_on, "
                                                  "'結案（FAIL）':record.returned_on}[byId('status-filter').value] "
@@ -6410,13 +7299,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  "      ['損壞日期', record.occurred_on], ['送修日期', "
                                                  "record.sent_on], ['回修日期', record.returned_on], ['結案日期', "
                                                  "record.closed_on], ['異常類別', record.failure_tag]]));\n"
-                                                 '    if (record.sent_on && record.returned_on) {\n'
-                                                 "      body.append(element('p', 'hint', `損壞→送修 "
-                                                 '${Math.round((Date.parse(record.sent_on) - '
-                                                 'Date.parse(record.occurred_on)) / 86400000)} 天 · 送修→回修 '
-                                                 '${Math.round((Date.parse(record.returned_on) - '
-                                                 'Date.parse(record.sent_on)) / 86400000)} 天`));\n'
-                                                 '    }\n'
+                                                 '    body.append(repairTimeline(record));\n'
                                                  "    const failure = element('section', 'detail-section');\n"
                                                  "    failure.append(element('h3', '', '異常描述'), "
                                                  "element('div', 'detail-text', "
@@ -6466,33 +7349,15 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  "  byId('quick-results').replaceChildren();\n"
                                                  '  try {\n'
                                                  '    const query = new URLSearchParams({serial});\n'
-                                                 '    const [records, master, dbn] = await '
+                                                 '    const [records, summary, dbn] = await '
                                                  "Promise.all([api('/api/repairs/records?' + query),\n"
-                                                 "      api('/api/repairs/serial-mapping?' + query), "
+                                                 "      api('/api/repairs/serial-summary?' + query), "
                                                  "api('/api/repairs/dbn?' + query)]);\n"
                                                  '    if (request !== quickRequest) return;\n'
                                                  '    quickSerial = serial;\n'
                                                  '    updateCounts(records.status_counts);\n'
-                                                 "    const summary = element('section', 'quick-summary');\n"
-                                                 "    summary.append(element('h2', '', "
-                                                 'master.data?.board_name || records.data[0]?.description || '
-                                                 "'尚無板件主檔'),\n"
-                                                 "      element('p', 'serial-text', serial), element('p', "
-                                                 "'', `共 ${records.total} 筆送修紀錄 · Part "
-                                                 "Number：${master.data?.board_part_code || '未記錄'}`));\n"
-                                                 "    byId('quick-results').append(summary);\n"
-                                                 '    for (const record of records.data) {\n'
-                                                 "      const card = element('button', 'quick-card');\n"
-                                                 "      card.type = 'button';\n"
-                                                 "      card.append(element('strong', '', "
-                                                 '`${record.description} · ${record.current_status}`),\n'
-                                                 "        element('span', '', `${record.machine_code} · "
-                                                 '${record.occurred_on} · ${record.failure_tag}`),\n'
-                                                 "        element('span', '', record.failure_description));\n"
-                                                 "      card.addEventListener('click', () => "
-                                                 'openDetail(record.id));\n'
-                                                 "      byId('quick-results').append(card);\n"
-                                                 '    }\n'
+                                                 '    renderQuickResults(summary, records, dbn, '
+                                                 "byId('quick-results'));\n"
                                                  '    if (records.total > 20) {\n'
                                                  "      const all = element('button', 'quick-card', '目前顯示前 "
                                                  "20 筆，前往送修清單查看全部');\n"
@@ -6502,12 +7367,6 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  '1; loadRecords();});\n'
                                                  "      byId('quick-results').append(all);\n"
                                                  '    }\n'
-                                                 "    const dbnHeading = element('h2', '', `DBN "
-                                                 '紀錄（${dbn.total} 筆）`);\n'
-                                                 "    byId('quick-results').append(dbnHeading);\n"
-                                                 "    if (typeof renderDbnCard === 'function') for (const "
-                                                 'row of dbn.data) '
-                                                 "byId('quick-results').append(renderDbnCard(row));\n"
                                                  '    if (dbn.total > 20) {\n'
                                                  "      const allDbn = element('button', 'quick-card', '前往 "
                                                  "DBN 清單查看全部'); allDbn.type = 'button';\n"
@@ -6542,6 +7401,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  "function updateBoards(preferred = byId('board').value) {\n"
                                                  '  const machine = catalogs.machines.find(row => '
                                                  "row.machine_code === byId('machine').value);\n"
+                                                 "  byId('model').value = machine?.model || '';\n"
                                                  '  const boards = catalogs.boards.filter(row => row.model '
                                                  '=== machine?.model &&\n'
                                                  '    (!mapping || (row.board_name === mapping.board_name && '
@@ -6566,15 +7426,20 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  'function updatePricePreview() {\n'
                                                  '  const model = catalogs?.machines.find(row => '
                                                  "row.machine_code === byId('machine').value)?.model;\n"
+                                                 "  const amount = repairPrice(model, byId('board').value, "
+                                                 "byId('part').value, byId('repair-type').value);\n"
+                                                 "  byId('repair-amount-preview').textContent = amount == "
+                                                 "null ? '未設定' : (amount / 100).toLocaleString('zh-TW') + ' "
+                                                 "元';\n"
+                                                 '}\n'
+                                                 '\n'
+                                                 'function repairPrice(model, board, part, type) {\n'
                                                  '  const price = catalogs?.prices?.find(row => row.model '
-                                                 "=== model && row.board_name === byId('board').value && "
-                                                 "row.board_part_code === byId('part').value);\n"
+                                                 '=== model && row.board_name === board && '
+                                                 'row.board_part_code === part);\n'
                                                  '  const column = '
-                                                 "{'板修':'board_repair_cents','外修':'external_repair_cents','合約':'contract_repair_cents','保固':'warranty_repair_cents'}[byId('repair-type').value];\n"
-                                                 '  const amount = price?.[column];\n'
-                                                 "  byId('repair-amount-preview').textContent = "
-                                                 "`本次儲存金額：${amount == null ? '未設定' : (amount / "
-                                                 "100).toLocaleString('zh-TW') + ' 元'}（依目前本機價目）`;\n"
+                                                 "{'板修':'board_repair_cents','外修':'external_repair_cents','合約':'contract_repair_cents','保固':'warranty_repair_cents'}[type];\n"
+                                                 '  return price?.[column] ?? null;\n'
                                                  '}\n'
                                                  '\n'
                                                  'async function lookupMapping() {\n'
@@ -6773,6 +7638,12 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  "for (const id of ['tag-filter', 'type-filter']) "
                                                  "byId(id).addEventListener('change', () => {page = 1; "
                                                  'loadRecords();});\n'
+                                                 'let searchTimer = null;\n'
+                                                 "byId('query').addEventListener('input', () => {\n"
+                                                 '  window.clearTimeout(searchTimer);\n'
+                                                 '  searchTimer = window.setTimeout(() => {serialFilter = '
+                                                 "''; page = 1; loadRecords();}, 220);\n"
+                                                 '});\n'
                                                  '\n'
                                                  '(async () => {\n'
                                                  '  try {\n'
@@ -6792,7 +7663,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  "  } catch (error) {byId('message').textContent = "
                                                  "error.message; byId('message').dataset.error = 'true';}\n"
                                                  '})();\n',
-                                      'sha256': '9bdcb0b23a69ef3f2d81380bd691934a2f0225a10610a7fdab697c12825ee126'},
+                                      'sha256': '099644dd85ed23d22d205dece70e9a71eb45d90210ed375a6062edb97c6dde75'},
            'company/web/style.css': {'content': ':root{color-scheme:dark;font-family:"Segoe '
                                                 'UI",sans-serif;background:#101113;color:#e7e7e8}\n'
                                                 '*{box-sizing:border-box}body{margin:0}main{max-width:850px;margin:60px '
@@ -6813,7 +7684,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                 '@media(max-width:600px){main{margin:25px auto;padding:0 '
                                                 '16px}h1{font-size:22px}section{padding:18px}dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:10px}}\n',
                                      'sha256': '064406c8758be5620dfe7440f59d59ec1de5f6307e74f5bad85dd03e018c0769'}},
- 'version': '2026-11-02-local-workflows-v2'}
+ 'version': '2026-11-02-original-ui-stage2'}
 
 
 def check_local_path(path):

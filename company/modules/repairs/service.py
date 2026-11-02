@@ -71,8 +71,9 @@ def list_records(path, query):
         arguments.append(normalize_serial(serial))
     if text:
         text = "%" + text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-        where.append("(serial_no LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR machine_code LIKE ? ESCAPE '\\' OR failure_description LIKE ? ESCAPE '\\')")
-        arguments.extend([text] * 4)
+        fields = ('serial_no', 'description', 'machine_code', 'model', 'failure_description', 'failure_tag', 'repair_type')
+        where.append('(' + ' OR '.join(field + " LIKE ? ESCAPE '\\'" for field in fields) + ')')
+        arguments.extend([text] * len(fields))
     if status:
         if status not in (*ACTIVE_STATUSES, "結案（PASS）", "結案（FAIL）"):
             raise APIError("狀態無效")

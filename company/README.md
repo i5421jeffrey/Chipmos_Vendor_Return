@@ -7,6 +7,7 @@
 
 - `/`：環境檢查；`/repairs/`：送修新增／搜尋／編輯／刪除、每筆及全站異動紀錄、DBN、S/N 主檔、機台／板件／價格對應、年／月統計。
 - 沿用原版左側導覽、狀態清單、S/N 快速搜尋、六欄送修列表、右側詳細資料及深色配色。新增管理表單以本機功能為主，尚未完成與原版逐畫面／像素一致性驗收，不能稱為外觀一模一樣。機台保養模組仍未安裝。
+- 介面第二段：離線封裝原版 Logo 與 CSS；DBN／S/N 改回欄列清單、快速搜尋改回板件摘要與送修／DBN 分區、統計改回年度／月份選單及卡片／分類金額圖例、詳細資料有三階段維修時程。Model 與金額唯讀顯示，DBN 依類型隱藏不適用欄位。Logo JSON 為安裝封裝用途，不直接對外提供；只有明確 PNG 路由可讀取圖片。沒有搬入原版雲端 JS 或前端硬編碼密碼，不宣稱已完成登入權限。
 - 快速搜尋以正規化後的完整 S/N 精確查詢，不混入「包含相同字串」的其他序號；狀態導覽筆數由 SQLite 實際紀錄取得。
 - S/N 主檔只存 S/N、板名與 PN，命中後鎖定板名／PN；一般案件的主檔衝突阻止寫入。主檔維護支援改名及選擇是否同步歷史，先顯示影響筆數，再確認；版本或預覽後的歷史變更會阻擋。同步不重算歷史金額／Socket 快照，且須與歷史 Model 相容；任一筆失敗全部回復。改 S/N 但不同步時，有歷史引用的舊主檔會保留，避免破壞外鍵。
 - 機型由機台對應取得，維修金額由板件與維修分類決定；未設定為 NULL，零元仍為 0。
@@ -92,7 +93,11 @@ cd D:\Python\SPMS
 .\.venv\Scripts\python.exe .\company\server.py --port 8766
 ```
 
-## 驗收
+## 公司端驗證狀態
+
+使用者回報基本流程、DBN／Socket、附件及第一輪 FAIL→再次送修測試完成。之後要求跳過所有公司端驗證並繼續移植，故第二輪 PASS、統計、主檔歷史同步、人工備份／復原及本次畫面一致性仍屬**未驗收**；不得將略過記為通過，也不以此宣稱正式上線。開發機自動測試照常執行，但不能取代 Windows／真實資料驗收。
+
+## 驗收參考程序（保留供後續，不作為目前移植的前置要求）
 
 1. 頁面顯示 SQLite 已連線及版本，結構版本為 1。
 2. 按「重新檢查」仍成功。
@@ -174,6 +179,7 @@ Mac 開發機可額外執行 `swift scripts/test_company_ui.swift` 檢查 JS 語
 要重建離線基礎對應（只讀 Git 檔案、不連雲端），執行 `python scripts/build_company_catalog.py`；
 這只產生封裝檔，不會更新已安裝 SQLite 的主檔，正式主檔變更須另行審閱遷移。
 DBN 基礎對應：`python scripts/build_company_dbn_catalog.py`（從明確 Git SQL VALUES／Socket JSON 擷取，不執行 PostgreSQL 或連雲端）。
+原版外觀資源：`python scripts/build_company_ui_assets.py`，產生 `company/web/original.css` 與純文字 `branding.json`；另以 `parity.css` 適配本機 DOM。原版 CSS 有變更時須重新產生，再重建安裝檔。資源重現測試：`python -m unittest discover -s scripts -p "test_company_ui_assets.py" -v`。
 
 單檔安裝程式由 `python scripts/build_company_installer.py` 產生；公司版程式更新後必須重新產生。
 安裝測試：`python -m unittest discover -s scripts -p "test_company_installer.py" -v`。

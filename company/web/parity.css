@@ -1,0 +1,54 @@
+/* Local bindings for the unchanged original SPMS visual components. */
+.brand-mark{border:0;border-radius:0;background:transparent}
+.brand-mark img{display:block;width:36px;height:36px;object-fit:contain;filter:invert(1)}
+.sidebar{gap:10px}.sidebar .system-switcher{margin-bottom:8px}
+.sidebar .switcher-menu{width:100%}
+.switcher-unavailable{display:block;padding:9px;color:#85868c;font-size:11px}
+.switcher-unavailable small{display:block;margin-top:4px;font-size:9px}
+.local-information{margin:0 0 18px;text-align:right;font-size:11px;color:#85868c}
+.local-information>summary{cursor:pointer}.local-information .notice{text-align:left;margin:10px 0}
+.content{padding-top:28px}.quick-search-view h1{line-height:1.25}
+.quick-search-intro p{margin:9px 0 0;line-height:1.5}
+.quick-search-form>label{display:block}.quick-search-controls input{background:#17181a;border-radius:7px}
+.quick-search-controls button{width:auto;flex:none}
+#quick-message{margin:12px 0 0}.quick-search-results{display:grid;gap:15px;margin-top:20px}
+.quick-summary-field label{display:block}.quick-result-section h2{font-size:13px;margin:0}
+.quick-board-summary p,.quick-record-card p{margin:7px 0}
+.quick-record-actions .button{width:auto}.quick-record-date{line-height:1.5}
+.quick-record-top .status-pill{font-size:11px}.quick-record-top{gap:8px}
+.list-toolbar{flex-wrap:wrap}.list-toolbar .search-wrap{min-width:200px}
+.list-toolbar input.search{padding-left:30px}
+.list-toolbar select,.list-toolbar button{width:auto;flex:none;height:32px;font-size:11px}
+.list-toolbar .list-count{margin:0 0 0 auto;text-align:right}
+.list-toolbar #status-filter{display:none}
+.issue-copy{display:flex!important;align-items:baseline;gap:10px;min-width:0;width:100%}
+.item-sub{margin:0;font-size:11px;max-width:35%}.item-title{flex:0 1 auto}
+.issue-line{min-width:0;flex:1}.issue-open-status{font-size:11px}
+.status-pill{font-size:13px;gap:9px;font-weight:500}.status-pill::before{width:9px;height:9px}
+.repair-tag-0{border-color:#8b8df8;color:#8b8df8}.repair-tag-1{border-color:#50c5d2;color:#50c5d2}
+.repair-tag-2{border-color:#e3b341;color:#e3b341}.repair-tag-3{border-color:#65c98a;color:#65c98a}
+.dbn-link{display:flex;align-items:center;color:#e3a05d;font-size:13px}
+.dbn-link[role=link]{cursor:pointer}.dbn-link[role=link]:hover{color:#ffc17f;text-decoration:underline}
+.dbn-link[role=link]:focus-visible{outline:2px solid var(--accent);outline-offset:3px}
+.dbn-issue-type{margin-top:4px;color:#999ba6;font-size:11px}
+.dbn-row .detail-text{margin:5px 0}.dbn-row .button,.serial-map-row .button{width:auto}
+.dbn-actions{gap:5px}.dbn-actions .button{padding:4px 7px;font-size:10px}
+.dbn-pin-details .detail-text{white-space:pre-wrap}
+.dut-pin-line{font-size:12px}.dut-pin-line strong{color:#bcbcc2}
+.pin-details summary{cursor:pointer;color:var(--accent)}
+.serial-map-row .serial-map-actions{display:flex}
+.stats-chart{max-height:none;width:100%;overflow:auto;margin-top:12px}
+.stats-chart svg{max-height:none}.stats-card table{min-width:0}
+#workspace-content .stats-card h2{margin:0;font-size:14px}
+.stats-controls select{width:auto}.stats-mode button{padding:5px 10px}
+.stats-card{background:#151618}.stats-data{margin-top:14px;color:#929398;font-size:11px}
+.stats-data>summary{cursor:pointer}.repair-color-0{background:#8b8df8}
+.repair-color-1{background:#50c5d2}.repair-color-2{background:#e3b341}.repair-color-3{background:#65c98a}
+.repair-timeline{margin-top:5px}.detail-section .repair-timeline{font-size:11px}
+.fields output{font-size:12px;min-height:34px}.fields label{gap:5px}
+.fields input:disabled,.fields select:disabled{color:#77787e;background:#161719}
+.fields .form-static-value{color:#d2d2d4}.fields input[readonly]{color:#989aa4}
+.fields .wide.hint{margin:0;line-height:1.6}
+@media(max-width:960px){.issue-copy{align-items:baseline}.item-sub{max-width:35%}.dbn-link{grid-column:1;grid-row:3}.issue-row .date-cell{grid-column:1/-1}}
+@media(max-width:800px){.list-heading.serial-map-heading{display:none}.serial-map-actions{justify-content:flex-start}}
+@media(max-width:600px){.sidebar{gap:5px}.sidebar .system-switcher{max-width:320px;margin:0 0 3px}.sidebar nav{display:flex}.local-information{font-size:10px}.content{padding:19px 12px 40px}.quick-search-view{margin:8px auto 0}.issue-copy{gap:8px}.issue-open-status{gap:3px}.stats-card{padding:13px}.stats-controls{gap:6px}}

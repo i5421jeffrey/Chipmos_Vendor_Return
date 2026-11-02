@@ -1,6 +1,7 @@
 """Local SPMS service. Python standard library only; no cloud connections."""
 
 import argparse
+import base64
 import json
 import sqlite3
 from contextlib import closing
@@ -24,6 +25,8 @@ ASSETS = {
     "/repairs/app.js": ("repairs.js", "text/javascript; charset=utf-8"),
     "/repairs/style.css": ("repairs.css", "text/css; charset=utf-8"),
     "/repairs/features.js": ("features.js", "text/javascript; charset=utf-8"),
+    "/repairs/original.css": ("original.css", "text/css; charset=utf-8"),
+    "/repairs/parity.css": ("parity.css", "text/css; charset=utf-8"),
 }
 
 
@@ -134,6 +137,8 @@ class Handler(BaseHTTPRequestHandler):
                     payload = repairs.catalog(self.server.database)
                 elif path == "/api/repairs/serial-mapping":
                     payload = repairs.serial_mapping(self.server.database, query.get("serial", [""])[0])
+                elif path == '/api/repairs/serial-summary':
+                    payload = operations.serial_summary(self.server.database, query.get('serial', [''])[0])
                 elif path == "/api/repairs/records":
                     payload = repairs.list_records(self.server.database, query)
                 elif path == '/api/repairs/dbn/catalog':
@@ -172,6 +177,9 @@ class Handler(BaseHTTPRequestHandler):
                     self.send_content(getattr(error, "status", 503), b"", "application/json", True)
                 else:
                     self.api_error(error)
+        elif path == '/repairs/ghost-logo.png':
+            branding = json.loads((ROOT / 'web/branding.json').read_text(encoding='utf-8'))
+            self.send_content(200, base64.b64decode(branding['content_base64'], validate=True), 'image/png', head)
         elif path in ASSETS:
             filename, content_type = ASSETS[path]
             self.send_content(200, (ROOT / "web" / filename).read_bytes(), content_type, head)

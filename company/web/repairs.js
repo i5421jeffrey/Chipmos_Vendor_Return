@@ -69,13 +69,21 @@ function renderRecord(record) {
   const main = element('span', 'issue-main');
   const symbol = {'已送修':'↗', '取回驗證':'◎', '結案（PASS）':'✓', '結案（FAIL）':'×'}[record.current_status] || '○';
   const copy = element('span', 'item-copy');
-  copy.append(element('strong', 'item-title', record.description),
-    element('span', 'item-sub', `${record.serial_no} · 開單 ${record.is_opened ? 'O' : 'X'}`));
+  copy.className = 'item-copy issue-copy';
+  const line = element('span', 'issue-line');
+  line.append(element('strong', 'item-title issue-title', record.description), element('span', 'item-sub issue-sub', record.serial_no));
+  copy.append(line, element('span', 'issue-open-status', `開單 ${record.is_opened ? 'O' : 'X'}`));
   main.append(element('span', 'state-symbol', symbol), copy);
   const tags = element('span', 'record-tags');
-  tags.append(element('span', 'failure-tag', record.failure_tag), element('span', 'repair-tag', record.repair_type));
+  const typeColor = ['板修','外修','合約','保固'].indexOf(record.repair_type);
+  tags.append(element('span', 'failure-tag', record.failure_tag), element('span', 'repair-tag repair-tag-' + typeColor, record.repair_type));
   const dbn = element('span', 'dbn-link', record.dbn_count ? `DBN ${record.dbn_count}` : '—');
-  if (record.dbn_count) dbn.addEventListener('click', event => {event.stopPropagation(); openWorkspace('dbn', record.serial_no);});
+  if (record.dbn_count) {
+    dbn.setAttribute('role', 'link'); dbn.tabIndex = 0;
+    const follow = event => {event.preventDefault(); event.stopPropagation(); openWorkspace('dbn', record.serial_no);};
+    dbn.addEventListener('click', follow);
+    dbn.addEventListener('keydown', event => {if (event.key === 'Enter' || event.key === ' ') follow(event);});
+  }
   const date = {'已送修':record.sent_on, '取回驗證':record.returned_on, '結案（PASS）':record.returned_on, '結案（FAIL）':record.returned_on}[byId('status-filter').value] || record.occurred_on;
   row.append(main, statusPill(record.current_status), tags, dbn,
     element('span', 'machine-cell', record.machine_code), element('span', 'date-cell', date));
@@ -113,9 +121,7 @@ async function openDetail(id) {
       ['S/N', record.serial_no], ['Part Number', record.board_part_code], ['是否開單', record.is_opened ? 'O' : 'X']]));
     body.append(detailSection('維修資訊', [['維修分類', record.repair_type], ['維修金額', record.repair_amount == null ? '未設定' : record.repair_amount.toLocaleString('zh-TW')],
       ['損壞日期', record.occurred_on], ['送修日期', record.sent_on], ['回修日期', record.returned_on], ['結案日期', record.closed_on], ['異常類別', record.failure_tag]]));
-    if (record.sent_on && record.returned_on) {
-      body.append(element('p', 'hint', `損壞→送修 ${Math.round((Date.parse(record.sent_on) - Date.parse(record.occurred_on)) / 86400000)} 天 · 送修→回修 ${Math.round((Date.parse(record.returned_on) - Date.parse(record.sent_on)) / 86400000)} 天`));
-    }
+    body.append(repairTimeline(record));
     const failure = element('section', 'detail-section');
     failure.append(element('h3', '', '異常描述'), element('div', 'detail-text', record.failure_description));
     body.append(failure);
@@ -153,33 +159,18 @@ async function searchSerial() {
   byId('quick-results').replaceChildren();
   try {
     const query = new URLSearchParams({serial});
-    const [records, master, dbn] = await Promise.all([api('/api/repairs/records?' + query),
-      api('/api/repairs/serial-mapping?' + query), api('/api/repairs/dbn?' + query)]);
+    const [records, summary, dbn] = await Promise.all([api('/api/repairs/records?' + query),
+      api('/api/repairs/serial-summary?' + query), api('/api/repairs/dbn?' + query)]);
     if (request !== quickRequest) return;
     quickSerial = serial;
     updateCounts(records.status_counts);
-    const summary = element('section', 'quick-summary');
-    summary.append(element('h2', '', master.data?.board_name || records.data[0]?.description || '尚無板件主檔'),
-      element('p', 'serial-text', serial), element('p', '', `共 ${records.total} 筆送修紀錄 · Part Number：${master.data?.board_part_code || '未記錄'}`));
-    byId('quick-results').append(summary);
-    for (const record of records.data) {
-      const card = element('button', 'quick-card');
-      card.type = 'button';
-      card.append(element('strong', '', `${record.description} · ${record.current_status}`),
-        element('span', '', `${record.machine_code} · ${record.occurred_on} · ${record.failure_tag}`),
-        element('span', '', record.failure_description));
-      card.addEventListener('click', () => openDetail(record.id));
-      byId('quick-results').append(card);
-    }
+    renderQuickResults(summary, records, dbn, byId('quick-results'));
     if (records.total > 20) {
       const all = element('button', 'quick-card', '目前顯示前 20 筆，前往送修清單查看全部');
       all.type = 'button';
       all.addEventListener('click', () => {serialFilter = serial; byId('query').value = ''; setView(false); page = 1; loadRecords();});
       byId('quick-results').append(all);
     }
-    const dbnHeading = element('h2', '', `DBN 紀錄（${dbn.total} 筆）`);
-    byId('quick-results').append(dbnHeading);
-    if (typeof renderDbnCard === 'function') for (const row of dbn.data) byId('quick-results').append(renderDbnCard(row));
     if (dbn.total > 20) {
       const allDbn = element('button', 'quick-card', '前往 DBN 清單查看全部'); allDbn.type = 'button';
       allDbn.addEventListener('click', () => openWorkspace('dbn', serial)); byId('quick-results').append(allDbn);
@@ -200,6 +191,7 @@ for (const button of document.querySelectorAll('[data-status]')) button.addEvent
 
 function updateBoards(preferred = byId('board').value) {
   const machine = catalogs.machines.find(row => row.machine_code === byId('machine').value);
+  byId('model').value = machine?.model || '';
   const boards = catalogs.boards.filter(row => row.model === machine?.model &&
     (!mapping || (row.board_name === mapping.board_name && row.board_part_code === mapping.board_part_code)));
   fillSelect(byId('board'), boards.map(row => row.board_name), '請選擇板件');
@@ -215,10 +207,14 @@ function updateBoards(preferred = byId('board').value) {
 
 function updatePricePreview() {
   const model = catalogs?.machines.find(row => row.machine_code === byId('machine').value)?.model;
-  const price = catalogs?.prices?.find(row => row.model === model && row.board_name === byId('board').value && row.board_part_code === byId('part').value);
-  const column = {'板修':'board_repair_cents','外修':'external_repair_cents','合約':'contract_repair_cents','保固':'warranty_repair_cents'}[byId('repair-type').value];
-  const amount = price?.[column];
-  byId('repair-amount-preview').textContent = `本次儲存金額：${amount == null ? '未設定' : (amount / 100).toLocaleString('zh-TW') + ' 元'}（依目前本機價目）`;
+  const amount = repairPrice(model, byId('board').value, byId('part').value, byId('repair-type').value);
+  byId('repair-amount-preview').textContent = amount == null ? '未設定' : (amount / 100).toLocaleString('zh-TW') + ' 元';
+}
+
+function repairPrice(model, board, part, type) {
+  const price = catalogs?.prices?.find(row => row.model === model && row.board_name === board && row.board_part_code === part);
+  const column = {'板修':'board_repair_cents','外修':'external_repair_cents','合約':'contract_repair_cents','保固':'warranty_repair_cents'}[type];
+  return price?.[column] ?? null;
 }
 
 async function lookupMapping() {
@@ -350,6 +346,11 @@ byId('search-form').addEventListener('submit', event => {event.preventDefault();
 byId('previous').addEventListener('click', () => {page--; loadRecords();});
 byId('next').addEventListener('click', () => {page++; loadRecords();});
 for (const id of ['tag-filter', 'type-filter']) byId(id).addEventListener('change', () => {page = 1; loadRecords();});
+let searchTimer = null;
+byId('query').addEventListener('input', () => {
+  window.clearTimeout(searchTimer);
+  searchTimer = window.setTimeout(() => {serialFilter = ''; page = 1; loadRecords();}, 220);
+});
 
 (async () => {
   try {

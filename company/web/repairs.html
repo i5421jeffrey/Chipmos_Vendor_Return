@@ -4,15 +4,18 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>SPMS 公司版 — 備品管理</title>
+  <meta name="theme-color" content="#101113">
+  <link rel="icon" type="image/png" href="/repairs/ghost-logo.png">
+  <link rel="stylesheet" href="/repairs/original.css">
   <link rel="stylesheet" href="/repairs/style.css">
+  <link rel="stylesheet" href="/repairs/parity.css">
   <script src="/repairs/app.js" defer></script>
   <script src="/repairs/features.js" defer></script>
 </head>
 <body>
 <div class="app">
   <aside class="sidebar">
-    <div class="brand"><span class="brand-mark" aria-hidden="true">S</span><div><strong>SPMS</strong><small>Spare Parts Management System</small></div></div>
-    <div class="system-label">備品管理系統 · 公司 SQLite 版</div>
+    <details class="system-switcher"><summary class="switcher-trigger"><span class="brand-mark"><img src="/repairs/ghost-logo.png" alt=""></span><span class="brand-copy"><span class="brand-title">SPMS</span><span class="brand-subtitle">Spare Parts Management System</span></span><span class="switcher-chevron">⌄</span></summary><div class="switcher-menu"><a href="/repairs/" aria-current="page"><span>▧</span><span>備品管理系統<small>板件送修管理 · SQLite</small></span><span class="switcher-check">✓</span></a><span class="switcher-unavailable">▦ 機台管理系統<small>預留模組，尚未安裝</small></span></div></details>
     <nav aria-label="快速搜尋"><button class="nav-item" id="nav-quick" type="button" aria-current="page"><span aria-hidden="true">⌕</span>快速搜尋</button></nav>
     <div class="nav-label">紀錄項目</div>
     <nav id="status-nav" aria-label="送修狀態">
@@ -28,19 +31,16 @@
     <a class="environment-link" href="/">SQLite 環境檢查</a>
   </aside>
   <main class="content">
-    <p class="local-badge">本機驗證版 · 不連接 Supabase</p>
-    <div class="notice">SQLite 離線功能驗收版。舊資料尚未匯入，內附機台、價格及 Socket 基礎對應仍須核對；不是正式上線／像素一致性驗收。僅限本機，登入權限及公司內網部署待 IT 核准。</div>
+    <details class="local-information"><summary>SQLite 本機移植版 · 不連接 Supabase</summary><p class="notice">公司端略過的驗證仍標為未驗收。舊資料尚未匯入；尚未完成畫面一致性及正式上線驗收。僅限本機，登入權限及公司內網部署待 IT 核准。</p></details>
     <section id="quick-view" class="quick-search-view">
-      <h1>SPMS</h1><p class="quick-intro">Enter a board S/N to quickly view related repair records.</p>
-      <form id="quick-form"><label for="quick-query">板件 S/N</label><div class="quick-controls"><input id="quick-query" type="search" placeholder="001234567" maxlength="64" required autocomplete="off"><button type="submit">Search</button></div></form>
+      <div class="quick-search-intro"><h1>SPMS</h1><p>Enter a board S/N to quickly view related repair and DBN records.</p></div>
+      <form id="quick-form" class="quick-search-form"><label for="quick-query">S/N</label><div class="quick-search-controls"><input id="quick-query" class="quick-search-input" type="search" placeholder="001234567" maxlength="64" required autocomplete="off" enterkeyhint="search" spellcheck="false"><button class="button primary quick-search-submit" type="submit">Search</button></div></form>
       <p id="quick-message" role="status" aria-live="polite">輸入 S/N 查詢本機送修與 DBN 紀錄。</p>
-      <div id="quick-results"></div>
+      <div id="quick-results" class="quick-search-results"></div>
     </section>
     <section id="records-view" hidden>
       <div class="title-row"><div><h1 id="view-title">全部送修</h1><p>追蹤送修狀態、開單資訊及異常描述</p></div><button id="create" type="button" disabled>＋ 新增送修</button></div>
-      <form id="search-form" class="toolbar"><input id="query" type="search" placeholder="搜尋板件、S/N、機台或異常描述…" aria-label="搜尋"><select id="status-filter" aria-label="狀態"><option value="">所有狀態</option><option>待送修</option><option>已送修</option><option>取回驗證</option><option>結案（PASS）</option><option>結案（FAIL）</option></select><button type="submit">查詢</button></form>
-      <div class="toolbar"><select id="tag-filter" aria-label="異常類別篩選"></select><select id="type-filter" aria-label="維修分類篩選"></select></div>
-      <p id="message" class="list-count" role="status" aria-live="polite">正在載入…</p>
+      <form id="search-form" class="list-toolbar"><div class="search-wrap"><span class="search-icon" aria-hidden="true">⌕</span><input id="query" class="search" type="search" placeholder="搜尋板件、S/N、Model、機台、異常描述或標籤…" aria-label="搜尋"></div><select id="type-filter" class="failure-filter" aria-label="維修分類篩選"></select><select id="tag-filter" class="failure-filter" aria-label="異常類別篩選"></select><select id="status-filter" class="failure-filter" aria-label="狀態"><option value="">所有狀態</option><option>待送修</option><option>已送修</option><option>取回驗證</option><option>結案（PASS）</option><option>結案（FAIL）</option></select><button type="submit">查詢</button><span id="message" class="list-count" role="status" aria-live="polite">正在載入…</span></form>
       <div class="list-heading"><span>項目</span><span>目前狀態</span><span>標籤</span><span>DBN</span><span>機台</span><span id="date-heading">損壞日期</span></div>
       <div id="records" class="rows" aria-label="送修清單"></div>
       <div class="pager"><button id="previous" type="button" disabled>上一頁</button><span id="page"></span><button id="next" type="button" disabled>下一頁</button></div>
@@ -48,7 +48,7 @@
     <section id="workspace-view" hidden>
       <div class="title-row"><div><h1 id="workspace-title"></h1><p id="workspace-description"></p></div><div id="workspace-actions" class="actions"></div></div>
       <form id="workspace-search" class="toolbar"><input id="workspace-query" type="search" placeholder="搜尋 S/N、板名或相關資訊" aria-label="管理清單搜尋"><button>查詢</button></form>
-      <div id="stats-controls" class="toolbar" hidden><select id="stats-mode" aria-label="統計模式"><option value="year">各月份（指定年度）</option><option value="month">各年度（指定月份）</option></select><input id="stats-period" aria-label="年度或月份" value="2026" maxlength="4"><button id="stats-load" type="button">更新統計</button><select id="ranking-sort" aria-label="機台損壞排序"><option value="desc">次數多到少</option><option value="asc">次數少到多</option></select></div>
+      <div id="stats-controls" class="stats-controls" hidden><div class="stats-mode" role="group" aria-label="統計期間"><button id="stats-mode-year" type="button" aria-pressed="true">年度</button><button id="stats-mode-month" type="button" aria-pressed="false">月份</button></div><select id="stats-year" class="stats-select" aria-label="選擇年度"></select><select id="stats-month" class="stats-select" aria-label="選擇月份" hidden></select><select id="ranking-sort" class="stats-select" aria-label="機台損壞排序"><option value="desc">最多</option><option value="asc">最少</option></select></div>
       <p id="workspace-message" role="status" aria-live="polite"></p><div id="workspace-content"></div>
       <div class="pager" id="workspace-pager"><button id="workspace-previous" type="button">上一頁</button><span id="workspace-page"></span><button id="workspace-next" type="button">下一頁</button></div>
     </section>
@@ -62,14 +62,15 @@
   <div class="dialog-head"><h2 id="editor-title">新增送修</h2><button id="close" type="button" aria-label="關閉">×</button></div>
   <form id="record-form">
     <div class="fields">
-      <label>S/N<input name="serial_no" id="serial" maxlength="64" autocomplete="off" required></label>
       <label>機台<select name="machine_code" id="machine" required></select></label>
-      <p id="mapping-hint" class="wide hint" role="status"></p>
+      <label>Model<input id="model" readonly></label>
       <label>板件名稱<select name="description" id="board" required></select></label>
       <label>Part Number<input name="board_part_code" id="part" readonly required></label>
-      <label>異常類別<select name="failure_tag" id="failure-tag" required></select></label>
+      <label>S/N<input name="serial_no" id="serial" maxlength="64" autocomplete="off" required></label>
       <label>維修分類<select name="repair_type" id="repair-type" required></select></label>
-      <p id="repair-amount-preview" class="wide hint" role="status"></p>
+      <label>金額<output id="repair-amount-preview" class="form-static-value" role="status"></output></label>
+      <label>異常類別<select name="failure_tag" id="failure-tag" required></select></label>
+      <p id="mapping-hint" class="wide hint" role="status"></p>
       <label class="wide">異常描述<textarea name="failure_description" id="failure-description" maxlength="10000" required></textarea></label>
       <label>狀態<select name="current_status" id="record-status" required></select></label>
       <label class="check"><input type="checkbox" name="is_opened" id="is-opened">已開單</label>

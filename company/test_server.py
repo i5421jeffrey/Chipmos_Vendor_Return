@@ -27,7 +27,7 @@ class LocalServiceTests(unittest.TestCase):
         self.base = f"http://127.0.0.1:{self.server.server_port}"
 
     def test_home_assets_and_headers(self):
-        for path in ("/", "/index.html", "/style.css", "/app.js", "/repairs/", "/repairs/style.css", "/repairs/app.js"):
+        for path in ("/", "/index.html", "/style.css", "/app.js", "/repairs/", "/repairs/style.css", "/repairs/app.js", "/repairs/features.js", "/repairs/original.css", "/repairs/parity.css", "/repairs/ghost-logo.png"):
             with urlopen(self.base + path, timeout=5) as response:
                 self.assertEqual(response.status, 200)
                 self.assertEqual(response.headers["Cache-Control"], "no-store")
@@ -54,7 +54,7 @@ class LocalServiceTests(unittest.TestCase):
             self.assertEqual(connection.execute("SELECT value FROM test_persistence").fetchone()[0], "retained")
 
     def test_private_paths_not_served(self):
-        for path in ("/data/spms.sqlite3", "/server.py", "/../server.py", "/%2e%2e/server.py", "/api/unknown"):
+        for path in ("/data/spms.sqlite3", "/server.py", "/../server.py", "/%2e%2e/server.py", "/api/unknown", "/repairs/branding.json"):
             with self.assertRaises(HTTPError) as caught:
                 urlopen(self.base + path, timeout=5)
             self.assertEqual(caught.exception.code, 404)

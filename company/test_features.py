@@ -50,6 +50,18 @@ class FeatureTests(unittest.TestCase):
         row = ops.save_dbn(self.path, dict(dbn(), customer_code='VB', product_code=None, station_code=None))['data']
         self.assertIsNone(row['socket_file_id'])
 
+    def test_quick_summary_covers_all_pages_and_model_tag_search(self):
+        for index in range(21):
+            service.save_record(self.path, example(machine_code='F45' if index < 20 else 'F46'))
+        ops.save_dbn(self.path, dbn())
+        summary = ops.serial_summary(self.path, '2850948')
+        self.assertEqual(summary['machines'], ['F45','F46'])
+        self.assertEqual(summary['models'], ['T5377S'])
+        self.assertEqual(summary['mapping']['board_name'], 'HVDR PE')
+        self.assertEqual(service.list_records(self.path, {'q':['T5377S']})['total'], 21)
+        self.assertEqual(service.list_records(self.path, {'q':['RTE']})['total'], 21)
+        self.assertEqual(service.list_records(self.path, {'q':['板修']})['total'], 21)
+
     def test_dbn_snapshot_is_historical(self):
         row = ops.save_dbn(self.path, dbn())['data']
         self.assertEqual(row['serial_no'], '002850948')
@@ -329,6 +341,7 @@ class FeatureHTTPTests(unittest.TestCase):
         self.request('/api/repairs/dbn/' + identity, 'PUT', dict(dbn(), expected_version=1))
         self.assertEqual(self.request('/api/repairs/dbn?serial=2850948')[1]['total'], 1)
         self.assertEqual(self.request('/api/repairs/mappings')[1]['total'], 1)
+        self.assertEqual(self.request('/api/repairs/serial-summary?serial=2850948')[1]['models'], ['T5377S'])
         self.assertGreater(self.request('/api/repairs/history')[1]['total'], 1)
         self.request('/api/repairs/statistics?mode=year&period=2026')
         self.request('/api/repairs/masters')

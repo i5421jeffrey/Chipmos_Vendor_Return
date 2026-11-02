@@ -1,11 +1,13 @@
 /* Local-only feature workspaces. Untrusted values are always text, never HTML. */
 let workspace = '', workspacePage = 1, workspaceSerial = '', workspaceRequest = 0;
 let operationsSaving = false, operationsSubmit = null, masterData = null;
+let statisticsMode = 'year', statisticsYear = String(new Date().getFullYear()), statisticsMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+const fieldContainers = new WeakMap();
 const workspaceTitles = {dbn:'DBN 紀錄', mappings:'S/N 主檔維護', history:'全站異動紀錄', statistics:'統計資料', masters:'機台／板件／價格對應'};
 const operationsDialog = byId('operations-modal');
 const descriptions = {dbn:'DBN 紀錄獨立於送修案件；DUT／PIN 保存當時快照。', mappings:'主檔只保存 S/N、板名與 PN；歷史同步須先預覽及確認，不重算金額。', history:'本機異動紀錄；尚未登入，這不是具名操作人員稽核。', statistics:'首輪損壞頻率與機台排行；依結案日期加總各輪已知金額。', masters:'修改只影響後續選擇與儲存，不自動改寫既有案件、S/N 或價格快照。'};
 
-function action(label, handler, className = '') {
+function action(label, handler, className = 'button') {
   const button = element('button', className, label); button.type = 'button';
   button.addEventListener('click', async () => {
     if (button.disabled) return;
@@ -43,6 +45,7 @@ function formField(label, kind = 'text', value = '', choices = null) {
   if (kind === 'textarea') input.maxLength = 10000;
   if (kind === 'file') input.accept = '.txt,.asc';
   wrapper.append(input); byId('operations-fields').append(wrapper);
+  fieldContainers.set(input, wrapper);
   return input;
 }
 
@@ -92,10 +95,21 @@ for (const button of document.querySelectorAll('[data-workspace]')) button.addEv
 byId('workspace-search').addEventListener('submit', event => {event.preventDefault(); workspaceSerial = ''; workspacePage = 1; loadWorkspace();});
 byId('workspace-previous').addEventListener('click', () => {workspacePage--; loadWorkspace();});
 byId('workspace-next').addEventListener('click', () => {workspacePage++; loadWorkspace();});
-byId('stats-load').addEventListener('click', loadWorkspace);
 byId('ranking-sort').addEventListener('change', loadWorkspace);
-byId('stats-period').value = String(new Date().getFullYear());
-byId('stats-mode').addEventListener('change', () => {byId('stats-period').value = byId('stats-mode').value === 'year' ? String(new Date().getFullYear()) : String(new Date().getMonth() + 1).padStart(2, '0');});
+for (let month = 1; month <= 12; month++) byId('stats-month').add(new Option(`${month} 月`, String(month).padStart(2, '0')));
+byId('stats-month').value = statisticsMonth;
+byId('stats-year').add(new Option(statisticsYear, statisticsYear));
+byId('stats-year').addEventListener('change', () => {statisticsYear = byId('stats-year').value; loadWorkspace();});
+byId('stats-month').addEventListener('change', () => {statisticsMonth = byId('stats-month').value; loadWorkspace();});
+function setStatisticsMode(mode) {
+  statisticsMode = mode;
+  byId('stats-mode-year').setAttribute('aria-pressed', String(mode === 'year'));
+  byId('stats-mode-month').setAttribute('aria-pressed', String(mode === 'month'));
+  byId('stats-year').hidden = mode !== 'year'; byId('stats-month').hidden = mode !== 'month';
+  return loadWorkspace();
+}
+byId('stats-mode-year').addEventListener('click', () => setStatisticsMode('year'));
+byId('stats-mode-month').addEventListener('click', () => setStatisticsMode('month'));
 
 async function loadWorkspace() {
   const request = ++workspaceRequest, kind = workspace;
@@ -104,7 +118,7 @@ async function loadWorkspace() {
   try {
     const query = new URLSearchParams({q:byId('workspace-query').value, page:workspacePage});
     if (workspaceSerial) query.set('serial', workspaceSerial);
-    if (kind === 'statistics') {query.set('mode', byId('stats-mode').value); query.set('period', byId('stats-period').value);}
+    if (kind === 'statistics') {query.set('mode', statisticsMode); query.set('period', statisticsMode === 'year' ? statisticsYear : statisticsMonth);}
     const result = await api('/api/repairs/' + kind + '?' + query);
     if (request !== workspaceRequest || kind !== workspace) return;
     const content = byId('workspace-content'); content.replaceChildren();
@@ -117,11 +131,14 @@ async function loadWorkspace() {
       byId('workspace-message').textContent = '主檔不自動改寫歷史案件。'; return;
     }
     workspacePage = result.page;
+    if (kind === 'dbn') content.append(workspaceHeading(['S/N','板件名稱','機台','客戶','產品','站點','紀錄日期','操作'], 'dbn-heading'));
+    if (kind === 'mappings') content.append(workspaceHeading(['S/N','板件名稱','Part Number','操作'], 'serial-map-heading'));
     for (const row of result.data) {
-      if (kind === 'dbn') content.append(renderDbnCard(row));
+      if (kind === 'dbn') content.append(renderDbnRow(row));
       else if (kind === 'mappings') {
-        const card = element('section', 'quick-summary');
-        card.append(element('strong', '', row.serial_no), element('p', '', `${row.board_name} · ${row.board_part_code}`), action('修改', () => editMapping(row)));
+        const card = element('div', 'serial-map-row');
+        const actions = element('span', 'serial-map-actions'); actions.dataset.label = '操作'; actions.append(action('修改', () => editMapping(row)));
+        card.append(labeledCell('S/N', row.serial_no, 'serial-map-serial'), labeledCell('板件名稱', row.board_name), labeledCell('Part Number', row.board_part_code), actions);
         content.append(card);
       } else {
         const card = element('section', 'quick-summary');
@@ -131,6 +148,7 @@ async function loadWorkspace() {
         content.append(card);
       }
     }
+    if (!result.total) content.append(element('p', 'serial-map-empty', '沒有符合條件的紀錄。'));
     byId('workspace-message').textContent = `${workspaceSerial ? 'S/N ' + workspaceSerial + ' · ' : ''}共 ${result.total} 筆`;
     byId('workspace-page').textContent = `第 ${result.page}／${Math.max(1, Math.ceil(result.total / 20))} 頁`;
     byId('workspace-previous').disabled = result.page <= 1;
@@ -142,34 +160,97 @@ async function loadWorkspace() {
 }
 
 function pinDetails(record) {
-  const result = element('details', 'pin-details');
+  const result = element('details', 'pin-details dbn-pin-details');
   result.append(element('summary', '', `DUT ${record.dut} · PIN`));
   const snapshot = record.dut_pin_snapshot || {}, rows = Object.entries(snapshot).map(([dut, pins]) => [dut, Array.isArray(pins) ? [...new Set(pins)] : null]);
   const common = rows.length > 1 && rows.every(([, pins]) => pins?.length)
     ? rows[0][1].filter(pin => rows.every(([, pins]) => pins.includes(pin))) : [];
-  if (common.length) result.append(element('p', 'detail-text', '共用 PIN：' + [...new Set(common)].join(', ')));
+  function pinLine(label, content, shared = false) {
+    const line = element('div', 'dut-pin-line' + (shared ? ' dut-pin-common' : ''));
+    line.append(element('strong', '', label), element('span', '', content)); return line;
+  }
+  if (common.length) result.append(pinLine('共用PIN:', [...new Set(common)].join(', '), true));
   for (const [dut, pins] of rows) {
     const remaining = pins?.filter(pin => !common.includes(pin));
-    result.append(element('p', 'detail-text', `DUT${dut}：${pins ? (remaining.length ? remaining.join(', ') : '無額外 PIN') : '尚無對應'}`));
+    result.append(pinLine(`DUT${dut}:`, pins ? (remaining.length ? remaining.join(', ') : '無額外 PIN') : '尚無對應'));
   }
   if (!record.socket_file_id) result.append(element('p', 'hint', '此產品沒有 Socket 對應；不推測 PIN。'));
   return result;
 }
 
-function renderDbnCard(record) {
-  const card = element('section', 'quick-summary');
-  card.append(element('strong', '', `${record.serial_no} · ${record.board_name}`),
-    element('p', '', `${record.machine_code} · ${record.customer_code}／${record.product_code || '—'}／${record.station_code || '—'} · ${record.issue_type}`),
-    element('p', 'hint', new Date(record.created_at).toLocaleString('zh-TW', {timeZone:'Asia/Taipei'})));
-  if (record.dut) card.append(pinDetails(record));
-  if (record.issue_description) card.append(element('p', 'detail-text', record.issue_description));
-  const actions = element('div', 'actions');
-  actions.append(action('編輯', () => editDbn(record)), action('刪除', async () => {
+function workspaceHeading(labels, className) {
+  const row = element('div', 'list-heading ' + className);
+  for (const label of labels) row.append(element('span', '', label)); return row;
+}
+
+function labeledCell(label, value, className = '') {
+  const cell = element('span', className, value ?? '—'); cell.dataset.label = label; return cell;
+}
+
+function renderDbnRow(record) {
+  const row = element('div', 'dbn-row'), board = labeledCell('板件名稱', record.board_name);
+  board.append(element('div', 'dbn-issue-type', record.issue_type));
+  if (record.dut) board.append(pinDetails(record));
+  if (record.issue_description) board.append(element('p', 'detail-text', record.issue_description));
+  const controls = labeledCell('操作', '', 'dbn-actions');
+  const edit = () => controls.replaceChildren(action('修改內容', () => editDbn(record), 'button primary'), action('刪除', async () => {
     if (!window.confirm(`永久刪除這筆 DBN（${record.serial_no}）？送修案件不受影響。`)) return;
-    await api('/api/repairs/dbn/' + encodeURIComponent(record.id), 'DELETE', {expected_version:record.version});
-    await refreshFeatures();
-  }));
-  card.append(actions); return card;
+    await api('/api/repairs/dbn/' + encodeURIComponent(record.id), 'DELETE', {expected_version:record.version}); await refreshFeatures();
+  }, 'button danger'), action('取消', reset));
+  const reset = () => controls.replaceChildren(action('編輯', edit)); reset();
+  row.append(labeledCell('S/N', record.serial_no, 'dbn-serial'), board, labeledCell('機台', record.machine_code),
+    labeledCell('客戶', record.customer_code), labeledCell('產品', record.product_code || '-'), labeledCell('站點', record.station_code || '-'),
+    labeledCell('紀錄日期', new Date(record.created_at).toLocaleDateString('zh-TW', {timeZone:'Asia/Taipei'}), 'dbn-date'), controls);
+  return row;
+}
+
+function repairTimeline(record) {
+  const section = element('section', 'detail-section'); section.append(element('h3', '', '維修時程'));
+  const timeline = element('div', 'repair-timeline');
+  const stages = [['損壞', record.occurred_on], ['送修', record.sent_on], ['回修', record.returned_on]];
+  stages.forEach(([label, date], index) => {
+    if (index) {
+      const before = stages[index - 1][1], days = before && date ? Math.round((Date.parse(date) - Date.parse(before)) / 86400000) + ' 天' : '—';
+      const link = element('div', 'timeline-link'); link.append(element('span', 'timeline-days', days)); timeline.append(link);
+    }
+    const step = element('div', 'timeline-step');
+    step.append(element('span', 'timeline-dot'), element('div', 'timeline-label', label), element('div', 'timeline-date', date || '未記錄')); timeline.append(step);
+  });
+  section.append(timeline); return section;
+}
+
+function renderQuickResults(summary, records, dbn, container) {
+  const board = element('section', 'quick-board-summary'), heading = element('div', 'quick-summary-heading'), title = element('div');
+  title.append(element('h2', 'quick-summary-title', summary.mapping?.board_name || records.data[0]?.description || dbn.data[0]?.board_name || '—'), element('div', 'quick-summary-serial', 'S/N ' + summary.serial_no));
+  heading.append(title, element('div', 'quick-summary-count', `${records.total} 筆送修 · ${dbn.total} 筆 DBN`)); board.append(heading);
+  const grid = element('div', 'quick-summary-grid');
+  for (const [label, value] of [['Part Number',summary.mapping?.board_part_code || '—'], ['Model',summary.models.join('、') || '—'], ['機台',summary.machines.join('、') || '—'], ['板件資料',summary.mapping ? '已關聯' : '—']]) {
+    const field = element('div', 'quick-summary-field'); field.append(element('label', '', label), element('div', '', value)); grid.append(field);
+  }
+  board.append(grid); container.append(board);
+  function group(title, result) {
+    const section = element('section', 'quick-result-section'), head = element('div', 'quick-section-heading'), list = element('div', 'quick-result-list');
+    head.append(element('h2', '', title), element('span', 'quick-section-count', `${result.total} 筆${result.total > 20 ? '（目前顯示前 20 筆）' : ''}`));
+    if (!result.total) list.append(element('p', 'quick-empty', `沒有此 S/N 的${title}。`));
+    section.append(head, list); container.append(section); return list;
+  }
+  const repairList = group('送修紀錄', records);
+  for (const row of records.data) {
+    const card = element('article', 'quick-record-card'), top = element('div', 'quick-record-top');
+    top.append(statusPill(row.current_status), element('span', 'failure-tag-pill', `${row.repair_type} · ${row.repair_amount == null ? '金額未填' : row.repair_amount.toLocaleString('zh-TW') + ' 元'}`),
+      element('span', 'failure-tag-pill', row.failure_tag), element('span', 'quick-record-date', `損壞 ${row.occurred_on}${row.sent_on ? ' · 送修 ' + row.sent_on : ''}${row.returned_on ? ' · 回修 ' + row.returned_on : ''}`));
+    const meta = element('div', 'quick-record-meta'); meta.append(element('span', '', row.machine_code), element('span', '', row.model), element('span', '', row.is_opened ? '已開單' : '未開單'));
+    const controls = element('div', 'quick-record-actions'); controls.append(action('查看送修詳情', () => openDetail(row.id)));
+    card.append(top, meta, element('div', 'quick-record-description', row.failure_description), controls); repairList.append(card);
+  }
+  const dbnList = group('DBN 紀錄', dbn);
+  for (const row of dbn.data) {
+    const card = element('article', 'quick-record-card');
+    card.append(element('div', 'quick-record-date', new Date(row.created_at).toLocaleString('zh-TW', {timeZone:'Asia/Taipei'})),
+      element('div', 'quick-record-meta', `機台：${row.machine_code} · ${row.model}`),
+      element('div', 'quick-dbn-tags', `客戶：${row.customer_code} · 產品：${row.product_code || '-'} · 站點：${row.station_code || '-'}`), element('p', '', row.issue_type));
+    if (row.dut) card.append(pinDetails(row)); if (row.issue_description) card.append(element('p', 'detail-text', row.issue_description)); dbnList.append(card);
+  }
 }
 
 async function refreshFeatures() {
@@ -200,31 +281,42 @@ async function editDbn(record = null) {
     kind:formField('DBN 類型', 'select', record?.issue_type, ['Group','Single Dut','RTE','Other']),
     dut:formField('DUT（單一編號或連續範圍）', 'text', record?.dut), description:formField('異常描述（RTE／Other 必填）', 'textarea', record?.issue_description)
   };
+  inputs.model = formField('Model'); inputs.model.readOnly = true; inputs.model.required = false;
+  const order = ['machine','model','board','part','serial','customer','product','station','kind','dut','description'];
+  for (const key of order) {inputs[key].dataset.field = key; byId('operations-fields').append(fieldContainers.get(inputs[key]));}
   inputs.serial.maxLength = 64; inputs.part.readOnly = true;
+  const mappingHint = element('p', 'wide hint'); byId('operations-fields').append(mappingHint);
   const preview = element('div', 'wide hint'); byId('operations-fields').append(preview);
   function boards(preferred = inputs.board.value) {
     const model = catalogs.machines.find(row => row.machine_code === inputs.machine.value)?.model;
+    inputs.model.value = model || '';
     const choices = catalogs.boards.filter(row => row.model === model && (!localMapping || (row.board_name === localMapping.board_name && row.board_part_code === localMapping.board_part_code)));
     fillSelect(inputs.board, choices.map(row => row.board_name), '請選擇板件');
     inputs.board.value = choices.some(row => row.board_name === preferred) ? preferred : localMapping ? choices[0]?.board_name || '' : '';
     inputs.board.disabled = Boolean(localMapping);
     inputs.part.value = choices.find(row => row.board_name === inputs.board.value)?.board_part_code || '';
-    if (localMapping) preview.textContent = `S/N 已鎖定 ${localMapping.board_name}／${localMapping.board_part_code}，請選相容機台。`;
+    mappingHint.textContent = localMapping ? `S/N 已鎖定 ${localMapping.board_name}／${localMapping.board_part_code}，請選相容機台。` : '輸入 S/N 後查詢主檔；新增 DBN 不會建立送修案件。';
   }
   function products() {
     fillSelect(inputs.product, [...new Set(dbnCatalog.combinations.filter(row => row.customer_code === inputs.customer.value).map(row => row.product_code))], '請選擇產品');
     inputs.product.required = dbnCatalog.combinations.some(row => row.customer_code === inputs.customer.value);
+    inputs.product.disabled = !inputs.product.required;
     stations();
   }
   function stations() {
     const choices = dbnCatalog.combinations.filter(row => row.customer_code === inputs.customer.value && row.product_code === inputs.product.value).map(row => row.station_code);
     fillSelect(inputs.station, choices, '請選擇站點'); inputs.station.required = inputs.product.required;
+    inputs.station.disabled = !choices.length;
     issue();
   }
   function issue() {
     const usesDut = ['Group', 'Single Dut'].includes(inputs.kind.value);
+    const usesDescription = ['RTE', 'Other'].includes(inputs.kind.value);
     inputs.dut.required = usesDut; inputs.dut.disabled = !usesDut;
-    inputs.description.required = !usesDut; inputs.description.disabled = usesDut;
+    inputs.description.required = usesDescription; inputs.description.disabled = !usesDescription;
+    fieldContainers.get(inputs.dut).hidden = !usesDut;
+    fieldContainers.get(inputs.description).hidden = !usesDescription;
+    preview.hidden = !usesDut;
     preview.replaceChildren();
     if (!usesDut || !inputs.dut.value) return;
     const match = /^(\d{1,4})(?:\s*-\s*(\d{1,4}))?$/.exec(inputs.dut.value.trim());
@@ -234,6 +326,7 @@ async function editDbn(record = null) {
     if (first < 1 || last < first || last > 2048 || last - first > 7 || (inputs.kind.value === 'Single Dut' && match[2])) {preview.textContent = 'Single Dut 限單一編號；Group 限連續 1–8 個 DUT'; return;}
     const canonical = first === last ? String(first) : `${first}-${last}`;
     const same = record && record.product_code === inputs.product.value && record.dut === canonical;
+    if (!same && socket && last > socket.dut_count) {preview.textContent = 'DUT 超出此 Socket File 範圍'; return;}
     const snapshot = same ? record.dut_pin_snapshot : Object.fromEntries(Array.from({length:last-first+1}, (_, index) => [String(first+index), socket?.dut_pins[String(first+index)] || null]));
     preview.append(pinDetails({dut:canonical, socket_file_id:same ? record.socket_file_id : socket?.id, dut_pin_snapshot:snapshot}));
   }
@@ -374,6 +467,12 @@ function retryRepair(record) {
     operationsDialog.close(); await refreshFeatures(); await openDetail(result.retry.id);
   });
   type = formField('下一筆維修分類', 'select', record.repair_type, catalogs.repair_types);
+  const amount = formField('金額（依目前本機價目）'); amount.readOnly = true; amount.required = false;
+  function previewAmount() {
+    const cents = repairPrice(record.model, record.description, record.board_part_code, type.value);
+    amount.value = cents == null ? '未設定' : (cents/100).toLocaleString('zh-TW') + ' 元';
+  }
+  type.addEventListener('change', previewAmount); previewAmount();
   description = formField('本次異常描述', 'textarea'); file = formField('本次 Fail Log（不自動複製前一筆）', 'file');
 }
 
@@ -392,20 +491,27 @@ function chart(groups, amounts = false) {
     const node = document.createElementNS(ns, tag); for (const [key, value] of Object.entries(attributes)) node.setAttribute(key, String(value));
     if (label !== undefined) node.textContent = label; return node;
   }
-  const svg = svgNode('svg', {viewBox:'0 0 920 270', role:'img', 'aria-label':amounts ? '各維修分類結案金額' : '故障頻率', class:'stats-chart'});
-  const entries = Object.entries(groups), maximum = Math.max(1, ...entries.map(([, value]) => amounts ? Object.values(value).reduce((sum, amount) => sum + amount, 0) : value));
-  const slot = 840 / Math.max(1, entries.length), width = Math.min(48, slot * .6), colors = ['#8b8df8','#d7906c','#78bcba','#a2bf7c'];
+  const svg = svgNode('svg', {viewBox:'0 0 920 286', role:'img', 'aria-label':amounts ? '各維修分類結案金額' : '故障頻率'});
+  const entries = Object.entries(groups), rawMaximum = Math.max(0, ...entries.map(([, value]) => amounts ? Object.values(value).reduce((sum, amount) => sum + amount, 0) : value));
+  const maximum = amounts ? Math.max(100, rawMaximum) : Math.max(4, Math.ceil(rawMaximum / 4) * 4);
+  const slot = 840 / Math.max(1, entries.length), width = Math.min(48, slot * .6), colors = ['#8b8df8','#50c5d2','#e3b341','#65c98a'];
+  for (let index = 0; index <= 4; index++) {
+    const value = maximum * index / 4, y = 230 - index * 50;
+    svg.append(svgNode('line', {x1:60, y1:y, x2:906, y2:y, class:'stats-gridline'}),
+      svgNode('text', {x:52, y:y + 4, 'text-anchor':'end', class:'stats-axis'}, (amounts ? value / 100 : value).toLocaleString('zh-TW', {maximumFractionDigits:2})));
+  }
   entries.forEach(([key, values], index) => {
     let stacked = 0;
     const pairs = amounts ? Object.entries(values) : [['次數', values]];
     pairs.forEach(([label, value], color) => {
       const height = value / maximum * 200;
-      const rect = svgNode('rect', {x:60 + index * slot, y:220 - stacked - height, width, height, fill:colors[color]});
+      const rect = svgNode('rect', {x:60 + index * slot + (slot-width)/2, y:230 - stacked - height, width, height, fill:colors[color], class:'stats-bar'});
       rect.append(svgNode('title', {}, `${key} ${label}：${amounts ? value / 100 : value}`)); svg.append(rect); stacked += height;
+      if (!amounts && value) svg.append(svgNode('text', {x:60 + index*slot + slot/2, y:Math.max(25, 225 - height), 'text-anchor':'middle', class:'stats-axis'}, value));
     });
-    svg.append(svgNode('text', {x:60 + index * slot, y:250, fill:'#929398', 'font-size':10}, key));
+    svg.append(svgNode('text', {x:60 + index * slot + slot/2, y:272, 'text-anchor':'middle', class:'stats-axis'}, statisticsMode === 'year' ? Number(key.slice(5)) + '月' : key.slice(0,4)));
   });
-  return svg;
+  const wrapper = element('div', 'stats-chart'); wrapper.append(svg); return wrapper;
 }
 
 function renderStatistics(result, container) {
@@ -413,9 +519,30 @@ function renderStatistics(result, container) {
   const total = Object.values(result.frequency).reduce((sum, value) => sum + value, 0);
   const amount = Object.values(result.amounts_cents).reduce((sum, row) => sum + Object.values(row).reduce((a, b) => a + b, 0), 0);
   byId('workspace-message').textContent = `損壞 ${total} 次 · 已知結案金額 ${(amount / 100).toLocaleString('zh-TW')} 元 · 金額未設定 ${result.missing_amounts} 筆（不視為零元）`;
-  container.append(element('h2', '', '故障發生頻率'), chart(result.frequency), table(['期間','首輪損壞次數'], Object.entries(result.frequency)));
-  container.append(element('h2', '', '結案金額'), chart(result.amounts_cents, true), table(['期間', ...labels], Object.entries(result.amounts_cents).map(([period, amounts]) => [period, ...labels.map(label => (amounts[label] / 100).toLocaleString('zh-TW'))])));
+  const years = [...new Set([statisticsYear, ...(result.years || [])])].sort().reverse();
+  fillSelect(byId('stats-year'), years); byId('stats-year').value = statisticsYear;
+  function card(title, description, value) {
+    const section = element('section', 'stats-card'), head = element('div', 'stats-card-head'), copy = element('div');
+    copy.append(element('h2', '', title), element('div', 'stats-card-subtitle', description)); head.append(copy, element('div', 'stats-total', value)); section.append(head); return section;
+  }
+  const grid = element('div', 'stats-grid');
+  const frequencyCard = card('故障發生頻率', '依損壞日期；同一段連續維修只計一次', `${total} 次`);
+  frequencyCard.append(chart(result.frequency));
+  const frequencyTable = element('details', 'stats-data'); frequencyTable.append(element('summary', '', '查看統計明細'), table(['期間','首輪損壞次數'], Object.entries(result.frequency))); frequencyCard.append(frequencyTable);
+  const amountCard = card('維修金額', '依結案日期；每筆案件皆計入，包含 FAIL', (amount / 100).toLocaleString('zh-TW') + ' 元');
+  amountCard.append(chart(result.amounts_cents, true));
+  const legend = element('div', 'stats-legend');
+  for (const [index, label] of labels.entries()) {
+    const sum = Object.values(result.amounts_cents).reduce((sum, values) => sum + values[label], 0), entry = element('div', 'stats-legend-item');
+    const name = element('div', 'stats-legend-label'); name.append(element('span', 'stats-swatch repair-color-' + index), element('span', '', label));
+    entry.append(name, element('div', 'stats-legend-value', (sum/100).toLocaleString('zh-TW')), element('div', 'stats-legend-share', (amount ? sum/amount*100 : 0).toFixed(1) + '%')); legend.append(entry);
+  }
+  amountCard.append(legend);
+  const amountsTable = element('details', 'stats-data'); amountsTable.append(element('summary', '', '查看金額明細'), table(['期間', ...labels], Object.entries(result.amounts_cents).map(([period, amounts]) => [period, ...labels.map(label => (amounts[label] / 100).toLocaleString('zh-TW'))]))); amountCard.append(amountsTable);
+  grid.append(frequencyCard, amountCard); container.append(grid);
   const ranking = byId('ranking-sort').value === 'asc' ? [...result.ranking].sort((a,b) => a.count - b.count || a.machine.localeCompare(b.machine)) : result.ranking;
   let rank = 0, last = null;
-  container.append(element('h2', '', '機台損壞排行'), table(['排名','機台','次數'], ranking.map((row, index) => {if (row.count !== last) rank = index + 1; last = row.count; return [rank, row.machine, row.count];})));
+  const rankingCard = card('機台損壞次數排名', '依損壞日期；同一段連續維修只計一次', `共 ${ranking.length} 台機台`);
+  rankingCard.className = 'stats-card machine-ranking';
+  rankingCard.append(table(['排名','機台','次數'], ranking.map((row, index) => {if (row.count !== last) rank = index + 1; last = row.count; return [rank, row.machine, row.count];}))); container.append(rankingCard);
 }
