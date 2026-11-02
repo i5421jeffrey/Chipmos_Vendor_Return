@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>SPMS 公司版 — 環境驗證</title>
+  <link rel="stylesheet" href="/style.css">
+  <script src="/app.js" defer></script>
+</head>
+<body>
+  <main>
+    <p class="brand">SPMS · 公司版</p>
+    <h1>第一階段：本機環境驗證</h1>
+    <p class="intro">Python 網站服務＋本機 SQLite。此頁不會連接 Supabase 或其他外部服務。</p>
+    <section aria-labelledby="connection-title">
+      <h2 id="connection-title">連線狀態</h2>
+      <p id="status" role="status" aria-live="polite">正在檢查…</p>
+      <dl>
+        <dt>主資料庫</dt><dd>SQLite（本機）</dd>
+        <dt>SQLite 版本</dt><dd id="sqlite-version">—</dd>
+        <dt>結構版本</dt><dd id="schema-version">—</dd>
+        <dt>首次建立時間（UTC）</dt><dd id="initialized-at">—</dd>
+        <dt>存取範圍</dt><dd>僅這台電腦</dd>
+      </dl>
+      <button id="refresh" type="button">重新檢查</button>
+    </section>
+    <aside>
+      <strong>這是環境驗證頁，不是完整管理系統。</strong>
+      <p>尚未加入維修／DBN 業務功能、舊資料匯入、登入權限或內網多人使用。請勿在此階段開放防火牆或當作正式服務。</p>
+    </aside>
+  </main>
+</body>
+</html>
