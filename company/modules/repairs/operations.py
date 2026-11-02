@@ -5,7 +5,7 @@ import re
 from datetime import datetime, timedelta, timezone
 from uuid import uuid4
 
-from database import connect, utc_now
+from database import connect, sql_instant, utc_now
 from errors import APIError
 from . import attachments, service
 
@@ -41,6 +41,8 @@ def version(row, expected):
 def get_row(connection, table, identity):
     # table is always an internal constant, never from a request.
     row = connection.execute(f'SELECT * FROM {table} WHERE id=?', (identity,)).fetchone()
+    if row is None and table == 'dbn_records':
+        row = connection.execute('SELECT * FROM legacy_dbn_records WHERE id=?', (identity,)).fetchone()
     if not row:
         raise APIError('找不到此紀錄', 404)
     return row
@@ -104,14 +106,14 @@ def public_dbn(row):
 def list_dbn(path, query):
     with connect(path) as connection:
         connection.execute('BEGIN')
-        return paginate(connection, 'dbn_records', query, ('serial_no', 'board_name', 'board_part_code', 'machine_code', 'model', 'customer_code', 'product_code', 'station_code', 'issue_type', 'dut', 'issue_description'), 'julianday(created_at) DESC,id', public_dbn)
+        return paginate(connection, 'all_dbn_records', query, ('serial_no', 'board_name', 'board_part_code', 'machine_code', 'model', 'customer_code', 'product_code', 'station_code', 'issue_type', 'dut', 'issue_description'), sql_instant('created_at') + ' DESC,id', public_dbn)
 
 
 def serial_summary(path, number):
     number = serial(number)
     with connect(path) as connection:
         connection.execute('BEGIN')
-        rows = connection.execute('SELECT machine_code,model FROM repair_records WHERE serial_no=? UNION SELECT machine_code,model FROM dbn_records WHERE serial_no=?', (number, number)).fetchall()
+        rows = connection.execute('SELECT machine_code,model FROM repair_records WHERE serial_no=? UNION SELECT machine_code,model FROM all_dbn_records WHERE serial_no=?', (number, number)).fetchall()
         mapping = connection.execute('SELECT board_name,board_part_code FROM serial_board_mappings WHERE serial_no=?', (number,)).fetchone()
         return dict(serial_no=number, mapping=dict(mapping) if mapping else None,
                     machines=sorted({row['machine_code'] for row in rows}), models=sorted({row['model'] for row in rows}))
@@ -169,7 +171,13 @@ def save_dbn(path, payload, identity=None):
         now = utc_now()
         if identity:
             values.update(updated_at=now, version=previous['version'] + 1)
-            connection.execute('UPDATE dbn_records SET ' + ','.join(key + '=?' for key in values) + ' WHERE id=?', [*values.values(), identity])
+            legacy = connection.execute('SELECT 1 FROM legacy_dbn_records WHERE id=?', (identity,)).fetchone()
+            if legacy:
+                values.update(id=identity, created_at=previous['created_at'])
+                connection.execute('INSERT INTO dbn_records (' + ','.join(values) + ') VALUES (' + ','.join('?' for _ in values) + ')', list(values.values()))
+                connection.execute('DELETE FROM legacy_dbn_records WHERE id=?', (identity,))
+            else:
+                connection.execute('UPDATE dbn_records SET ' + ','.join(key + '=?' for key in values) + ' WHERE id=?', [*values.values(), identity])
         else:
             identity = str(uuid4())
             values.update(id=identity, created_at=now, updated_at=now)
@@ -192,6 +200,8 @@ def resolve(path, identity, payload):
         today = datetime.now(timezone(timedelta(hours=8))).date().isoformat()
         if today < row['returned_on']:
             raise APIError('回修日期在未來，不能結案')
+        if not row['sent_on'] or row['returned_on'] < row['sent_on'] or row['sent_on'] < row['occurred_on']:
+            raise APIError('舊案日期先後異常，請核對並明確更正後再結案', 409)
         before = service.public_record(row)
         status = '結案（PASS）' if payload['passed'] else '結案（FAIL）'
         if payload['passed'] and set(payload) - {'expected_version', 'passed'}:
@@ -280,6 +290,8 @@ def delete(path, kind, identity, payload):
                           {**service.public_record(get_row(connection, 'repair_records', parent['id'])), 'attachment': None})
         else:
             table = 'repair_records' if kind == 'records' else 'dbn_records'
+            if kind == 'dbn' and connection.execute('SELECT 1 FROM legacy_dbn_records WHERE id=?', (identity,)).fetchone():
+                table = 'legacy_dbn_records'
             row = get_row(connection, table, identity)
             version(row, payload.get('expected_version'))
             if kind == 'records' and (row['retry_of_record_id'] or connection.execute('SELECT 1 FROM repair_records WHERE retry_of_record_id=?', (identity,)).fetchone()):
@@ -290,7 +302,7 @@ def delete(path, kind, identity, payload):
                     service.audit(connection, 'repair_attachments', meta['id'], 'DELETE', {**meta, 'serial_no': row['serial_no']}, None)
             before = service.public_record(row) if kind == 'records' else public_dbn(row)
             connection.execute(f'DELETE FROM {table} WHERE id=?', (identity,))
-            service.audit(connection, table, identity, 'DELETE', before, None)
+            service.audit(connection, 'dbn_records' if kind == 'dbn' else table, identity, 'DELETE', before, None)
         return {'deleted': identity}
 
 
@@ -306,10 +318,10 @@ def mapping_impact(connection, payload):
     name = text(payload.get('board_name'), '板名')
     part = text(payload.get('board_part_code'), 'Part Number')
     rows = {}
-    for table, field in (('repair_records', 'description'), ('dbn_records', 'board_name')):
+    for table, field in (('repair_records', 'description'), ('dbn_records', 'board_name'), ('legacy_dbn_records', 'board_name')):
         rows[table] = [dict(row) for row in connection.execute(f'SELECT * FROM {table} WHERE serial_no=? AND (serial_no<>? OR {field}<>? OR board_part_code<>?) ORDER BY id', (old, new, name, part))]
     token = hashlib.sha256(json.dumps(rows, sort_keys=True, ensure_ascii=False).encode()).hexdigest()
-    return dict(repair_count=len(rows['repair_records']), dbn_count=len(rows['dbn_records']), token=token), rows
+    return dict(repair_count=len(rows['repair_records']), dbn_count=len(rows['dbn_records']) + len(rows['legacy_dbn_records']), token=token), rows
 
 
 def preview_mapping(path, payload):
@@ -358,9 +370,9 @@ def save_mapping(path, payload):
                     connection.execute(f'UPDATE {table} SET serial_no=?,{field}=?,board_part_code=?,version=version+1,updated_at=? WHERE id=?', (number, name, part, now, row['id']))
                     after_row = get_row(connection, table, row['id'])
                     after = service.public_record(after_row) if table == 'repair_records' else public_dbn(after_row)
-                    service.audit(connection, table, row['id'], 'UPDATE', before, after)
+                    service.audit(connection, 'dbn_records' if table == 'legacy_dbn_records' else table, row['id'], 'UPDATE', before, after)
         if previous and number != previous_number:
-            referenced = any(connection.execute(f'SELECT 1 FROM {table} WHERE serial_no=?', (previous_number,)).fetchone() for table in ('repair_records', 'dbn_records'))
+            referenced = any(connection.execute(f'SELECT 1 FROM {table} WHERE serial_no=?', (previous_number,)).fetchone() for table in ('repair_records', 'all_dbn_records'))
             if not referenced:
                 connection.execute('DELETE FROM serial_board_mappings WHERE serial_no=?', (previous_number,))
                 service.audit(connection, 'serial_board_mappings', previous_number, 'DELETE', dict(previous), None)
@@ -392,17 +404,17 @@ def history(path, query):
     if 'start' in dates and 'end' in dates and dates['start'] > dates['end']:
         raise APIError('開始日期不可晚於結束日期')
     if 'start' in dates:
-        where.append('julianday(changed_at)>=julianday(?)')
+        where.append(sql_instant('changed_at') + '>=julianday(?)')
         args.append(dates['start'].isoformat())
     if 'end' in dates:
         # Inclusive Taipei calendar date; avoid overflow on 9999-12-31.
-        where.append('julianday(changed_at)<julianday(?)+1')
+        where.append(sql_instant('changed_at') + '<julianday(?)+1')
         args.append(dates['end'].isoformat())
     with connect(path) as connection:
         connection.execute('BEGIN')
         def decode(row):
             return {**dict(row), 'changes': json.loads(row['changes'])}
-        return paginate(connection, 'record_change_history', query, ('serial_no', 'board_name', 'source_table', 'operation', 'changes'), 'changed_at DESC,id DESC', decode, where, args)
+        return paginate(connection, 'record_change_history', query, ('serial_no', 'board_name', 'source_table', 'operation', 'changes'), sql_instant('changed_at') + ' DESC,id DESC', decode, where, args)
 
 
 def statistics(path, query):

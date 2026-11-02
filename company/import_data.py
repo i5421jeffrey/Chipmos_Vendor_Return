@@ -135,6 +135,8 @@ def import_rows(connection, package):
         ops.keys(row, allowed)
         record_id = identity(row.get('id'))
         values = {key: ops.text(row.get(key), key) for key in ('machine_code','board_name','board_part_code','customer_code')}
+        if connection.execute('SELECT 1 FROM all_dbn_records WHERE id=?', (record_id,)).fetchone():
+            raise APIError('DBN ID 已存在，不覆寫包含未補齊類型的來源舊案', 409)
         values['serial_no'] = ops.serial(row.get('serial_no'))
         values['model'] = ops.board_context(connection, values['machine_code'], values['board_name'], values['board_part_code'])
         customer = values['customer_code']

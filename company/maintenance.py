@@ -22,7 +22,15 @@ def verify(path):
         for content, expected in connection.execute('SELECT content,sha256 FROM repair_attachments'):
             if hashlib.sha256(content).hexdigest() != expected:
                 raise ValueError('Attachment SHA256 verification failed')
-        return {table: connection.execute('SELECT count(*) FROM ' + table).fetchone()[0]
+        if connection.execute("SELECT 1 FROM sqlite_master WHERE name='legacy_source_files'").fetchone():
+            legacy_versions = connection.execute("SELECT version FROM spms_module_migrations WHERE module='legacy_import' ORDER BY version").fetchall()
+            if legacy_versions != [(1,)]:
+                raise ValueError('Unsupported source archive module version')
+            for content, expected in connection.execute('SELECT content,sha256 FROM legacy_source_files'):
+                if hashlib.sha256(content).hexdigest() != expected:
+                    raise ValueError('Source CSV SHA256 verification failed')
+        dbn_table = 'all_dbn_records' if connection.execute("SELECT 1 FROM sqlite_master WHERE name='all_dbn_records'").fetchone() else 'dbn_records'
+        return {table: connection.execute('SELECT count(*) FROM ' + (dbn_table if table == 'dbn_records' else table)).fetchone()[0]
                 for table in ('repair_records', 'dbn_records', 'serial_board_mappings', 'repair_attachments', 'record_change_history')}
 
 

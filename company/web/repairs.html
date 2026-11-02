@@ -29,10 +29,11 @@
     <div class="nav-label">管理與查詢</div>
     <nav class="management-nav" aria-label="管理與查詢"><button class="nav-item" data-workspace="dbn">DBN 紀錄</button><button class="nav-item" data-workspace="mappings">S/N 主檔維護</button><button class="nav-item" data-workspace="statistics">統計資料</button><button class="nav-item" data-workspace="history">全站異動紀錄</button><button class="nav-item" data-workspace="masters">機台／板件／價格對應</button><button class="nav-item" disabled>機台保養模組（未安裝）</button></nav>
     <a class="environment-link" href="/">SQLite 環境檢查</a>
+    <div class="edit-mode-controls"><p id="edit-mode-state" role="status">唯讀模式</p><button id="toggle-edit" type="button">開啟編輯</button><p id="edit-access-message" role="status"></p></div>
   </aside>
   <main class="content">
     <div id="startup-error" class="notice" role="alert" hidden><p id="startup-message"></p><button id="reload-catalogs" type="button">重新讀取對應表</button></div>
-    <details class="local-information"><summary>SQLite 本機移植版 · 不連接 Supabase</summary><p class="notice">公司端略過的驗證仍標為未驗收。舊資料尚未匯入；尚未完成畫面一致性及正式上線驗收。僅限本機，登入權限及公司內網部署待 IT 核准。</p></details>
+    <details class="local-information"><summary>SQLite 本機移植版 · 不連接 Supabase</summary><p class="notice">公司端略過的驗證仍標為未驗收。密碼解鎖僅供防誤觸，不是個人登入或具名稽核。來源資料須另行確認匯入；畫面一致性及正式內網部署仍待驗收／IT 核准。</p></details>
     <section id="quick-view" class="quick-search-view">
       <div class="quick-search-intro"><h1>SPMS</h1><p>Enter a board S/N to quickly view related repair and DBN records.</p></div>
       <form id="quick-form" class="quick-search-form"><label for="quick-query">S/N</label><div class="quick-search-controls"><input id="quick-query" class="quick-search-input" type="search" placeholder="001234567" maxlength="64" required autocomplete="off" enterkeyhint="search" spellcheck="false"><button class="button primary quick-search-submit" type="submit">Search</button></div></form>
@@ -40,7 +41,7 @@
       <div id="quick-results" class="quick-search-results"></div>
     </section>
     <section id="records-view" hidden>
-      <div class="title-row"><div><h1 id="view-title">全部送修</h1><p>追蹤送修狀態、開單資訊及異常描述</p></div><button id="create" type="button" disabled>＋ 新增送修</button></div>
+      <div class="title-row"><div><h1 id="view-title">全部送修</h1><p>追蹤送修狀態、開單資訊及異常描述</p></div><button id="create" type="button" data-edit-only hidden disabled>＋ 新增送修</button></div>
       <form id="search-form" class="list-toolbar"><div class="search-wrap"><span class="search-icon" aria-hidden="true">⌕</span><input id="query" class="search" type="search" placeholder="搜尋板件、S/N、Model、機台、異常描述或標籤…" aria-label="搜尋"></div><select id="type-filter" class="failure-filter" aria-label="維修分類篩選"></select><select id="tag-filter" class="failure-filter" aria-label="異常類別篩選"></select><select id="status-filter" class="failure-filter" aria-label="狀態"><option value="">所有狀態</option><option>待送修</option><option>已送修</option><option>取回驗證</option><option>結案（PASS）</option><option>結案（FAIL）</option></select><button type="submit">查詢</button><span id="message" class="list-count" role="status" aria-live="polite">正在載入…</span></form>
       <div class="list-heading"><span>項目</span><span>目前狀態</span><span>標籤</span><span>DBN</span><span>機台</span><span id="date-heading">損壞日期</span></div>
       <div id="records" class="rows" aria-label="送修清單"></div>
@@ -63,7 +64,7 @@
 </div>
 <dialog id="record-detail" class="record-detail" aria-labelledby="detail-title">
   <div class="dialog-head"><span>送修詳細資料</span><button id="close-detail" type="button" aria-label="關閉詳細資料">×</button></div>
-  <div class="detail-body"><p id="detail-serial" class="serial-text"></p><h2 id="detail-title"></h2><div class="detail-actions"><button id="edit-detail" type="button">編輯／異動</button></div><div id="detail-content"></div><p id="detail-message" role="status"></p></div>
+  <div class="detail-body"><p id="detail-serial" class="serial-text"></p><h2 id="detail-title"></h2><div class="detail-actions"><button id="edit-detail" type="button" data-edit-only hidden>編輯／異動</button></div><div id="detail-content"></div><p id="detail-message" role="status"></p></div>
 </dialog>
 <dialog id="editor" aria-labelledby="editor-title">
   <div class="dialog-head"><h2 id="editor-title">新增送修</h2><button id="close" type="button" aria-label="關閉">×</button></div>
@@ -90,10 +91,11 @@
       <p class="hint">新增依本機價目計價；一般編輯保留原金額。未設定不等於 0 元。</p>
     </div>
     <p id="form-message" role="status" aria-live="polite"></p>
-    <div class="actions"><button id="reload-record" type="button" hidden>重新載入此案</button><button id="cancel" type="button">取消</button><button id="save" type="submit">儲存</button></div>
+    <div class="actions"><button id="editor-unlock" type="button">重新開啟編輯</button><button id="reload-record" type="button" hidden>重新載入此案</button><button id="cancel" type="button">取消</button><button id="save" type="submit">儲存</button></div>
   </form>
   <details id="history-section" hidden><summary>此筆異動紀錄</summary><ol id="history"></ol></details>
 </dialog>
-<dialog id="operations-modal" aria-labelledby="operations-title"><div class="dialog-head"><h2 id="operations-title"></h2><button id="operations-close" type="button" aria-label="關閉操作視窗">×</button></div><form id="operations-form"><div id="operations-fields" class="fields"></div><p id="operations-message" role="status" aria-live="polite"></p><div class="actions"><button id="operations-cancel" type="button">取消</button><button id="operations-save" type="submit">儲存</button></div></form></dialog>
+<dialog id="operations-modal" aria-labelledby="operations-title"><div class="dialog-head"><h2 id="operations-title"></h2><button id="operations-close" type="button" aria-label="關閉操作視窗">×</button></div><form id="operations-form"><div id="operations-fields" class="fields"></div><p id="operations-message" role="status" aria-live="polite"></p><div class="actions"><button id="operations-unlock" type="button">重新開啟編輯</button><button id="operations-cancel" type="button">取消</button><button id="operations-save" type="submit">儲存</button></div></form></dialog>
+<dialog id="edit-unlock" aria-labelledby="edit-unlock-title"><h2 id="edit-unlock-title">開啟編輯模式</h2><form id="edit-unlock-form"><label>共用編輯密碼<input id="edit-password" type="password" maxlength="200" autocomplete="current-password" required></label><p id="edit-unlock-message" role="status"></p><div class="actions"><button id="edit-unlock-cancel" type="button">取消</button><button id="edit-unlock-submit" type="submit">開啟編輯</button></div></form></dialog>
 </body>
 </html>

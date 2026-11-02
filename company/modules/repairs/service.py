@@ -4,7 +4,7 @@ import re
 from datetime import date
 from uuid import uuid4
 
-from database import connect, utc_now
+from database import connect, sql_instant, utc_now
 from errors import APIError
 
 ACTIVE_STATUSES = ("待送修", "已送修", "取回驗證")
@@ -94,11 +94,11 @@ def list_records(path, query):
         counts = {row["current_status"]: row["count"] for row in connection.execute(
             "SELECT current_status, count(*) AS count FROM repair_records GROUP BY current_status")}
         page = min(page, max(1, (total + 19) // 20))
-        rows = connection.execute("SELECT * FROM repair_records" + condition + " ORDER BY occurred_on DESC, julianday(created_at) DESC, id LIMIT 20 OFFSET ?",
+        rows = connection.execute("SELECT * FROM repair_records" + condition + " ORDER BY occurred_on DESC, " + sql_instant('created_at') + " DESC, id LIMIT 20 OFFSET ?",
                                   [*arguments, (page - 1) * 20]).fetchall()
         data = []
         for row in rows:
-            count = connection.execute('SELECT count(*) FROM dbn_records WHERE serial_no=?', (row['serial_no'],)).fetchone()[0]
+            count = connection.execute('SELECT count(*) FROM all_dbn_records WHERE serial_no=?', (row['serial_no'],)).fetchone()[0]
             data.append({**public_record(row), 'dbn_count': count})
         return {"data": data, "total": total, "page": page, "page_size": 20,
                 "status_counts": counts}
@@ -109,10 +109,15 @@ def record_detail(path, record_id):
         row = connection.execute("SELECT * FROM repair_records WHERE id=?", (record_id,)).fetchone()
         if not row:
             raise APIError("找不到送修紀錄", 404)
-        return {"data": public_record(row)}
+        result = public_record(row)
+        source = connection.execute("SELECT original_json,warnings FROM legacy_source_rows WHERE source_table='repair_records' AND source_key=?", (record_id,)).fetchone()
+        if source:
+            result['legacy_source'] = json.loads(source['original_json'])
+            result['legacy_warnings'] = json.loads(source['warnings'])
+        return {"data": result}
 
 
-def validate(connection, payload):
+def validate(connection, payload, historical=False):
     if set(payload) - FIELDS:
         raise APIError("包含不支援的欄位，請重新載入頁面")
     result = {}
@@ -154,9 +159,9 @@ def validate(connection, payload):
         raise APIError("已送修／取回驗證必須填送修日期")
     if result["current_status"] == "取回驗證" and not result["returned_on"]:
         raise APIError("取回驗證必須填回修日期")
-    if result["sent_on"] and result["sent_on"] < result["occurred_on"]:
+    if not historical and result["sent_on"] and result["sent_on"] < result["occurred_on"]:
         raise APIError("送修日期不得早於損壞日期")
-    if result["returned_on"] and (not result["sent_on"] or result["returned_on"] < result["sent_on"]):
+    if not historical and result["returned_on"] and (not result["sent_on"] or result["returned_on"] < result["sent_on"]):
         raise APIError("回修日期不得早於送修日期，且須有送修日期")
     machine = connection.execute("SELECT model FROM repair_machine_models WHERE machine_code=?", (result["machine_code"],)).fetchone()
     if not machine:
@@ -242,7 +247,7 @@ def save_record(path, payload, record_id=None):
 
 def list_history(path, record_id):
     with connect(path) as connection:
-        rows = connection.execute("SELECT * FROM record_change_history WHERE source_table='repair_records' AND record_id=? ORDER BY changed_at DESC, id DESC", (record_id,))
+        rows = connection.execute("SELECT * FROM record_change_history WHERE source_table='repair_records' AND record_id=? ORDER BY " + sql_instant('changed_at') + " DESC, id DESC", (record_id,))
         result = []
         for row in rows:
             entry = dict(row)

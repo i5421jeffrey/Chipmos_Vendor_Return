@@ -1,6 +1,7 @@
 # SPMS 公司版：SQLite 離線功能驗收
 
-只使用本機 Python 與 SQLite，不連接或更新 Supabase。尚未開放內網或匯入舊資料。
+只使用本機 Python 與 SQLite，不連接或更新 Supabase。尚未開放內網或在公司正式資料庫匯入舊資料。
+已提供共用密碼解鎖編輯，以及核准 CSV／附件的離線轉換、來源封存與副本試匯入；不是個人帳號／角色系統。
 不需安裝第三方套件。目標環境：Windows 11、Python 3.13、現代瀏覽器。
 
 本輪原版功能對照、集中修補與未完成界線見 [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)。
@@ -31,8 +32,8 @@
 - 集中故障處理：快速搜尋分區顯示失敗，不把失敗當零筆；附件／送修鏈失敗仍保留基本詳情，未知狀態停用相關危險操作並提供重讀。對應表初始化失敗可重試；送出前的非同步查詢也鎖定輸入。DBN 補齊 DUT／類型／站點／PN／Model 搜尋，送修支援 PN；匯入異動可用 IMPORT 篩選。來源時間原字串保留、按實際時間點排序。
 - 詳細資料的連續送修歷史逐輪顯示日期、狀態、維修分類、金額、異常類別、描述與該輪附件；標示目前案件，可點選切換，不將同 S/N 的其他獨立送修混入本鏈。只有單筆未結案時顯示「尚無連續送修紀錄」。S/N 主檔表單提供獨立唯讀 PN 預覽。此輪畫面仍未經 Windows／視覺驗收。
 - 再次送修的進行中案件顯示前一輪 FAIL 提醒；連續送修鏈在詳細資料停用刪除按鈕（後端仍檢查）。未設定金額時保留但停用 PASS／FAIL 按鈕，提示補價後明確重新套用價目；重新計價另有儲存前確認，取消不寫入且保留表單。
-- 離線 JSON 匯入、SQLite 備份驗證與復原到新檔工具已提供（下方）。**真實舊資料尚未匯入**：仍須提供公司核准的匯出檔，先審核轉換與核對筆數；程式不會讀雲端取得資料。
-- **尚未實作登入／角色權限、正式內網部署與排程／異地備份；尚未完成 Windows 本輪操作及視覺驗收**。這些不是下載一次就能代替的公司 IT 設定／驗收。所有使用者目前等同本機操作者，異動紀錄不是具名人員稽核；不得直接開放內網作正式服務。
+- 離線匯入、SQLite 備份驗證與復原到新檔工具已提供（下方）。`legacy_import.py` 可處理本次核准的 13 份 CSV 與實體附件，保留來源欄位、來源異動、時間、金額及 PIN；公司正式匯入仍須另行確認。程式不會讀雲端取得資料。
+- 使用者指定以**共用密碼解鎖編輯防誤觸**，不採個人帳號／角色管理。所有寫入有後端工作階段檢查，但異動不是具名人員稽核；這不是正式內網的身分安全方案。正式內網部署與排程／異地備份、Windows 本輪操作及視覺驗收仍未完成，不得直接開放內網作正式服務。
 
 內附 `modules/repairs/catalog.json` 為 Git 內兩份已知來源的離線基礎對應，
 來源檔名及 SHA256 記錄於 JSON；不是 Supabase 線上資料快照，也不是完整機台管理清冊。
@@ -133,7 +134,7 @@ cd D:\Python\SPMS
 SQLite 使用 WAL 模式；運作中不要只複製主資料庫檔來備份。下列備份工具使用 SQLite backup API；排程、保管及異地副本仍須依公司規範設置。
 
 此階段僅監聽 `127.0.0.1`。不要開防火牆、轉送連接埠或改成對外開放；
-登入、權限、正式多人／內網部署尚未完成；目前為本機版本衝突保護、交易、升級備份及人工備份／復原驗證。
+共用密碼解鎖僅防誤觸，不提供個人角色或具名稽核；正式多人／內網部署尚未完成。保留本機版本衝突保護、交易、升級備份及人工備份／復原驗證。
 停止時若出現錯誤，保留 PowerShell 訊息供排查，不要刪除資料庫重試。
 
 ## SQLite 備份、驗證與復原演練
@@ -150,7 +151,7 @@ SQLite 使用 WAL 模式；運作中不要只複製主資料庫檔來備份。�
 
 ## 舊資料：離線 JSON 匯入工具（先審核，不自動讀雲端）
 
-`company/import_data.py` 接受已核對的 `spms-offline-import-v1` JSON；**不直接接受 Supabase SQL dump／CSV／Storage URL，也不下載雲端附件**。原始匯出資料需先另外保留，取得真實匯出檔後才可核對轉換；無法相容的舊資料會拒絕，不會默默補值或丟欄位。來源歷史異動表尚無轉換器，匯入會新增本機 `IMPORT` 異動，不冒充來源歷史。
+`company/import_data.py` 接受已核對的 `spms-offline-import-v1` JSON；這個舊版格式**不直接接受 SQL dump／CSV／Storage URL，也不下載雲端附件**，僅新增本機 `IMPORT` 異動。實際 CSV 與來源異動請改用下方 `legacy_import.py`；兩者格式不可混用。
 
 格式：
 
@@ -178,7 +179,70 @@ SQLite 使用 WAL 模式；運作中不要只複製主資料庫檔來備份。�
 .\.venv\Scripts\python.exe .\company\import_data.py D:\approved-import.json --apply
 ```
 
-匯入後逐表核對 ID／筆數、NULL 與零元、來源時間、連續送修鏈、附件 SHA256 及 PIN 快照，再另做備份。尚未拿到真實來源檔，因此此工具只通過合成資料測試，**不代表真實舊資料轉換／移轉已完成**。
+匯入後逐表核對 ID／筆數、NULL 與零元、來源時間、連續送修鏈、附件 SHA256 及 PIN 快照，再另做備份。這個舊版格式的合成測試不等於公司正式移轉已完成。
+
+## 共用密碼開啟編輯（防誤觸）
+
+更新程式後，預設為唯讀；未設定密碼也能瀏覽，但不能寫入。在公司主機 `D:\Python\SPMS` 執行一次：
+
+```powershell
+.\.venv\Scripts\python.exe .\company\edit_access.py
+```
+
+依提示輸入兩次共用密碼；不放在命令列、不回傳給助理、不使用原前端硬編碼密碼。
+設定存在 `company\data\edit-password.json`，僅存隨機 salt 與 scrypt 雜湊；更新安裝器不封裝或覆寫此檔。
+更換密碼也是執行同一命令；原工作階段會失效。此設定不在 SQLite 備份內，須由 IT 另行保管或復原後重新設定。
+
+- 頁面按「開啟編輯」並輸入密碼，才顯示新增／修改／刪除／結案／附件寫入及價格維護。
+- 後端對每個寫入 API 檢查隨機 token；token 僅放頁面記憶體，不寫 cookie、網址或 localStorage。只解鎖目前分頁，重新整理後唯讀。
+- 「結束編輯」撤銷 token；有未儲存表單須確認，有正在送出的操作則等完成後再結束。服務重啟、密碼變更或 8 小時到期也會失效。
+- 工作階段到期的寫入不自動重送，表單保留輸入；可按表單內「重新開啟編輯」後自行確認再儲存。
+- 連續錯誤五次暫停嘗試 30 秒。沒有預設密碼、個人帳號或角色，不能據此識別實際操作人員；仍只限 localhost。
+
+## 真實 CSV／附件：一次性來源移轉包
+
+`legacy_import.py` 僅針對已審閱的備品 CSV 欄位與規則，不執行 SQL，也不是通用 dump 或增量同步工具。
+需要 13 張表：`dbn_customers,dbn_records,dbn_socket_files,dbn_valid_combinations,record_change_history,repair_attachments,repair_board_prices,repair_machine_models,repair_machines,repair_model_boards,repair_models,repair_records,serial_board_mappings`。
+CSV 檔名為 `<表名>_rows.csv`；實體附件根目錄下保留 `<案件ID>/<Storage檔名>`。
+
+準備資料包（在有核准來源的電腦執行；若已收到 `source_bundle.json` 則不用重建）：
+
+```text
+python company/legacy_import.py build --csv-directory APPROVED_CSV_FOLDER --files-directory EXTRACTED_FILES_FOLDER --output source_bundle.json --description "approved source export and date"
+```
+
+資料包含完整 CSV 與附件，**是公司資料，不是公開安裝檔**，須依公司核准方式傳送及保存；不提交 GitHub。
+轉換不修改來源；每份 CSV／附件含 SHA256，所有 13 份原始 CSV 位元組會連同附件一起存入 SQLite 的同一交易與備份。
+
+處理界線：
+
+- 送修保留原 ID、版本、金額（含 NULL／0）、日期、送修鏈、建立／更新時間；不以現價重計。
+- DBN 保留原 PIN 與 Socket ID。原類型空白且無 DUT／快照／描述的舊案存入新增的 `legacy_dbn_records`，清單／搜尋／摘要仍一併顯示，標為「未記錄類型」。不推測為 Other；只有明確補齊類型並儲存後，才原子轉為正常 DBN，保留 ID／原建立時間及來源封存。
+- DBN 原 CSV 沒有版本／更新時間：本機初始版本為 1、更新時間採原建立時間；新 S/N 主檔建立時間採原更新時間，沿用的相同主檔保留本機時間。這些衍生欄位會列在核對報告，不冒充來源提供值。
+- 明確標記來源日期先後例外及前輪結案晚於再次送修損壞日；原值／關聯不改。個案日期錯序時禁止 PASS／FAIL，須人工核對、明確編輯更正。一般新增／編輯仍套用原有嚴格日期驗證。
+- 來源異動原操作、時間、舊值／新值保留，ID 加 `legacy-` 前綴防碰撞；畫面標示「來源歷史」，與本機 `IMPORT` 事件分開。來源已刪除案件的歷史也保留。
+- 舊欄位 `repair_month/item/area/tester_id/failure_data/order_status` 等完整封存，案件詳細資料可唯讀查看原始欄位，但不是新增可編輯業務欄位。`repair_machines` 與 `repair_models` 完整 CSV 僅封存；本機選項使用實際的 `repair_machine_models`／板件／價格對應，不偽稱兩套機台表已合併。
+- 不重建資料庫，不覆寫既有案件；相同基礎對應可沿用、不同值整批拒絕。公司既有測試資料不刪除。重複匯入不是同步，會拒絕並整批回復。
+- additive `legacy_import` 模組 v1 升級前備份，與 repairs v2 並存。此版資料庫不可退回不支援來源封存與舊 DBN 的程式，否則會漏顯資料。
+
+公司正式匯入步驟（集中驗收時執行，不因本機試跑成功自動匯入）：
+
+1. 依既有更新程序安裝新版；啟動一次服務完成備份式新增遷移，再停止服務。保留 `company\data` 與 `.venv`，不要拿預覽 SQLite 替換正式檔。
+2. 將核准 `source_bundle.json` 放在例如 `D:\Python\SPMS\migration\`，先對目前公司資料庫做副本預檢：
+
+```powershell
+.\.venv\Scripts\python.exe .\company\legacy_import.py import .\migration\source_bundle.json
+```
+
+3. 核對報告、來源例外及公司現有資料是否衝突。無 `--apply` 時只試匯入暫存副本，不改正式檔。確認後才執行：
+
+```powershell
+.\.venv\Scripts\python.exe .\company\legacy_import.py import .\migration\source_bundle.json --apply
+```
+
+輸入 `IMPORT` 才會先建立 `before-legacy-import-*.sqlite3` 備份並整批交易寫入。失敗整批回復，不會刪除重建。
+最後用 `maintenance.py verify` 核對並另做備份，再啟動服務、設定密碼及集中驗收。
+來源為手動分表匯出，不證明同一時間點快照或雲端最新完整筆數。若匯出後舊系統仍有變動，正式切換前須停止舊系統寫入、重新收齊並核對來源；不能把目前資料包當成持續同步。
 
 ## 開發測試
 
@@ -190,6 +254,7 @@ python -m unittest discover -s company -p "test_*.py" -v
 
 Mac 開發機可額外執行 `swift scripts/test_company_ui.swift` 檢查 JS 語法及 mock DOM 流程（導覽、精確 S/N 查詢、詳細資料／編輯、衝突保留輸入）；這不取代 Windows 瀏覽器與 CSS 視覺驗收。
 該命令另執行隔離的 `scripts/company_ui_resilience_test.js`，涵蓋部分讀取失敗、起始載入恢復、取消後遲到回應、前置查詢鎖定、錯誤回應及對應維護表單保護。
+另有隔離的 `scripts/company_ui_edit_access_test.js` 檢查唯讀／解鎖／鎖回、到期保留輸入、舊案類型及來源時間顯示。後端 `test_edit_access.py`／`test_legacy_import.py` 使用合成資料，不包含真實公司來源。
 要重建離線基礎對應（只讀 Git 檔案、不連雲端），執行 `python scripts/build_company_catalog.py`；
 這只產生封裝檔，不會更新已安裝 SQLite 的主檔，正式主檔變更須另行審閱遷移。
 DBN 基礎對應：`python scripts/build_company_dbn_catalog.py`（從明確 Git SQL VALUES／Socket JSON 擷取，不執行 PostgreSQL 或連雲端）。

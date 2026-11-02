@@ -25,6 +25,7 @@ class InstallerTests(unittest.TestCase):
             "company/server.py": b"old program\r\n",
             "company/data/spms.sqlite3": b"existing database; never open or overwrite",
             "company/data/spms.sqlite3-wal": b"existing WAL",
+            "company/data/edit-password.json": b"existing local password hash",
             ".venv/keep.txt": b"existing venv",
             "company/unlisted.txt": b"user work",
         }.items():
@@ -35,6 +36,7 @@ class InstallerTests(unittest.TestCase):
     def assert_protected(self):
         self.assertEqual((self.base / "company/data/spms.sqlite3").read_bytes(), b"existing database; never open or overwrite")
         self.assertEqual((self.base / "company/data/spms.sqlite3-wal").read_bytes(), b"existing WAL")
+        self.assertEqual((self.base / "company/data/edit-password.json").read_bytes(), b"existing local password hash")
         self.assertEqual((self.base / ".venv/keep.txt").read_bytes(), b"existing venv")
         self.assertEqual((self.base / "company/unlisted.txt").read_bytes(), b"user work")
 

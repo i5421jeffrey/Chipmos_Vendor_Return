@@ -162,6 +162,9 @@ class RepairHTTPTests(unittest.TestCase):
         self.path = Path(folder.name) / "spms.sqlite3"
         initialize_database(self.path)
         self.server = LocalServer(("127.0.0.1", 0), self.path)
+        from edit_access import configure
+        configure(self.path.parent / 'edit-password.json', 'test-only-password')
+        self.edit_token = self.server.edit_gate.unlock('test-only-password')['token']
         thread = threading.Thread(target=self.server.serve_forever, daemon=True)
         thread.start()
         self.addCleanup(self.server.server_close)
@@ -170,7 +173,7 @@ class RepairHTTPTests(unittest.TestCase):
         self.base = f"http://127.0.0.1:{self.server.server_port}"
 
     def request(self, path, method="GET", payload=None, headers=None):
-        defaults = {"Content-Type": "application/json", "X-SPMS-Request": "1"}
+        defaults = {"Content-Type": "application/json", "X-SPMS-Request": "1", "X-SPMS-Edit-Token": self.edit_token}
         defaults.update(headers or {})
         body = json.dumps(payload).encode() if payload is not None else None
         with urlopen(Request(self.base + path, data=body, method=method, headers=defaults), timeout=5) as response:

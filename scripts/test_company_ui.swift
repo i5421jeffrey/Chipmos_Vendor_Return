@@ -20,7 +20,7 @@ func values(_ pattern: String) throws -> [String] {
 let ids = try values("\\bid=\"([^\"]+)\"")
 if Set(ids).count != ids.count { print("Duplicate company HTML IDs");exit(1) }
 let tests = try String(contentsOfFile: "scripts/company_ui_test.js", encoding: .utf8).components(separatedBy: "// TESTS")
-for suite in ["normal", "resilience"] {
+for suite in ["normal", "resilience", "edit_access"] {
     let context = JSContext()!
     for (name, array) in [("pageIds", ids), ("pageStatuses", try values("data-status=\"([^\"]*)\"")), ("pageCounters", try values("data-count=\"([^\"]+)\"")), ("pageWorkspaces", try values("data-workspace=\"([^\"]+)\""))] {
         let json = String(data: try JSONSerialization.data(withJSONObject: array), encoding: .utf8)!
@@ -29,7 +29,9 @@ for suite in ["normal", "resilience"] {
     context.evaluateScript(tests[0])
     context.evaluateScript(try String(contentsOfFile: "company/web/repairs.js", encoding: .utf8))
     context.evaluateScript(try String(contentsOfFile: "company/web/features.js", encoding: .utf8))
-    context.evaluateScript(suite == "normal" ? tests[1] : try String(contentsOfFile: "scripts/company_ui_resilience_test.js", encoding: .utf8))
+    if suite != "edit_access" {context.evaluateScript("editToken='test-suite-token'; updateEditControls();")}
+    let suitePath = suite == "resilience" ? "scripts/company_ui_resilience_test.js" : "scripts/company_ui_edit_access_test.js"
+    context.evaluateScript(suite == "normal" ? tests[1] : try String(contentsOfFile: suitePath, encoding: .utf8))
     if let error = context.exception { print(error);exit(1) }
     if let error = context.objectForKeyedSubscript("companyUiFailure"), !error.isUndefined { print(error);exit(1) }
     if context.objectForKeyedSubscript("companyUiDone")?.toBool() != true { print("Company mock UI tests did not complete: \(suite)");exit(1) }

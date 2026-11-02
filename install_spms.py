@@ -65,8 +65,11 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                            '|\n'
                                                            '| **機台／板件／價格對應（指定保留）** | 公司版擴充，不因原版還原移除 | '
                                                            '搜尋、中文清單、元單位、逐列編輯、主檔 token 及不改寫歷史測試 |\n'
+                                                           '| 密碼解鎖編輯（防誤觸） | 使用者指定保留原版操作，不做個人角色 | '
+                                                           '`edit_access.py`、唯讀預設、記憶體 token、後端每次寫入檢查、到期／鎖回測試 '
+                                                           '|\n'
                                                            '| 離線安裝、遷移、備份與匯入工具 | 公司 Windows／SQLite 需求 | '
-                                                           '`database.py`、`maintenance.py`、`import_data.py`；暫存資料庫及獨立安裝後測試 '
+                                                           '`database.py`、`maintenance.py`、`import_data.py`、`legacy_import.py`；來源封存、副本及獨立安裝後測試 '
                                                            '|\n'
                                                            '\n'
                                                            '## 本輪集中修補的例外流程\n'
@@ -93,12 +96,17 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                            '2. 原版 CSS／Logo '
                                                            '已離線封裝；本輪桌面瀏覽器未連線，沒有執行真實瀏覽器、CSS、Windows '
                                                            '縮放及視覺驗收。mock DOM 不取代這些檢查。\n'
-                                                           '3. 原版 UI-only '
-                                                           '硬編碼密碼沒有搬成「登入」。**真正登入、角色、具名稽核仍未實作**，須先決定公司帳號來源與權限規則。\n'
-                                                           '4. **真實舊資料仍未移轉**：缺核准匯出檔及實體附件。現有工具只接受 README 的審核 '
-                                                           'JSON；原始 SQL／CSV、來源異動、舊欄位如 '
-                                                           '`repair_month`／`item`／`area`／`tester_id`／`failure_data`／`order_status` '
-                                                           '沒有通用轉換器。未知欄位拒絕，不默默丟棄。需原樣保留來源檔，取得真實資料後再決定轉換及核對。\n'
+                                                           '3. '
+                                                           '使用者已指定**共用密碼開啟編輯、防誤觸即可**，不採個人帳號／角色。已實作後端檢查及本機密碼雜湊設定，沒有搬原前端硬編碼密碼；不宣稱具名稽核或正式內網身分安全。\n'
+                                                           '4. **已取得核准 '
+                                                           'CSV／附件並完成本機副本轉換核對；公司正式匯入仍未執行**。`legacy_import.py` '
+                                                           '對這次備品格式保留來源異動、歷史金額／PIN／時間／版本、所有原始 CSV '
+                                                           '位元組及附件。空白類型 DBN '
+                                                           '以新增表保存並一併查詢，編輯須明確補齊；日期例外不改值、加提醒。舊欄位如 '
+                                                           '`repair_month/item/area/tester_id/failure_data/order_status` '
+                                                           '為唯讀來源封存，不是新業務欄位；`repair_machines/repair_models` '
+                                                           '僅完整封存，非另一套維護介面。詳見 README。不是通用 SQL dump／任意 CSV '
+                                                           '轉換或增量同步；手動匯出亦未證明雲端最新完整快照。\n'
                                                            '5. **正式內網、服務啟動管理、排程／異地備份仍未部署**。只監聽 '
                                                            'localhost；不可自行改綁定位址或開防火牆作正式服務。需 IT 核准與主機設定。\n'
                                                            '6. 機台保養模組仍僅預留，不在目前備品優先範圍。\n'
@@ -112,7 +120,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                            '\n'
                                                            '- 後端／HTTP／升級／備份／離線匯入：`python -m unittest '
                                                            'discover -s company -p "test_*.py" -v`\n'
-                                                           '- UI 正常／故障恢復兩個隔離的 mock-DOM 套件：`swift '
+                                                           '- UI 正常／故障恢復／編輯解鎖三個隔離的 mock-DOM 套件：`swift '
                                                            'scripts/test_company_ui.swift`\n'
                                                            '- 原版資源重現、離線頁面資源、保留對應維護入口：`python -m unittest '
                                                            'discover -s scripts -p '
@@ -124,11 +132,14 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                            '"test_company_installer.py" -v`\n'
                                                            '\n'
                                                            '安裝檔不封裝／覆寫 `company/data` 或 '
-                                                           '`.venv`，也不自動啟動服務、匯入真實舊資料或開放內網。\n',
-                                                'sha256': 'e20e4406aff2acd4a008f0170282362e462247d8d42eb55f3b9447a867bd7409'},
+                                                           '`.venv`，也不自動啟動服務、匯入真實舊資料或開放內網。\n'
+                                                           '真實來源包與預覽結果只保存在使用者核准的本機資料夾，不放入儲存庫或通用安裝檔；公司正式匯入仍需停止服務、預檢及 '
+                                                           '`IMPORT` 確認。\n',
+                                                'sha256': '884c80c4048895d90db83cbca73d0170556b701ec21a199781469f5298e0cdaa'},
            'company/README.md': {'content': '# SPMS 公司版：SQLite 離線功能驗收\n'
                                             '\n'
-                                            '只使用本機 Python 與 SQLite，不連接或更新 Supabase。尚未開放內網或匯入舊資料。\n'
+                                            '只使用本機 Python 與 SQLite，不連接或更新 Supabase。尚未開放內網或在公司正式資料庫匯入舊資料。\n'
+                                            '已提供共用密碼解鎖編輯，以及核准 CSV／附件的離線轉換、來源封存與副本試匯入；不是個人帳號／角色系統。\n'
                                             '不需安裝第三方套件。目標環境：Windows 11、Python 3.13、現代瀏覽器。\n'
                                             '\n'
                                             '本輪原版功能對照、集中修補與未完成界線見 '
@@ -193,11 +204,12 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '預覽。此輪畫面仍未經 Windows／視覺驗收。\n'
                                             '- 再次送修的進行中案件顯示前一輪 FAIL 提醒；連續送修鏈在詳細資料停用刪除按鈕（後端仍檢查）。未設定金額時保留但停用 '
                                             'PASS／FAIL 按鈕，提示補價後明確重新套用價目；重新計價另有儲存前確認，取消不寫入且保留表單。\n'
-                                            '- 離線 JSON 匯入、SQLite '
-                                            '備份驗證與復原到新檔工具已提供（下方）。**真實舊資料尚未匯入**：仍須提供公司核准的匯出檔，先審核轉換與核對筆數；程式不會讀雲端取得資料。\n'
-                                            '- **尚未實作登入／角色權限、正式內網部署與排程／異地備份；尚未完成 Windows '
-                                            '本輪操作及視覺驗收**。這些不是下載一次就能代替的公司 IT '
-                                            '設定／驗收。所有使用者目前等同本機操作者，異動紀錄不是具名人員稽核；不得直接開放內網作正式服務。\n'
+                                            '- 離線匯入、SQLite 備份驗證與復原到新檔工具已提供（下方）。`legacy_import.py` 可處理本次核准的 '
+                                            '13 份 CSV 與實體附件，保留來源欄位、來源異動、時間、金額及 '
+                                            'PIN；公司正式匯入仍須另行確認。程式不會讀雲端取得資料。\n'
+                                            '- '
+                                            '使用者指定以**共用密碼解鎖編輯防誤觸**，不採個人帳號／角色管理。所有寫入有後端工作階段檢查，但異動不是具名人員稽核；這不是正式內網的身分安全方案。正式內網部署與排程／異地備份、Windows '
+                                            '本輪操作及視覺驗收仍未完成，不得直接開放內網作正式服務。\n'
                                             '\n'
                                             '內附 `modules/repairs/catalog.json` 為 Git 內兩份已知來源的離線基礎對應，\n'
                                             '來源檔名及 SHA256 記錄於 JSON；不是 Supabase 線上資料快照，也不是完整機台管理清冊。\n'
@@ -323,7 +335,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             'API；排程、保管及異地副本仍須依公司規範設置。\n'
                                             '\n'
                                             '此階段僅監聽 `127.0.0.1`。不要開防火牆、轉送連接埠或改成對外開放；\n'
-                                            '登入、權限、正式多人／內網部署尚未完成；目前為本機版本衝突保護、交易、升級備份及人工備份／復原驗證。\n'
+                                            '共用密碼解鎖僅防誤觸，不提供個人角色或具名稽核；正式多人／內網部署尚未完成。保留本機版本衝突保護、交易、升級備份及人工備份／復原驗證。\n'
                                             '停止時若出現錯誤，保留 PowerShell 訊息供排查，不要刪除資料庫重試。\n'
                                             '\n'
                                             '## SQLite 備份、驗證與復原演練\n'
@@ -349,9 +361,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '## 舊資料：離線 JSON 匯入工具（先審核，不自動讀雲端）\n'
                                             '\n'
                                             '`company/import_data.py` 接受已核對的 `spms-offline-import-v1` '
-                                            'JSON；**不直接接受 Supabase SQL dump／CSV／Storage '
-                                            'URL，也不下載雲端附件**。原始匯出資料需先另外保留，取得真實匯出檔後才可核對轉換；無法相容的舊資料會拒絕，不會默默補值或丟欄位。來源歷史異動表尚無轉換器，匯入會新增本機 '
-                                            '`IMPORT` 異動，不冒充來源歷史。\n'
+                                            'JSON；這個舊版格式**不直接接受 SQL dump／CSV／Storage URL，也不下載雲端附件**，僅新增本機 '
+                                            '`IMPORT` 異動。實際 CSV 與來源異動請改用下方 `legacy_import.py`；兩者格式不可混用。\n'
                                             '\n'
                                             '格式：\n'
                                             '\n'
@@ -394,7 +405,95 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '```\n'
                                             '\n'
                                             '匯入後逐表核對 ID／筆數、NULL 與零元、來源時間、連續送修鏈、附件 SHA256 及 PIN '
-                                            '快照，再另做備份。尚未拿到真實來源檔，因此此工具只通過合成資料測試，**不代表真實舊資料轉換／移轉已完成**。\n'
+                                            '快照，再另做備份。這個舊版格式的合成測試不等於公司正式移轉已完成。\n'
+                                            '\n'
+                                            '## 共用密碼開啟編輯（防誤觸）\n'
+                                            '\n'
+                                            '更新程式後，預設為唯讀；未設定密碼也能瀏覽，但不能寫入。在公司主機 `D:\\Python\\SPMS` 執行一次：\n'
+                                            '\n'
+                                            '```powershell\n'
+                                            '.\\.venv\\Scripts\\python.exe .\\company\\edit_access.py\n'
+                                            '```\n'
+                                            '\n'
+                                            '依提示輸入兩次共用密碼；不放在命令列、不回傳給助理、不使用原前端硬編碼密碼。\n'
+                                            '設定存在 `company\\data\\edit-password.json`，僅存隨機 salt 與 scrypt '
+                                            '雜湊；更新安裝器不封裝或覆寫此檔。\n'
+                                            '更換密碼也是執行同一命令；原工作階段會失效。此設定不在 SQLite 備份內，須由 IT 另行保管或復原後重新設定。\n'
+                                            '\n'
+                                            '- 頁面按「開啟編輯」並輸入密碼，才顯示新增／修改／刪除／結案／附件寫入及價格維護。\n'
+                                            '- 後端對每個寫入 API 檢查隨機 token；token 僅放頁面記憶體，不寫 cookie、網址或 '
+                                            'localStorage。只解鎖目前分頁，重新整理後唯讀。\n'
+                                            '- 「結束編輯」撤銷 token；有未儲存表單須確認，有正在送出的操作則等完成後再結束。服務重啟、密碼變更或 8 '
+                                            '小時到期也會失效。\n'
+                                            '- 工作階段到期的寫入不自動重送，表單保留輸入；可按表單內「重新開啟編輯」後自行確認再儲存。\n'
+                                            '- 連續錯誤五次暫停嘗試 30 秒。沒有預設密碼、個人帳號或角色，不能據此識別實際操作人員；仍只限 localhost。\n'
+                                            '\n'
+                                            '## 真實 CSV／附件：一次性來源移轉包\n'
+                                            '\n'
+                                            '`legacy_import.py` 僅針對已審閱的備品 CSV 欄位與規則，不執行 SQL，也不是通用 dump '
+                                            '或增量同步工具。\n'
+                                            '需要 13 '
+                                            '張表：`dbn_customers,dbn_records,dbn_socket_files,dbn_valid_combinations,record_change_history,repair_attachments,repair_board_prices,repair_machine_models,repair_machines,repair_model_boards,repair_models,repair_records,serial_board_mappings`。\n'
+                                            'CSV 檔名為 `<表名>_rows.csv`；實體附件根目錄下保留 `<案件ID>/<Storage檔名>`。\n'
+                                            '\n'
+                                            '準備資料包（在有核准來源的電腦執行；若已收到 `source_bundle.json` 則不用重建）：\n'
+                                            '\n'
+                                            '```text\n'
+                                            'python company/legacy_import.py build --csv-directory '
+                                            'APPROVED_CSV_FOLDER --files-directory EXTRACTED_FILES_FOLDER '
+                                            '--output source_bundle.json --description "approved source '
+                                            'export and date"\n'
+                                            '```\n'
+                                            '\n'
+                                            '資料包含完整 CSV 與附件，**是公司資料，不是公開安裝檔**，須依公司核准方式傳送及保存；不提交 GitHub。\n'
+                                            '轉換不修改來源；每份 CSV／附件含 SHA256，所有 13 份原始 CSV 位元組會連同附件一起存入 SQLite '
+                                            '的同一交易與備份。\n'
+                                            '\n'
+                                            '處理界線：\n'
+                                            '\n'
+                                            '- 送修保留原 ID、版本、金額（含 NULL／0）、日期、送修鏈、建立／更新時間；不以現價重計。\n'
+                                            '- DBN 保留原 PIN 與 Socket ID。原類型空白且無 DUT／快照／描述的舊案存入新增的 '
+                                            '`legacy_dbn_records`，清單／搜尋／摘要仍一併顯示，標為「未記錄類型」。不推測為 '
+                                            'Other；只有明確補齊類型並儲存後，才原子轉為正常 DBN，保留 ID／原建立時間及來源封存。\n'
+                                            '- DBN 原 CSV 沒有版本／更新時間：本機初始版本為 1、更新時間採原建立時間；新 S/N '
+                                            '主檔建立時間採原更新時間，沿用的相同主檔保留本機時間。這些衍生欄位會列在核對報告，不冒充來源提供值。\n'
+                                            '- 明確標記來源日期先後例外及前輪結案晚於再次送修損壞日；原值／關聯不改。個案日期錯序時禁止 '
+                                            'PASS／FAIL，須人工核對、明確編輯更正。一般新增／編輯仍套用原有嚴格日期驗證。\n'
+                                            '- 來源異動原操作、時間、舊值／新值保留，ID 加 `legacy-` 前綴防碰撞；畫面標示「來源歷史」，與本機 '
+                                            '`IMPORT` 事件分開。來源已刪除案件的歷史也保留。\n'
+                                            '- 舊欄位 '
+                                            '`repair_month/item/area/tester_id/failure_data/order_status` '
+                                            '等完整封存，案件詳細資料可唯讀查看原始欄位，但不是新增可編輯業務欄位。`repair_machines` 與 '
+                                            '`repair_models` 完整 CSV 僅封存；本機選項使用實際的 '
+                                            '`repair_machine_models`／板件／價格對應，不偽稱兩套機台表已合併。\n'
+                                            '- '
+                                            '不重建資料庫，不覆寫既有案件；相同基礎對應可沿用、不同值整批拒絕。公司既有測試資料不刪除。重複匯入不是同步，會拒絕並整批回復。\n'
+                                            '- additive `legacy_import` 模組 v1 升級前備份，與 repairs v2 '
+                                            '並存。此版資料庫不可退回不支援來源封存與舊 DBN 的程式，否則會漏顯資料。\n'
+                                            '\n'
+                                            '公司正式匯入步驟（集中驗收時執行，不因本機試跑成功自動匯入）：\n'
+                                            '\n'
+                                            '1. 依既有更新程序安裝新版；啟動一次服務完成備份式新增遷移，再停止服務。保留 `company\\data` 與 '
+                                            '`.venv`，不要拿預覽 SQLite 替換正式檔。\n'
+                                            '2. 將核准 `source_bundle.json` 放在例如 '
+                                            '`D:\\Python\\SPMS\\migration\\`，先對目前公司資料庫做副本預檢：\n'
+                                            '\n'
+                                            '```powershell\n'
+                                            '.\\.venv\\Scripts\\python.exe .\\company\\legacy_import.py '
+                                            'import .\\migration\\source_bundle.json\n'
+                                            '```\n'
+                                            '\n'
+                                            '3. 核對報告、來源例外及公司現有資料是否衝突。無 `--apply` 時只試匯入暫存副本，不改正式檔。確認後才執行：\n'
+                                            '\n'
+                                            '```powershell\n'
+                                            '.\\.venv\\Scripts\\python.exe .\\company\\legacy_import.py '
+                                            'import .\\migration\\source_bundle.json --apply\n'
+                                            '```\n'
+                                            '\n'
+                                            '輸入 `IMPORT` 才會先建立 `before-legacy-import-*.sqlite3` '
+                                            '備份並整批交易寫入。失敗整批回復，不會刪除重建。\n'
+                                            '最後用 `maintenance.py verify` 核對並另做備份，再啟動服務、設定密碼及集中驗收。\n'
+                                            '來源為手動分表匯出，不證明同一時間點快照或雲端最新完整筆數。若匯出後舊系統仍有變動，正式切換前須停止舊系統寫入、重新收齊並核對來源；不能把目前資料包當成持續同步。\n'
                                             '\n'
                                             '## 開發測試\n'
                                             '\n'
@@ -409,6 +508,10 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '視覺驗收。\n'
                                             '該命令另執行隔離的 '
                                             '`scripts/company_ui_resilience_test.js`，涵蓋部分讀取失敗、起始載入恢復、取消後遲到回應、前置查詢鎖定、錯誤回應及對應維護表單保護。\n'
+                                            '另有隔離的 `scripts/company_ui_edit_access_test.js` '
+                                            '檢查唯讀／解鎖／鎖回、到期保留輸入、舊案類型及來源時間顯示。後端 '
+                                            '`test_edit_access.py`／`test_legacy_import.py` '
+                                            '使用合成資料，不包含真實公司來源。\n'
                                             '要重建離線基礎對應（只讀 Git 檔案、不連雲端），執行 `python '
                                             'scripts/build_company_catalog.py`；\n'
                                             '這只產生封裝檔，不會更新已安裝 SQLite 的主檔，正式主檔變更須另行審閱遷移。\n'
@@ -423,7 +526,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '產生；公司版程式更新後必須重新產生。\n'
                                             '安裝測試：`python -m unittest discover -s scripts -p '
                                             '"test_company_installer.py" -v`。\n',
-                                 'sha256': '612864292ab0f31eec9f159d7ca3b95a13f85d26e3a51fefefe97cebf3c984fb'},
+                                 'sha256': 'e649e51d607404c1a989633e6f9919b6f0ae09fb2321e22deaa42a2546d4b6a4'},
            'company/database.py': {'content': '"""Shared SQLite connections and additive, backed-up module '
                                               'migrations."""\n'
                                               'import json\n'
@@ -438,6 +541,16 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                               'def utc_now():\n'
                                               '    return '
                                               'datetime.now(timezone.utc).isoformat(timespec="microseconds")\n'
+                                              '\n'
+                                              '\n'
+                                              'def sql_instant(column):\n'
+                                              '    # Internal column names only. PostgreSQL +00 offsets need '
+                                              ':00 for SQLite.\n'
+                                              '    return ("julianday(CASE WHEN substr(" + column + ",-3,1) '
+                                              'IN (\'+\',\'-\') "\n'
+                                              '            "AND substr(" + column + ",-2) GLOB '
+                                              '\'[0-9][0-9]\' THEN " + column + "||\':00\' ELSE " + column + '
+                                              '" END)")\n'
                                               '\n'
                                               '\n'
                                               '@contextmanager\n'
@@ -464,10 +577,17 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                               'connection.execute("SELECT version FROM '
                                               'spms_module_migrations WHERE module=\'repairs\'")} if exists '
                                               'else set()\n'
+                                              '        legacy_versions = {row[0] for row in '
+                                              'connection.execute("SELECT version FROM '
+                                              'spms_module_migrations WHERE module=\'legacy_import\'")} if '
+                                              'exists else set()\n'
+                                              '        if legacy_versions - {1}:\n'
+                                              "            raise ValueError('Legacy import module is newer "
+                                              "than this program; do not downgrade')\n"
                                               '        if versions - {1, 2}:\n'
                                               '            raise ValueError("Database is newer than this '
                                               'program; do not downgrade")\n'
-                                              '        if versions == {1, 2}:\n'
+                                              '        if versions == {1, 2} and legacy_versions == {1}:\n'
                                               '            return\n'
                                               '        # SQLite backup includes committed WAL contents. '
                                               'Never overwrite a backup.\n'
@@ -489,6 +609,9 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                               '        versions = {row[0] for row in '
                                               'connection.execute("SELECT version FROM '
                                               'spms_module_migrations WHERE module=\'repairs\'")}\n'
+                                              '        legacy_versions = {row[0] for row in '
+                                              'connection.execute("SELECT version FROM '
+                                              'spms_module_migrations WHERE module=\'legacy_import\'")}\n'
                                               '        if 1 not in versions:\n'
                                               '            run_schema(connection, root / '
                                               "'modules/repairs/schema.sql')\n"
@@ -534,6 +657,12 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                               '            connection.execute("INSERT INTO '
                                               'spms_module_migrations VALUES (\'repairs\', 2, ?)", '
                                               '(utc_now(),))\n'
+                                              '        if not legacy_versions:\n'
+                                              '            run_schema(connection, root / '
+                                              "'modules/repairs/schema_legacy.sql')\n"
+                                              '            connection.execute("INSERT INTO '
+                                              'spms_module_migrations VALUES (\'legacy_import\', 1, ?)", '
+                                              '(utc_now(),))\n'
                                               '\n'
                                               '\n'
                                               'def run_schema(connection, path):\n'
@@ -543,7 +672,152 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                               "path.read_text(encoding='utf-8').split(';'):\n"
                                               '        if statement.strip():\n'
                                               '            connection.execute(statement)\n',
-                                   'sha256': 'e436456d2db674218798d2143c7992458464979097adec035c5d3015d858eddc'},
+                                   'sha256': '3a2b0d8d43e521d828b85d38743341b2dd621a05e00b4252d86cf265ae350e18'},
+           'company/edit_access.py': {'content': '"""Shared-password accidental-edit guard, not individual '
+                                                 'user authentication."""\n'
+                                                 'import argparse\n'
+                                                 'import getpass\n'
+                                                 'import hashlib\n'
+                                                 'import hmac\n'
+                                                 'import json\n'
+                                                 'import os\n'
+                                                 'import secrets\n'
+                                                 'import threading\n'
+                                                 'import time\n'
+                                                 'from pathlib import Path\n'
+                                                 '\n'
+                                                 'from errors import APIError\n'
+                                                 '\n'
+                                                 '\n'
+                                                 'def password_hash(password, salt):\n'
+                                                 "    return hashlib.scrypt(password.encode('utf-8'), "
+                                                 'salt=salt, n=16384, r=8, p=1).hex()\n'
+                                                 '\n'
+                                                 '\n'
+                                                 'def configure(path, password):\n'
+                                                 '    if not isinstance(password, str) or not 1 <= '
+                                                 'len(password) <= 200:\n'
+                                                 "        raise ValueError('密碼須為 1–200 字元')\n"
+                                                 '    path = Path(path)\n'
+                                                 '    path.parent.mkdir(parents=True, exist_ok=True)\n'
+                                                 '    salt = secrets.token_bytes(16)\n'
+                                                 "    value = dict(format='spms-edit-password-v1', "
+                                                 'salt=salt.hex(), digest=password_hash(password, salt))\n'
+                                                 "    temporary = path.with_name(path.name + '.' + "
+                                                 "secrets.token_hex(8) + '.tmp')\n"
+                                                 '    try:\n'
+                                                 "        with temporary.open('x', encoding='utf-8') as "
+                                                 'handle:\n'
+                                                 '            os.chmod(temporary, 0o600)\n'
+                                                 '            json.dump(value, handle)\n'
+                                                 '        os.replace(temporary, path)\n'
+                                                 '    finally:\n'
+                                                 '        if temporary.exists():\n'
+                                                 '            temporary.unlink()\n'
+                                                 '\n'
+                                                 '\n'
+                                                 'class EditGate:\n'
+                                                 '    def __init__(self, path):\n'
+                                                 '        self.path = Path(path)\n'
+                                                 '        self.lock = threading.Lock()\n'
+                                                 '        self.sessions = {}\n'
+                                                 '        self.failures = 0\n'
+                                                 '        self.blocked_until = 0\n'
+                                                 '        self.fingerprint = None\n'
+                                                 '\n'
+                                                 '    def settings(self):\n'
+                                                 '        try:\n'
+                                                 '            raw = self.path.read_bytes()\n'
+                                                 '        except FileNotFoundError:\n'
+                                                 "            raw = b''\n"
+                                                 '        except OSError:\n'
+                                                 "            raise APIError('無法讀取編輯密碼設定，請檢查公司主機檔案權限', 503)\n"
+                                                 '        fingerprint = hashlib.sha256(raw).hexdigest()\n'
+                                                 '        if self.fingerprint != fingerprint:\n'
+                                                 '            self.sessions.clear()\n'
+                                                 '            self.fingerprint = fingerprint\n'
+                                                 '        if not raw:\n'
+                                                 '            return None\n'
+                                                 '        try:\n'
+                                                 '            value = json.loads(raw)\n'
+                                                 "            if value['format'] != 'spms-edit-password-v1' "
+                                                 "or len(bytes.fromhex(value['salt'])) != 16 or "
+                                                 "len(bytes.fromhex(value['digest'])) != 64:\n"
+                                                 '                raise ValueError()\n'
+                                                 '            return value\n'
+                                                 '        except (ValueError, KeyError, TypeError):\n'
+                                                 "            raise APIError('編輯密碼設定損壞，請在公司主機重新設定', 503)\n"
+                                                 '\n'
+                                                 '    def status(self):\n'
+                                                 '        with self.lock:\n'
+                                                 '            return dict(configured=self.settings() is not '
+                                                 'None, individual_accounts=False)\n'
+                                                 '\n'
+                                                 '    def unlock(self, password):\n'
+                                                 '        with self.lock:\n'
+                                                 '            settings = self.settings()\n'
+                                                 '            if settings is None:\n'
+                                                 "                raise APIError('尚未設定共用編輯密碼，請在公司主機執行 "
+                                                 "edit_access.py', 403)\n"
+                                                 '            now = time.monotonic()\n'
+                                                 '            if now < self.blocked_until:\n'
+                                                 "                raise APIError('密碼嘗試過多，請等候 30 秒再試', 429)\n"
+                                                 '            if not isinstance(password, str) or not 1 <= '
+                                                 'len(password) <= 200 or not '
+                                                 'hmac.compare_digest(password_hash(password, '
+                                                 "bytes.fromhex(settings['salt'])), settings['digest']):\n"
+                                                 '                self.failures += 1\n'
+                                                 '                if self.failures >= 5:\n'
+                                                 '                    self.blocked_until = now + 30\n'
+                                                 '                    self.failures = 0\n'
+                                                 "                raise APIError('編輯密碼不正確', 401)\n"
+                                                 '            self.failures = 0\n'
+                                                 '            self.sessions = {key: expires for key, expires '
+                                                 'in self.sessions.items() if expires > now}\n'
+                                                 '            if len(self.sessions) >= 128:\n'
+                                                 "                raise APIError('編輯視窗過多，請重啟本機服務清除工作階段', "
+                                                 '429)\n'
+                                                 '            token = secrets.token_urlsafe(32)\n'
+                                                 '            self.sessions[token] = now + 8 * 60 * 60\n'
+                                                 '            return dict(token=token, expires_in=8 * 60 * '
+                                                 '60)\n'
+                                                 '\n'
+                                                 '    def require(self, token):\n'
+                                                 '        with self.lock:\n'
+                                                 '            self.settings()\n'
+                                                 '            if not token or self.sessions.get(token, 0) <= '
+                                                 'time.monotonic():\n'
+                                                 "                raise APIError('目前為唯讀模式，請輸入密碼開啟編輯', 401)\n"
+                                                 '\n'
+                                                 '    def revoke(self, token):\n'
+                                                 '        with self.lock:\n'
+                                                 '            self.sessions.pop(token, None)\n'
+                                                 '\n'
+                                                 '\n'
+                                                 'def main():\n'
+                                                 '    parser = argparse.ArgumentParser(description=__doc__)\n'
+                                                 "    parser.add_argument('--file', type=Path, "
+                                                 'default=Path(__file__).resolve().parent / '
+                                                 "'data/edit-password.json')\n"
+                                                 '    args = parser.parse_args()\n'
+                                                 '    try:\n'
+                                                 "        print('設定／更換共用編輯密碼，不建立個人帳號。設定檔只存 salt 與 scrypt "
+                                                 "雜湊。')\n"
+                                                 "        password = getpass.getpass('新密碼：')\n"
+                                                 "        if password != getpass.getpass('再次輸入：'):\n"
+                                                 "            raise ValueError('兩次輸入不同，未修改設定')\n"
+                                                 '        configure(args.file, password)\n'
+                                                 "        print('已設定。既有編輯工作階段將失效；頁面重新整理後為唯讀。')\n"
+                                                 '        return 0\n'
+                                                 '    except (OSError, ValueError, EOFError, '
+                                                 'KeyboardInterrupt) as error:\n'
+                                                 "        print('未完成：', error)\n"
+                                                 '        return 1\n'
+                                                 '\n'
+                                                 '\n'
+                                                 "if __name__ == '__main__':\n"
+                                                 '    raise SystemExit(main())\n',
+                                      'sha256': '163745f5cbe9f2ac9e9e00c7e0d1a00a61f7479c2ce49714c49cd4477fe83199'},
            'company/errors.py': {'content': 'class APIError(Exception):\n'
                                             '    def __init__(self, message, status=400):\n'
                                             '        super().__init__(message)\n'
@@ -739,6 +1013,10 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  '        values = {key: ops.text(row.get(key), key) for key '
                                                  'in '
                                                  "('machine_code','board_name','board_part_code','customer_code')}\n"
+                                                 "        if connection.execute('SELECT 1 FROM "
+                                                 "all_dbn_records WHERE id=?', (record_id,)).fetchone():\n"
+                                                 "            raise APIError('DBN ID 已存在，不覆寫包含未補齊類型的來源舊案', "
+                                                 '409)\n'
                                                  "        values['serial_no'] = "
                                                  "ops.serial(row.get('serial_no'))\n"
                                                  "        values['model'] = ops.board_context(connection, "
@@ -883,7 +1161,693 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  '\n'
                                                  "if __name__ == '__main__':\n"
                                                  '    raise SystemExit(main())\n',
-                                      'sha256': '7bfd3e0936f5539e4cf7bd96cdca00bb73465840b54225dd88fc24bab6ccd39b'},
+                                      'sha256': 'f440f044e1fab90fb32749ec38ac5f04df436771d42e6fccb71f17aa082b3785'},
+           'company/legacy_import.py': {'content': '"""Read-only CSV conversion and backed-up import of a '
+                                                   'complete reviewed source bundle.\n'
+                                                   '\n'
+                                                   'No network, SQL dump execution, conflict overwrite, date '
+                                                   'repair or PIN recalculation.\n'
+                                                   'Source CSV bytes and every original field are archived '
+                                                   'inside SQLite in the same transaction.\n'
+                                                   '"""\n'
+                                                   'import argparse\n'
+                                                   'import base64\n'
+                                                   'import csv\n'
+                                                   'import hashlib\n'
+                                                   'import io\n'
+                                                   'import json\n'
+                                                   'import re\n'
+                                                   'import sqlite3\n'
+                                                   'import tempfile\n'
+                                                   'from pathlib import Path, PurePosixPath\n'
+                                                   'from uuid import uuid4\n'
+                                                   '\n'
+                                                   'import import_data as reviewed\n'
+                                                   'from database import connect, utc_now\n'
+                                                   'from errors import APIError\n'
+                                                   'from maintenance import snapshot, verify\n'
+                                                   'from modules.repairs import attachments, operations as '
+                                                   'ops, service\n'
+                                                   '\n'
+                                                   "TABLES = ('dbn_customers', 'dbn_records', "
+                                                   "'dbn_socket_files', 'dbn_valid_combinations',\n"
+                                                   "          'record_change_history', 'repair_attachments', "
+                                                   "'repair_board_prices',\n"
+                                                   "          'repair_machine_models', 'repair_machines', "
+                                                   "'repair_model_boards',\n"
+                                                   "          'repair_models', 'repair_records', "
+                                                   "'serial_board_mappings')\n"
+                                                   "FORMAT = 'spms-legacy-csv-v1'\n"
+                                                   '\n'
+                                                   '\n'
+                                                   'def encoded(raw):\n'
+                                                   '    return '
+                                                   "dict(content_base64=base64.b64encode(raw).decode('ascii'), "
+                                                   'sha256=hashlib.sha256(raw).hexdigest())\n'
+                                                   '\n'
+                                                   '\n'
+                                                   'def decoded(item):\n'
+                                                   '    try:\n'
+                                                   "        raw = base64.b64decode(item['content_base64'], "
+                                                   'validate=True)\n'
+                                                   '        if hashlib.sha256(raw).hexdigest() != '
+                                                   "item['sha256']:\n"
+                                                   "            raise ValueError('Source checksum "
+                                                   "mismatch')\n"
+                                                   '        return raw\n'
+                                                   '    except (KeyError, TypeError, ValueError) as error:\n'
+                                                   "        raise ValueError('Invalid source bytes or "
+                                                   "SHA256') from error\n"
+                                                   '\n'
+                                                   '\n'
+                                                   'def parse_csv(raw):\n'
+                                                   '    csv.field_size_limit(64 * 1024 * 1024)\n'
+                                                   '    reader = '
+                                                   "csv.DictReader(io.StringIO(raw.decode('utf-8-sig'), "
+                                                   "newline=''), strict=True)\n"
+                                                   '    columns = reader.fieldnames\n'
+                                                   '    if not columns or len(set(columns)) != len(columns) '
+                                                   'or any(not name for name in columns):\n'
+                                                   "        raise ValueError('Missing or duplicate CSV "
+                                                   "column names')\n"
+                                                   '    rows = list(reader)\n'
+                                                   '    if any(None in row or any(value is None for value in '
+                                                   'row.values()) for row in rows):\n'
+                                                   "        raise ValueError('Malformed CSV row')\n"
+                                                   '    return rows\n'
+                                                   '\n'
+                                                   '\n'
+                                                   'def source_data(package):\n'
+                                                   '    if not isinstance(package, dict) or '
+                                                   "package.get('format') != FORMAT or set(package) != "
+                                                   "{'format', 'source_description', 'source_files', "
+                                                   "'attachments'}:\n"
+                                                   "        raise ValueError('Expected spms-legacy-csv-v1 "
+                                                   "bundle')\n"
+                                                   "    ops.text(package['source_description'], "
+                                                   "'source_description', 2000)\n"
+                                                   "    if not isinstance(package['source_files'], dict) or "
+                                                   "set(package['source_files']) != set(TABLES):\n"
+                                                   "        raise ValueError('All 13 reviewed CSV tables are "
+                                                   "required')\n"
+                                                   '    data = {table: '
+                                                   "parse_csv(decoded(package['source_files'][table])) for "
+                                                   'table in TABLES}\n'
+                                                   "    if not isinstance(package['attachments'], dict):\n"
+                                                   "        raise ValueError('Invalid attachments map')\n"
+                                                   "    expected = {row['storage_path'] for row in "
+                                                   "data['repair_attachments']}\n"
+                                                   "    if set(package['attachments']) != expected or "
+                                                   "len(expected) != len(data['repair_attachments']):\n"
+                                                   "        raise ValueError('Missing, duplicate or "
+                                                   "unexpected attachment paths')\n"
+                                                   '    for name in expected:\n'
+                                                   '        parts = PurePosixPath(name)\n'
+                                                   "        if parts.is_absolute() or '..' in parts.parts or "
+                                                   "'\\\\' in name:\n"
+                                                   "            raise ValueError('Unsafe attachment path')\n"
+                                                   '    return data\n'
+                                                   '\n'
+                                                   '\n'
+                                                   'def build(csv_directory, files_directory, description):\n'
+                                                   '    package = dict(format=FORMAT, '
+                                                   'source_description=description, source_files={}, '
+                                                   'attachments={})\n'
+                                                   '    for table in TABLES:\n'
+                                                   "        package['source_files'][table] = "
+                                                   'encoded((Path(csv_directory) / (table + '
+                                                   "'_rows.csv')).read_bytes())\n"
+                                                   '    data = {table: parse_csv(decoded(item)) for table, '
+                                                   "item in package['source_files'].items()}\n"
+                                                   '    root = Path(files_directory).resolve()\n'
+                                                   "    for row in data['repair_attachments']:\n"
+                                                   "        name = row['storage_path']\n"
+                                                   '        parts = PurePosixPath(name)\n'
+                                                   "        if parts.is_absolute() or '..' in parts.parts or "
+                                                   "'\\\\' in name:\n"
+                                                   "            raise ValueError('Unsafe attachment path')\n"
+                                                   '        path = (root / name).resolve()\n'
+                                                   '        if not path.is_relative_to(root):\n'
+                                                   "            raise ValueError('Attachment escapes "
+                                                   "selected folder')\n"
+                                                   "        package['attachments'][name] = "
+                                                   'encoded(path.read_bytes())\n'
+                                                   '    source_data(package)\n'
+                                                   '    return package\n'
+                                                   '\n'
+                                                   '\n'
+                                                   'def load(path):\n'
+                                                   '    raw = Path(path).read_bytes()\n'
+                                                   '    if len(raw) > 100 * 1024 * 1024:\n'
+                                                   "        raise ValueError('Bundle exceeds 100 MB')\n"
+                                                   '    value = json.loads(raw)\n'
+                                                   '    source_data(value)\n'
+                                                   '    return value\n'
+                                                   '\n'
+                                                   '\n'
+                                                   'def integer(value, label):\n'
+                                                   '    if not isinstance(value, str) or not '
+                                                   "re.fullmatch(r'[1-9][0-9]*', value):\n"
+                                                   "        raise ValueError(label + ' must be a positive "
+                                                   "integer')\n"
+                                                   '    return int(value)\n'
+                                                   '\n'
+                                                   '\n'
+                                                   'def boolean(value):\n'
+                                                   "    if value not in ('true', 'false'):\n"
+                                                   "        raise ValueError('Expected source true/false')\n"
+                                                   "    return value == 'true'\n"
+                                                   '\n'
+                                                   '\n'
+                                                   'def nullable(value):\n'
+                                                   "    return None if value == '' else value\n"
+                                                   '\n'
+                                                   '\n'
+                                                   'def same_or_insert(connection, table, values, keys):\n'
+                                                   "    where = ' AND '.join(key + '=?' for key in keys)\n"
+                                                   "    previous = connection.execute('SELECT * FROM ' + "
+                                                   "table + ' WHERE ' + where, [values[key] for key in "
+                                                   'keys]).fetchone()\n'
+                                                   '    if previous:\n'
+                                                   '        if any(previous[key] != value for key, value in '
+                                                   'values.items()):\n'
+                                                   "            raise ValueError('Existing catalog conflict "
+                                                   "in ' + table + '; no overwrite performed')\n"
+                                                   '    else:\n'
+                                                   '        reviewed.insert(connection, table, values)\n'
+                                                   '\n'
+                                                   '\n'
+                                                   'def archive_row(connection, batch, table, key, row, '
+                                                   'warnings=()):\n'
+                                                   "    reviewed.insert(connection, 'legacy_source_rows', "
+                                                   'dict(source_table=table, source_key=key, '
+                                                   'batch_id=batch,\n'
+                                                   '                    original_json=json.dumps(row, '
+                                                   'ensure_ascii=False), warnings=json.dumps(list(warnings), '
+                                                   'ensure_ascii=False)))\n'
+                                                   '\n'
+                                                   '\n'
+                                                   'def date_warnings(row):\n'
+                                                   '    issues = []\n'
+                                                   "    if row['sent_on'] and row['sent_on'] < "
+                                                   "row['occurred_on']:\n"
+                                                   "        issues.append('來源送修日期早於損壞日期；原樣保留，須核對後才能結案')\n"
+                                                   "    if row['returned_on'] and (not row['sent_on'] or "
+                                                   "row['returned_on'] < row['sent_on']):\n"
+                                                   '        '
+                                                   "issues.append('來源回修日期早於送修日期或缺送修日期；原樣保留，須核對後才能結案')\n"
+                                                   "    if row['closed_on'] and row['closed_on'] < "
+                                                   "row['returned_on']:\n"
+                                                   "        issues.append('來源結案日期早於回修日期；原樣保留，須核對')\n"
+                                                   '    return issues\n'
+                                                   '\n'
+                                                   '\n'
+                                                   'def import_into(connection, package):\n'
+                                                   '    data = source_data(package)\n'
+                                                   "    connection.execute('PRAGMA defer_foreign_keys=ON')\n"
+                                                   '    batch = uuid4().hex\n'
+                                                   '    now = utc_now()\n'
+                                                   "    reviewed.insert(connection, 'legacy_import_batches', "
+                                                   'dict(id=batch, imported_at=now, '
+                                                   "source_description=package['source_description']))\n"
+                                                   "    for table, item in package['source_files'].items():\n"
+                                                   '        reviewed.insert(connection, '
+                                                   "'legacy_source_files', dict(batch_id=batch, "
+                                                   "filename=table + '_rows.csv', sha256=item['sha256'], "
+                                                   'content=decoded(item)))\n'
+                                                   "    for table, keys in (('repair_machine_models', "
+                                                   "('machine_code',)), ('repair_model_boards', ('model', "
+                                                   "'board_name')),\n"
+                                                   "                        ('dbn_customers', "
+                                                   "('customer_code',)), ('dbn_valid_combinations', "
+                                                   "('customer_code', 'product_code', 'station_code'))):\n"
+                                                   "        columns = [row['name'] for row in "
+                                                   "connection.execute('PRAGMA table_info(' + table + ')')]\n"
+                                                   '        for row in data[table]:\n'
+                                                   '            values = {key: ops.text(row[key], key) for '
+                                                   'key in columns}\n'
+                                                   '            same_or_insert(connection, table, values, '
+                                                   'keys)\n'
+                                                   "    for row in data['repair_board_prices']:\n"
+                                                   "        values = {key: row[key] for key in ('model', "
+                                                   "'board_name', 'board_part_code')}\n"
+                                                   "        for prefix in ('board_repair', "
+                                                   "'external_repair', 'contract_repair', "
+                                                   "'warranty_repair'):\n"
+                                                   "            values[prefix + '_cents'] = "
+                                                   'reviewed.amount_cents(nullable(row[prefix + '
+                                                   "'_amount']))\n"
+                                                   '        same_or_insert(connection, '
+                                                   "'repair_board_prices', values, ('model', 'board_name', "
+                                                   "'board_part_code'))\n"
+                                                   "    for row in data['dbn_socket_files']:\n"
+                                                   "        if not boolean(row['is_active']):\n"
+                                                   "            raise ValueError('Inactive Socket requires "
+                                                   "explicit review; archived source is not auto-selected')\n"
+                                                   "        pins = json.loads(row['dut_pins'])\n"
+                                                   "        count = integer(row['dut_count'], 'dut_count')\n"
+                                                   '        if not isinstance(pins, dict) or any(not '
+                                                   'isinstance(v, list) or any(not isinstance(p, str) for p '
+                                                   'in v) for v in pins.values()):\n'
+                                                   "            raise ValueError('Invalid source socket "
+                                                   "pins')\n"
+                                                   "        values = dict(id=reviewed.identity(row['id']), "
+                                                   "product_code=row['product_code'], "
+                                                   "source_filename=row['source_filename'], "
+                                                   'dut_count=count,\n'
+                                                   '                      dut_pins=json.dumps(pins, '
+                                                   'ensure_ascii=False))\n'
+                                                   "        existing = connection.execute('SELECT * FROM "
+                                                   "dbn_socket_files WHERE product_code=?', "
+                                                   "(row['product_code'],)).fetchone()\n"
+                                                   '        if existing:\n'
+                                                   '            if any(existing[k] != values[k] for k in '
+                                                   "('id','product_code','source_filename','dut_count')) or "
+                                                   "json.loads(existing['dut_pins']) != pins:\n"
+                                                   "                raise ValueError('Existing Socket "
+                                                   "conflict; no overwrite performed')\n"
+                                                   '        else:\n'
+                                                   '            reviewed.insert(connection, '
+                                                   "'dbn_socket_files', values)\n"
+                                                   "    for row in data['serial_board_mappings']:\n"
+                                                   "        number = ops.serial(row['serial_no'])\n"
+                                                   "        if number != row['serial_no']:\n"
+                                                   "            raise ValueError('Source S/N requires "
+                                                   "explicit normalization review')\n"
+                                                   "        existed = connection.execute('SELECT 1 FROM "
+                                                   "serial_board_mappings WHERE serial_no=?', "
+                                                   '(number,)).fetchone()\n'
+                                                   '        ops.ensure_mapping(connection, row)\n'
+                                                   '        # A source mapping has no created_at/version. '
+                                                   'Preserve its updated_at;\n'
+                                                   '        # newly imported local created_at uses that '
+                                                   'known source timestamp.\n'
+                                                   "        stamp = reviewed.timestamp(row['updated_at'], "
+                                                   'None)\n'
+                                                   '        if stamp is None:\n'
+                                                   "            raise ValueError('Source mapping updated_at "
+                                                   "missing')\n"
+                                                   '        previous = connection.execute("SELECT 1 FROM '
+                                                   'legacy_source_rows WHERE '
+                                                   "source_table='serial_board_mappings' AND "
+                                                   'source_key=?", (number,)).fetchone()\n'
+                                                   '        if previous:\n'
+                                                   "            raise ValueError('Source mapping already "
+                                                   "imported')\n"
+                                                   '        if not existed:\n'
+                                                   "            connection.execute('UPDATE "
+                                                   'serial_board_mappings SET created_at=?,updated_at=? '
+                                                   "WHERE serial_no=?', (stamp, stamp, number))\n"
+                                                   '        archive_row(connection, batch, '
+                                                   "'serial_board_mappings', number, row)\n"
+                                                   '    warning_rows = []\n'
+                                                   "    source_repairs = {row['id']: row for row in "
+                                                   "data['repair_records']}\n"
+                                                   "    for row in data['repair_records']:\n"
+                                                   '        fields = {key: nullable(row[key]) if key in '
+                                                   "('sent_on', 'returned_on') else row[key] for key in "
+                                                   'service.FIELDS}\n'
+                                                   "        fields['is_opened'] = boolean(row['is_opened'])\n"
+                                                   "        closed = row['current_status'] in ('結案（PASS）', "
+                                                   "'結案（FAIL）')\n"
+                                                   '        if closed:\n'
+                                                   "            fields['current_status'] = '取回驗證'\n"
+                                                   '        values = service.validate(connection, fields, '
+                                                   'historical=True)\n'
+                                                   "        if values['serial_no'] != row['serial_no'] or "
+                                                   "values['model'] != row['model']:\n"
+                                                   "            raise ValueError('Source repair S/N or Model "
+                                                   "differs from current source context')\n"
+                                                   "        values.update(id=reviewed.identity(row['id']), "
+                                                   "current_status=row['current_status'],\n"
+                                                   '                      '
+                                                   "repair_amount_cents=reviewed.amount_cents(nullable(row['repair_amount'])),\n"
+                                                   '                      '
+                                                   "closed_on=reviewed.iso_date(row['closed_on']) if closed "
+                                                   'else None,\n'
+                                                   '                      '
+                                                   "retry_of_record_id=reviewed.identity(row['retry_of_record_id']) "
+                                                   "if row['retry_of_record_id'] else None,\n"
+                                                   "                      version=integer(row['version'], "
+                                                   "'version'), "
+                                                   "created_at=reviewed.timestamp(row['created_at'], None), "
+                                                   "updated_at=reviewed.timestamp(row['updated_at'], None))\n"
+                                                   "        if not values['created_at'] or not "
+                                                   "values['updated_at'] or (not closed and "
+                                                   "row['closed_on']):\n"
+                                                   "            raise ValueError('Missing source timestamps "
+                                                   "or unexpected closure date')\n"
+                                                   "        if values['repair_type'] == '保固' and "
+                                                   "values['repair_amount_cents'] not in (0, None):\n"
+                                                   "            raise ValueError('Nonzero warranty amount')\n"
+                                                   '        ops.ensure_mapping(connection, {**values, '
+                                                   "'board_name': values['description']})\n"
+                                                   "        reviewed.insert(connection, 'repair_records', "
+                                                   'values)\n'
+                                                   '        warnings = date_warnings(row)\n'
+                                                   "        if row['retry_of_record_id']:\n"
+                                                   '            parent = '
+                                                   "source_repairs.get(row['retry_of_record_id'])\n"
+                                                   "            if parent and parent['closed_on'] > "
+                                                   "row['occurred_on']:\n"
+                                                   '                '
+                                                   "warnings.append('來源再次送修損壞日早於前輪結案日；原關聯與日期保留，未推測實際時間')\n"
+                                                   "        archive_row(connection, batch, 'repair_records', "
+                                                   "row['id'], row, warnings)\n"
+                                                   '        if warnings:\n'
+                                                   '            '
+                                                   "warning_rows.append(dict(table='repair_records', "
+                                                   "id=row['id'], warnings=warnings))\n"
+                                                   "        service.audit(connection, 'repair_records', "
+                                                   "row['id'], 'IMPORT', None, "
+                                                   'service.public_record(ops.get_row(connection, '
+                                                   "'repair_records', row['id'])))\n"
+                                                   "    for row in data['repair_records']:\n"
+                                                   '        current, seen = row, set()\n'
+                                                   "        while current['retry_of_record_id']:\n"
+                                                   "            if current['id'] in seen:\n"
+                                                   "                raise ValueError('Retry cycle')\n"
+                                                   "            seen.add(current['id'])\n"
+                                                   '            parent = dict(ops.get_row(connection, '
+                                                   "'repair_records', current['retry_of_record_id']))\n"
+                                                   "            if parent['current_status'] != '結案（FAIL）' or "
+                                                   "parent['serial_no'] != current['serial_no'] or not "
+                                                   "parent['closed_on']:\n"
+                                                   "                raise ValueError('Invalid source retry "
+                                                   "relationship')\n"
+                                                   '            current = parent\n'
+                                                   "    for row in data['dbn_records']:\n"
+                                                   "        if connection.execute('SELECT 1 FROM "
+                                                   "all_dbn_records WHERE id=?', (row['id'],)).fetchone():\n"
+                                                   "            raise ValueError('Existing DBN ID "
+                                                   "conflict')\n"
+                                                   '        values = {key: row[key] for key in '
+                                                   "('serial_no','machine_code','model','board_name','board_part_code','customer_code')}\n"
+                                                   "        if ops.serial(values['serial_no']) != "
+                                                   "values['serial_no'] or ops.board_context(connection, "
+                                                   "values['machine_code'], values['board_name'], "
+                                                   "values['board_part_code']) != values['model']:\n"
+                                                   "            raise ValueError('DBN source context "
+                                                   "mismatch')\n"
+                                                   '        values.update({key: nullable(row[key]) for key '
+                                                   "in ('product_code','station_code')})\n"
+                                                   '        snapshot_pins = '
+                                                   "json.loads(row['dut_pin_snapshot'])\n"
+                                                   "        incomplete = not row['issue_type']\n"
+                                                   '        if incomplete:\n'
+                                                   "            if row['dut'] or row['socket_file_id'] or "
+                                                   "snapshot_pins or row['issue_description']:\n"
+                                                   "                raise ValueError('Untyped DBN has issue "
+                                                   "information; requires explicit review')\n"
+                                                   '            issue = dict(issue_type=None, dut=None, '
+                                                   'issue_description=None, socket_file_id=None, '
+                                                   "dut_pin_snapshot='{}')\n"
+                                                   '        else:\n'
+                                                   '            issue = ops.validate_issue(row)\n'
+                                                   "            if issue['dut'] != nullable(row['dut']):\n"
+                                                   "                raise ValueError('Source DUT requires "
+                                                   "explicit canonical-format review')\n"
+                                                   "            if row['issue_type'] in ('RTE','Other') and "
+                                                   "(row['dut'] or row['socket_file_id'] or snapshot_pins):\n"
+                                                   "                raise ValueError('RTE/Other source "
+                                                   "unexpectedly contains DUT/PIN information')\n"
+                                                   "            if row['issue_type'] in ('Group','Single "
+                                                   "Dut') and row['issue_description']:\n"
+                                                   "                raise ValueError('DUT source "
+                                                   'unexpectedly contains an extra description; requires '
+                                                   "review')\n"
+                                                   "            issue['issue_description'] = "
+                                                   "nullable(row['issue_description'])\n"
+                                                   '            if not isinstance(snapshot_pins, dict) or '
+                                                   'set(snapshot_pins) != '
+                                                   "set(json.loads(issue['dut_pin_snapshot'])):\n"
+                                                   "                raise ValueError('Source PIN snapshot "
+                                                   "does not match DUT selection')\n"
+                                                   '            for pins in snapshot_pins.values():\n'
+                                                   '                if pins is not None and (not '
+                                                   'isinstance(pins, list) or any(not isinstance(pin, str) '
+                                                   'or not 1 <= len(pin) <= 200 for pin in pins)):\n'
+                                                   "                    raise ValueError('Invalid source PIN "
+                                                   "token')\n"
+                                                   '            '
+                                                   'issue.update(dut_pin_snapshot=json.dumps(snapshot_pins, '
+                                                   'ensure_ascii=False), '
+                                                   "socket_file_id=nullable(row['socket_file_id']))\n"
+                                                   "            if issue['socket_file_id'] and not "
+                                                   "connection.execute('SELECT 1 FROM dbn_socket_files WHERE "
+                                                   "id=? AND product_code=?', "
+                                                   "(issue['socket_file_id'],values['product_code'])).fetchone():\n"
+                                                   "                raise ValueError('Source Socket "
+                                                   "reference mismatch')\n"
+                                                   "        stamp = reviewed.timestamp(row['created_at'], "
+                                                   'None)\n'
+                                                   '        if not stamp:\n'
+                                                   "            raise ValueError('Missing source DBN "
+                                                   "created_at')\n"
+                                                   '        values.update(issue, '
+                                                   "id=reviewed.identity(row['id']), created_at=stamp, "
+                                                   'updated_at=stamp, version=1)\n'
+                                                   '        ops.ensure_mapping(connection, values)\n'
+                                                   "        reviewed.insert(connection, 'legacy_dbn_records' "
+                                                   "if incomplete else 'dbn_records', values)\n"
+                                                   "        warnings = ['舊 DBN 未記錄類型；未猜測類型或 PIN。編輯時須明確補齊。'] "
+                                                   'if incomplete else []\n'
+                                                   "        archive_row(connection, batch, 'dbn_records', "
+                                                   "row['id'], row, warnings)\n"
+                                                   '        if warnings:\n'
+                                                   '            '
+                                                   "warning_rows.append(dict(table='dbn_records', "
+                                                   "id=row['id'], warnings=warnings))\n"
+                                                   "        service.audit(connection, 'dbn_records', "
+                                                   "row['id'], 'IMPORT', None, "
+                                                   "ops.public_dbn(ops.get_row(connection, 'dbn_records', "
+                                                   "row['id'])))\n"
+                                                   '    attachment_hashes = {}\n'
+                                                   "    for row in data['repair_attachments']:\n"
+                                                   '        content = '
+                                                   "decoded(package['attachments'][row['storage_path']])\n"
+                                                   "        if len(content) != integer(row['file_size'], "
+                                                   "'file_size'):\n"
+                                                   "            raise ValueError('Source attachment size "
+                                                   "mismatch')\n"
+                                                   "        upload = dict(filename=row['filename'], "
+                                                   "content_base64=base64.b64encode(content).decode('ascii'))\n"
+                                                   '        attachments.decode_upload(upload)\n'
+                                                   '        reviewed.insert(connection, '
+                                                   "'repair_attachments', "
+                                                   "dict(id=reviewed.identity(row['id']), "
+                                                   "repair_record_id=row['repair_record_id'], "
+                                                   "filename=row['filename'],\n"
+                                                   '                        content=content, '
+                                                   'sha256=hashlib.sha256(content).hexdigest(), '
+                                                   "created_at=reviewed.timestamp(row['created_at'], "
+                                                   'None)))\n'
+                                                   '        archive_row(connection, batch, '
+                                                   "'repair_attachments', row['id'], row)\n"
+                                                   "        attachment_hashes[row['id']] = "
+                                                   'hashlib.sha256(content).hexdigest()\n'
+                                                   "    for row in data['record_change_history']:\n"
+                                                   "        changes = json.loads(row['changes'])\n"
+                                                   '        if not isinstance(changes, dict) or any(not '
+                                                   "isinstance(v, dict) or set(v) - {'old','new'} for v in "
+                                                   'changes.values()):\n'
+                                                   "            raise ValueError('Invalid source history "
+                                                   "changes')\n"
+                                                   "        if row['source_table'] not in "
+                                                   "('repair_records','dbn_records','serial_board_mappings','repair_machine_models','repair_model_boards','repair_board_prices','repair_attachments') "
+                                                   "or row['operation'] not in "
+                                                   "('INSERT','UPDATE','DELETE'):\n"
+                                                   "            raise ValueError('Unreviewed source history "
+                                                   "type')\n"
+                                                   '        # Prefix makes imported source history distinct '
+                                                   'from locally generated IMPORT events.\n'
+                                                   '        reviewed.insert(connection, '
+                                                   "'record_change_history', dict(id='legacy-' + batch[:12] "
+                                                   "+ '-' + reviewed.identity(row['id']),\n"
+                                                   '                        '
+                                                   "source_table=row['source_table'], "
+                                                   "record_id=row['record_key'], operation=row['operation'], "
+                                                   "serial_no=nullable(row['serial_no']), "
+                                                   "board_name=nullable(row['board_name']),\n"
+                                                   '                        '
+                                                   "changed_at=reviewed.timestamp(row['changed_at'], None), "
+                                                   'changes=json.dumps(changes, ensure_ascii=False)))\n'
+                                                   '        archive_row(connection, batch, '
+                                                   "'record_change_history', row['id'], row)\n"
+                                                   "    if connection.execute('PRAGMA "
+                                                   "foreign_key_check').fetchall():\n"
+                                                   "        raise ValueError('Imported foreign key check "
+                                                   "failed')\n"
+                                                   '    # Reconcile business snapshots, not merely totals or '
+                                                   "the converter's inputs.\n"
+                                                   "    for row in data['repair_records']:\n"
+                                                   '        saved = dict(ops.get_row(connection, '
+                                                   "'repair_records', row['id']))\n"
+                                                   '        for key in service.FIELDS - '
+                                                   "{'is_opened','sent_on','returned_on'}:\n"
+                                                   '            if saved[key] != row[key]:\n'
+                                                   "                raise ValueError('Repair field "
+                                                   "reconciliation failed: ' + key)\n"
+                                                   '        for key in '
+                                                   "('sent_on','returned_on','closed_on','retry_of_record_id'):\n"
+                                                   '            if saved[key] != nullable(row[key]):\n'
+                                                   "                raise ValueError('Repair date/chain "
+                                                   "reconciliation failed')\n"
+                                                   "        if saved['repair_amount_cents'] != "
+                                                   "reviewed.amount_cents(nullable(row['repair_amount'])) or "
+                                                   "saved['version'] != int(row['version']) or "
+                                                   "bool(saved['is_opened']) != boolean(row['is_opened']):\n"
+                                                   "            raise ValueError('Repair amount/version "
+                                                   "reconciliation failed')\n"
+                                                   '        if any(saved[key] != row[key] for key in '
+                                                   "('model','created_at','updated_at')):\n"
+                                                   "            raise ValueError('Repair source time/Model "
+                                                   "reconciliation failed')\n"
+                                                   "    for row in data['dbn_records']:\n"
+                                                   '        saved = dict(ops.get_row(connection, '
+                                                   "'dbn_records', row['id']))\n"
+                                                   "        if json.loads(saved['dut_pin_snapshot']) != "
+                                                   "json.loads(row['dut_pin_snapshot']):\n"
+                                                   "            raise ValueError('PIN reconciliation "
+                                                   "failed')\n"
+                                                   '        for key in '
+                                                   "('serial_no','machine_code','model','board_name','board_part_code','customer_code','created_at'):\n"
+                                                   '            if saved[key] != row[key]:\n'
+                                                   "                raise ValueError('DBN field "
+                                                   "reconciliation failed: ' + key)\n"
+                                                   '        for key in '
+                                                   "('product_code','station_code','issue_type','dut','issue_description','socket_file_id'):\n"
+                                                   '            if saved[key] != nullable(row[key]):\n'
+                                                   "                raise ValueError('DBN source issue "
+                                                   "reconciliation failed: ' + key)\n"
+                                                   '    for identity, digest in attachment_hashes.items():\n'
+                                                   '        saved = ops.get_row(connection, '
+                                                   "'repair_attachments', identity)\n"
+                                                   "        if hashlib.sha256(saved['content']).hexdigest() "
+                                                   '!= digest:\n'
+                                                   "            raise ValueError('Attachment reconciliation "
+                                                   "failed')\n"
+                                                   '    return dict(batch_id=batch, '
+                                                   'source_counts={table:len(rows) for table, rows in '
+                                                   'data.items()},\n'
+                                                   '                '
+                                                   "operational_repairs=len(data['repair_records']), "
+                                                   "operational_dbn=len(data['dbn_records']),\n"
+                                                   "                incomplete_dbn=sum(not row['issue_type'] "
+                                                   "for row in data['dbn_records']),\n"
+                                                   '                '
+                                                   "source_history_imported=len(data['record_change_history']), "
+                                                   'attachments_verified=len(attachment_hashes),\n'
+                                                   "                archive_only_tables=['repair_machines', "
+                                                   "'repair_models'],\n"
+                                                   '                '
+                                                   "repair_amount_cents=sum(reviewed.amount_cents(nullable(row['repair_amount'])) "
+                                                   "or 0 for row in data['repair_records']),\n"
+                                                   '                null_amounts=sum(not '
+                                                   "row['repair_amount'] for row in data['repair_records']), "
+                                                   'warnings=warning_rows,\n'
+                                                   "                archive='All 13 original CSV byte "
+                                                   'streams retained in SQLite; extra legacy fields are not '
+                                                   "editable business fields',\n"
+                                                   "                derived_local_fields='DBN local "
+                                                   'version=1 and updated_at=source created_at; new mapping '
+                                                   'created_at=source updated_at; existing identical '
+                                                   'mappings retain local timestamps; originals remain '
+                                                   "archived',\n"
+                                                   "                existing_data='No record overwrite; "
+                                                   "equal catalogs reused, different catalogs rejected')\n"
+                                                   '\n'
+                                                   '\n'
+                                                   'def check(path, package):\n'
+                                                   '    with '
+                                                   "tempfile.TemporaryDirectory(prefix='spms-legacy-check-') "
+                                                   'as directory:\n'
+                                                   "        target = Path(directory) / 'preview.sqlite3'\n"
+                                                   '        snapshot(path, target)\n'
+                                                   '        with connect(target) as connection:\n'
+                                                   "            connection.execute('BEGIN IMMEDIATE')\n"
+                                                   '            result = import_into(connection, package)\n'
+                                                   "        result['database_verification'] = "
+                                                   'verify(target)\n'
+                                                   '        return result\n'
+                                                   '\n'
+                                                   '\n'
+                                                   'def apply(path, package):\n'
+                                                   '    with connect(path) as connection:\n'
+                                                   "        connection.execute('BEGIN IMMEDIATE')\n"
+                                                   "        folder = Path(path).parent / 'backups'\n"
+                                                   '        folder.mkdir(exist_ok=True)\n'
+                                                   "        backup = folder / ('before-legacy-import-' + "
+                                                   "uuid4().hex + '.sqlite3')\n"
+                                                   '        snapshot(path, backup)\n'
+                                                   '        result = import_into(connection, package)\n'
+                                                   '    return dict(result, backup=str(backup))\n'
+                                                   '\n'
+                                                   '\n'
+                                                   'def main():\n'
+                                                   '    parser = '
+                                                   'argparse.ArgumentParser(description=__doc__)\n'
+                                                   "    commands = parser.add_subparsers(dest='command', "
+                                                   'required=True)\n'
+                                                   "    build_cmd = commands.add_parser('build')\n"
+                                                   "    build_cmd.add_argument('--csv-directory', type=Path, "
+                                                   'required=True)\n'
+                                                   "    build_cmd.add_argument('--files-directory', "
+                                                   'type=Path, required=True)\n'
+                                                   "    build_cmd.add_argument('--output', type=Path, "
+                                                   'required=True)\n'
+                                                   "    build_cmd.add_argument('--description', "
+                                                   'required=True)\n'
+                                                   "    import_cmd = commands.add_parser('import')\n"
+                                                   "    import_cmd.add_argument('package', type=Path)\n"
+                                                   "    import_cmd.add_argument('--database', type=Path, "
+                                                   'default=Path(__file__).resolve().parent / '
+                                                   "'data/spms.sqlite3')\n"
+                                                   "    import_cmd.add_argument('--apply', "
+                                                   "action='store_true')\n"
+                                                   '    args = parser.parse_args()\n'
+                                                   '    try:\n'
+                                                   "        if args.command == 'build':\n"
+                                                   '            package = build(args.csv_directory, '
+                                                   'args.files_directory, args.description)\n'
+                                                   "            with args.output.open('x', encoding='utf-8') "
+                                                   'as handle:\n'
+                                                   '                json.dump(package, handle, '
+                                                   'ensure_ascii=False)\n'
+                                                   "            print('Created source bundle. Not "
+                                                   "imported:', args.output)\n"
+                                                   '            return 0\n'
+                                                   '        package = load(args.package)\n'
+                                                   "        print('Package SHA256:', "
+                                                   'hashlib.sha256(args.package.read_bytes()).hexdigest())\n'
+                                                   '        print(json.dumps(check(args.database, package), '
+                                                   'ensure_ascii=False, indent=2))\n'
+                                                   '        if not args.apply:\n'
+                                                   "            print('CHECK ONLY: original database "
+                                                   "unchanged.')\n"
+                                                   '            return 0\n'
+                                                   "        print('Stop SPMS. Review warnings. No "
+                                                   'overwrite/merge. A backup will be created before the '
+                                                   "transaction.')\n"
+                                                   "        if input('Type IMPORT to confirm: ') != "
+                                                   "'IMPORT':\n"
+                                                   "            print('Cancelled.')\n"
+                                                   '            return 0\n'
+                                                   '        print(json.dumps(apply(args.database, package), '
+                                                   'ensure_ascii=False, indent=2))\n'
+                                                   '        return 0\n'
+                                                   '    except (OSError, ValueError, KeyError, TypeError, '
+                                                   'csv.Error, sqlite3.Error, APIError) as error:\n'
+                                                   "        print('LEGACY IMPORT FAILED:', error)\n"
+                                                   '        return 1\n'
+                                                   '    except (EOFError, KeyboardInterrupt):\n'
+                                                   "        print('Cancelled.')\n"
+                                                   '        return 130\n'
+                                                   '\n'
+                                                   '\n'
+                                                   "if __name__ == '__main__':\n"
+                                                   '    raise SystemExit(main())\n',
+                                        'sha256': 'dbd748d3e48253cb0aa36e8baa5507b45a97cbf8e2df72fc7a5727e3ff2eb327'},
            'company/maintenance.py': {'content': '"""Offline SQLite backup/verification/recovery. Never '
                                                  'overwrite a live database.\n'
                                                  '\n'
@@ -924,8 +1888,28 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  'expected:\n'
                                                  "                raise ValueError('Attachment SHA256 "
                                                  "verification failed')\n"
+                                                 '        if connection.execute("SELECT 1 FROM sqlite_master '
+                                                 'WHERE name=\'legacy_source_files\'").fetchone():\n'
+                                                 '            legacy_versions = connection.execute("SELECT '
+                                                 'version FROM spms_module_migrations WHERE '
+                                                 'module=\'legacy_import\' ORDER BY version").fetchall()\n'
+                                                 '            if legacy_versions != [(1,)]:\n'
+                                                 "                raise ValueError('Unsupported source "
+                                                 "archive module version')\n"
+                                                 '            for content, expected in '
+                                                 "connection.execute('SELECT content,sha256 FROM "
+                                                 "legacy_source_files'):\n"
+                                                 '                if hashlib.sha256(content).hexdigest() != '
+                                                 'expected:\n'
+                                                 "                    raise ValueError('Source CSV SHA256 "
+                                                 "verification failed')\n"
+                                                 "        dbn_table = 'all_dbn_records' if "
+                                                 'connection.execute("SELECT 1 FROM sqlite_master WHERE '
+                                                 'name=\'all_dbn_records\'").fetchone() else '
+                                                 "'dbn_records'\n"
                                                  "        return {table: connection.execute('SELECT count(*) "
-                                                 "FROM ' + table).fetchone()[0]\n"
+                                                 "FROM ' + (dbn_table if table == 'dbn_records' else "
+                                                 'table)).fetchone()[0]\n'
                                                  "                for table in ('repair_records', "
                                                  "'dbn_records', 'serial_board_mappings', "
                                                  "'repair_attachments', 'record_change_history')}\n"
@@ -995,7 +1979,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  '\n'
                                                  "if __name__ == '__main__':\n"
                                                  '    raise SystemExit(main())\n',
-                                      'sha256': '1698fd9057dd31a8059350ceab4c35919f5fd7284bc637e8047ff67f68e3c9a1'},
+                                      'sha256': 'b44a053dbf27f53d48221450a27b604f63565d63b32ba5bfed6eb2c86928016c'},
            'company/modules/__init__.py': {'content': '"""Local business modules. Machine management is '
                                                       'deliberately not installed yet."""\n',
                                            'sha256': '10346710f4885f09c92ffff7772983a0b2dbaac53eb5151efa4b617652db011c'},
@@ -2075,7 +3059,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                                 'timezone\n'
                                                                 'from uuid import uuid4\n'
                                                                 '\n'
-                                                                'from database import connect, utc_now\n'
+                                                                'from database import connect, sql_instant, '
+                                                                'utc_now\n'
                                                                 'from errors import APIError\n'
                                                                 'from . import attachments, service\n'
                                                                 '\n'
@@ -2123,6 +3108,11 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                                 'never from a request.\n'
                                                                 "    row = connection.execute(f'SELECT * "
                                                                 "FROM {table} WHERE id=?', "
+                                                                '(identity,)).fetchone()\n'
+                                                                '    if row is None and table == '
+                                                                "'dbn_records':\n"
+                                                                "        row = connection.execute('SELECT * "
+                                                                "FROM legacy_dbn_records WHERE id=?', "
                                                                 '(identity,)).fetchone()\n'
                                                                 '    if not row:\n'
                                                                 "        raise APIError('找不到此紀錄', 404)\n"
@@ -2239,12 +3229,12 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                                 '    with connect(path) as connection:\n'
                                                                 "        connection.execute('BEGIN')\n"
                                                                 '        return paginate(connection, '
-                                                                "'dbn_records', query, ('serial_no', "
+                                                                "'all_dbn_records', query, ('serial_no', "
                                                                 "'board_name', 'board_part_code', "
                                                                 "'machine_code', 'model', 'customer_code', "
                                                                 "'product_code', 'station_code', "
                                                                 "'issue_type', 'dut', 'issue_description'), "
-                                                                "'julianday(created_at) DESC,id', "
+                                                                "sql_instant('created_at') + ' DESC,id', "
                                                                 'public_dbn)\n'
                                                                 '\n'
                                                                 '\n'
@@ -2255,8 +3245,9 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                                 "        rows = connection.execute('SELECT "
                                                                 'machine_code,model FROM repair_records '
                                                                 'WHERE serial_no=? UNION SELECT '
-                                                                'machine_code,model FROM dbn_records WHERE '
-                                                                "serial_no=?', (number, number)).fetchall()\n"
+                                                                'machine_code,model FROM all_dbn_records '
+                                                                "WHERE serial_no=?', (number, "
+                                                                'number)).fetchall()\n'
                                                                 '        mapping = '
                                                                 "connection.execute('SELECT "
                                                                 'board_name,board_part_code FROM '
@@ -2396,7 +3387,22 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                                 '        if identity:\n'
                                                                 '            values.update(updated_at=now, '
                                                                 "version=previous['version'] + 1)\n"
-                                                                "            connection.execute('UPDATE "
+                                                                '            legacy = '
+                                                                "connection.execute('SELECT 1 FROM "
+                                                                "legacy_dbn_records WHERE id=?', "
+                                                                '(identity,)).fetchone()\n'
+                                                                '            if legacy:\n'
+                                                                '                values.update(id=identity, '
+                                                                "created_at=previous['created_at'])\n"
+                                                                "                connection.execute('INSERT "
+                                                                "INTO dbn_records (' + ','.join(values) + ') "
+                                                                "VALUES (' + ','.join('?' for _ in values) + "
+                                                                "')', list(values.values()))\n"
+                                                                "                connection.execute('DELETE "
+                                                                "FROM legacy_dbn_records WHERE id=?', "
+                                                                '(identity,))\n'
+                                                                '            else:\n'
+                                                                "                connection.execute('UPDATE "
                                                                 "dbn_records SET ' + ','.join(key + '=?' for "
                                                                 "key in values) + ' WHERE id=?', "
                                                                 '[*values.values(), identity])\n'
@@ -2442,6 +3448,11 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                                 'datetime.now(timezone(timedelta(hours=8))).date().isoformat()\n'
                                                                 "        if today < row['returned_on']:\n"
                                                                 "            raise APIError('回修日期在未來，不能結案')\n"
+                                                                "        if not row['sent_on'] or "
+                                                                "row['returned_on'] < row['sent_on'] or "
+                                                                "row['sent_on'] < row['occurred_on']:\n"
+                                                                '            raise '
+                                                                "APIError('舊案日期先後異常，請核對並明確更正後再結案', 409)\n"
                                                                 '        before = '
                                                                 'service.public_record(row)\n'
                                                                 "        status = '結案（PASS）' if "
@@ -2628,6 +3639,12 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                                 '        else:\n'
                                                                 "            table = 'repair_records' if "
                                                                 "kind == 'records' else 'dbn_records'\n"
+                                                                "            if kind == 'dbn' and "
+                                                                "connection.execute('SELECT 1 FROM "
+                                                                "legacy_dbn_records WHERE id=?', "
+                                                                '(identity,)).fetchone():\n'
+                                                                '                table = '
+                                                                "'legacy_dbn_records'\n"
                                                                 '            row = get_row(connection, '
                                                                 'table, identity)\n'
                                                                 '            version(row, '
@@ -2654,7 +3671,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                                 "            connection.execute(f'DELETE "
                                                                 "FROM {table} WHERE id=?', (identity,))\n"
                                                                 '            service.audit(connection, '
-                                                                "table, identity, 'DELETE', before, None)\n"
+                                                                "'dbn_records' if kind == 'dbn' else table, "
+                                                                "identity, 'DELETE', before, None)\n"
                                                                 "        return {'deleted': identity}\n"
                                                                 '\n'
                                                                 '\n'
@@ -2680,6 +3698,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                                 '    rows = {}\n'
                                                                 "    for table, field in (('repair_records', "
                                                                 "'description'), ('dbn_records', "
+                                                                "'board_name'), ('legacy_dbn_records', "
                                                                 "'board_name')):\n"
                                                                 '        rows[table] = [dict(row) for row in '
                                                                 "connection.execute(f'SELECT * FROM {table} "
@@ -2691,7 +3710,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                                 'ensure_ascii=False).encode()).hexdigest()\n'
                                                                 '    return '
                                                                 "dict(repair_count=len(rows['repair_records']), "
-                                                                "dbn_count=len(rows['dbn_records']), "
+                                                                "dbn_count=len(rows['dbn_records']) + "
+                                                                "len(rows['legacy_dbn_records']), "
                                                                 'token=token), rows\n'
                                                                 '\n'
                                                                 '\n'
@@ -2811,15 +3831,16 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                                 "== 'repair_records' else "
                                                                 'public_dbn(after_row)\n'
                                                                 '                    '
-                                                                "service.audit(connection, table, row['id'], "
-                                                                "'UPDATE', before, after)\n"
+                                                                "service.audit(connection, 'dbn_records' if "
+                                                                "table == 'legacy_dbn_records' else table, "
+                                                                "row['id'], 'UPDATE', before, after)\n"
                                                                 '        if previous and number != '
                                                                 'previous_number:\n'
                                                                 '            referenced = '
                                                                 "any(connection.execute(f'SELECT 1 FROM "
                                                                 "{table} WHERE serial_no=?', "
                                                                 '(previous_number,)).fetchone() for table in '
-                                                                "('repair_records', 'dbn_records'))\n"
+                                                                "('repair_records', 'all_dbn_records'))\n"
                                                                 '            if not referenced:\n'
                                                                 "                connection.execute('DELETE "
                                                                 'FROM serial_board_mappings WHERE '
@@ -2869,14 +3890,16 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                                 "        raise APIError('開始日期不可晚於結束日期')\n"
                                                                 "    if 'start' in dates:\n"
                                                                 '        '
-                                                                "where.append('julianday(changed_at)>=julianday(?)')\n"
+                                                                "where.append(sql_instant('changed_at') + "
+                                                                "'>=julianday(?)')\n"
                                                                 '        '
                                                                 "args.append(dates['start'].isoformat())\n"
                                                                 "    if 'end' in dates:\n"
                                                                 '        # Inclusive Taipei calendar date; '
                                                                 'avoid overflow on 9999-12-31.\n'
                                                                 '        '
-                                                                "where.append('julianday(changed_at)<julianday(?)+1')\n"
+                                                                "where.append(sql_instant('changed_at') + "
+                                                                "'<julianday(?)+1')\n"
                                                                 '        '
                                                                 "args.append(dates['end'].isoformat())\n"
                                                                 '    with connect(path) as connection:\n'
@@ -2887,8 +3910,9 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                                 '        return paginate(connection, '
                                                                 "'record_change_history', query, "
                                                                 "('serial_no', 'board_name', 'source_table', "
-                                                                "'operation', 'changes'), 'changed_at "
-                                                                "DESC,id DESC', decode, where, args)\n"
+                                                                "'operation', 'changes'), "
+                                                                "sql_instant('changed_at') + ' DESC,id "
+                                                                "DESC', decode, where, args)\n"
                                                                 '\n'
                                                                 '\n'
                                                                 'def statistics(path, query):\n'
@@ -3075,7 +4099,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                                 "identity, 'UPDATE' if old else 'INSERT', "
                                                                 'dict(old) if old else None, after)\n'
                                                                 "        return {'data': after}\n",
-                                                     'sha256': 'a6a3498a201f2a15b49010b951682f8f5e147708e32e5933a27c358c0b6b4197'},
+                                                     'sha256': '86ed0b56c38570801f9d6ad20e6b11e3912f6dedee67f95ca97c1fd96b207917'},
            'company/modules/repairs/schema.sql': {'content': 'CREATE TABLE repair_machine_models (\n'
                                                              '    machine_code TEXT PRIMARY KEY,\n'
                                                              '    model TEXT NOT NULL\n'
@@ -3157,6 +4181,62 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                              'CREATE INDEX record_change_history_time_idx ON '
                                                              'record_change_history(changed_at);\n',
                                                   'sha256': 'c99a96d14cacad1ca3141df2cbd33f382c2bbb98fc3cdd20679e8db2cd5d0879'},
+           'company/modules/repairs/schema_legacy.sql': {'content': 'CREATE TABLE legacy_import_batches (\n'
+                                                                    '    id TEXT PRIMARY KEY, imported_at '
+                                                                    'TEXT NOT NULL, source_description TEXT '
+                                                                    'NOT NULL\n'
+                                                                    ');\n'
+                                                                    'CREATE TABLE legacy_source_files (\n'
+                                                                    '    batch_id TEXT NOT NULL REFERENCES '
+                                                                    'legacy_import_batches(id),\n'
+                                                                    '    filename TEXT NOT NULL, sha256 TEXT '
+                                                                    'NOT NULL, content BLOB NOT NULL,\n'
+                                                                    '    PRIMARY KEY(batch_id, filename)\n'
+                                                                    ');\n'
+                                                                    'CREATE TABLE legacy_source_rows (\n'
+                                                                    '    source_table TEXT NOT NULL, '
+                                                                    'source_key TEXT NOT NULL,\n'
+                                                                    '    batch_id TEXT NOT NULL REFERENCES '
+                                                                    'legacy_import_batches(id),\n'
+                                                                    '    original_json TEXT NOT NULL '
+                                                                    'CHECK(json_valid(original_json)),\n'
+                                                                    '    warnings TEXT NOT NULL '
+                                                                    'CHECK(json_valid(warnings)),\n'
+                                                                    '    PRIMARY KEY(source_table, '
+                                                                    'source_key)\n'
+                                                                    ');\n'
+                                                                    'CREATE TABLE legacy_dbn_records (\n'
+                                                                    '    id TEXT PRIMARY KEY, serial_no TEXT '
+                                                                    'NOT NULL REFERENCES '
+                                                                    'serial_board_mappings(serial_no),\n'
+                                                                    '    machine_code TEXT NOT NULL, model '
+                                                                    'TEXT NOT NULL, board_name TEXT NOT '
+                                                                    'NULL,\n'
+                                                                    '    board_part_code TEXT NOT NULL, '
+                                                                    'customer_code TEXT NOT NULL REFERENCES '
+                                                                    'dbn_customers(customer_code),\n'
+                                                                    '    product_code TEXT, station_code '
+                                                                    'TEXT, issue_type TEXT,\n'
+                                                                    '    dut TEXT, issue_description TEXT, '
+                                                                    'socket_file_id TEXT,\n'
+                                                                    '    dut_pin_snapshot TEXT NOT NULL '
+                                                                    'CHECK(json_valid(dut_pin_snapshot)),\n'
+                                                                    '    version INTEGER NOT NULL DEFAULT 1, '
+                                                                    'created_at TEXT NOT NULL, updated_at '
+                                                                    'TEXT NOT NULL,\n'
+                                                                    '    FOREIGN KEY(customer_code, '
+                                                                    'product_code, station_code)\n'
+                                                                    '      REFERENCES '
+                                                                    'dbn_valid_combinations(customer_code, '
+                                                                    'product_code, station_code)\n'
+                                                                    ');\n'
+                                                                    'CREATE VIEW all_dbn_records AS\n'
+                                                                    '    SELECT *, 0 AS legacy_incomplete '
+                                                                    'FROM dbn_records\n'
+                                                                    '    UNION ALL SELECT *, 1 AS '
+                                                                    'legacy_incomplete FROM '
+                                                                    'legacy_dbn_records;\n',
+                                                         'sha256': 'dfc80b185bd5d35b8746d5bded658787d5de0716688b662d2044fd3642004adc'},
            'company/modules/repairs/schema_v2.sql': {'content': 'ALTER TABLE serial_board_mappings ADD '
                                                                 'COLUMN version INTEGER NOT NULL DEFAULT 1;\n'
                                                                 'CREATE TABLE dbn_customers (customer_code '
@@ -3226,7 +4306,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                              'from datetime import date\n'
                                                              'from uuid import uuid4\n'
                                                              '\n'
-                                                             'from database import connect, utc_now\n'
+                                                             'from database import connect, sql_instant, '
+                                                             'utc_now\n'
                                                              'from errors import APIError\n'
                                                              '\n'
                                                              'ACTIVE_STATUSES = ("待送修", "已送修", "取回驗證")\n'
@@ -3378,14 +4459,16 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                              '// 20))\n'
                                                              '        rows = connection.execute("SELECT * '
                                                              'FROM repair_records" + condition + " ORDER BY '
-                                                             'occurred_on DESC, julianday(created_at) DESC, '
-                                                             'id LIMIT 20 OFFSET ?",\n'
+                                                             'occurred_on DESC, " + '
+                                                             'sql_instant(\'created_at\') + " DESC, id LIMIT '
+                                                             '20 OFFSET ?",\n'
                                                              '                                  [*arguments, '
                                                              '(page - 1) * 20]).fetchall()\n'
                                                              '        data = []\n'
                                                              '        for row in rows:\n'
                                                              "            count = connection.execute('SELECT "
-                                                             "count(*) FROM dbn_records WHERE serial_no=?', "
+                                                             'count(*) FROM all_dbn_records WHERE '
+                                                             "serial_no=?', "
                                                              "(row['serial_no'],)).fetchone()[0]\n"
                                                              '            data.append({**public_record(row), '
                                                              "'dbn_count': count})\n"
@@ -3401,10 +4484,21 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                              '(record_id,)).fetchone()\n'
                                                              '        if not row:\n'
                                                              '            raise APIError("找不到送修紀錄", 404)\n'
-                                                             '        return {"data": public_record(row)}\n'
+                                                             '        result = public_record(row)\n'
+                                                             '        source = connection.execute("SELECT '
+                                                             'original_json,warnings FROM legacy_source_rows '
+                                                             "WHERE source_table='repair_records' AND "
+                                                             'source_key=?", (record_id,)).fetchone()\n'
+                                                             '        if source:\n'
+                                                             "            result['legacy_source'] = "
+                                                             "json.loads(source['original_json'])\n"
+                                                             "            result['legacy_warnings'] = "
+                                                             "json.loads(source['warnings'])\n"
+                                                             '        return {"data": result}\n'
                                                              '\n'
                                                              '\n'
-                                                             'def validate(connection, payload):\n'
+                                                             'def validate(connection, payload, '
+                                                             'historical=False):\n'
                                                              '    if set(payload) - FIELDS:\n'
                                                              '        raise APIError("包含不支援的欄位，請重新載入頁面")\n'
                                                              '    result = {}\n'
@@ -3463,10 +4557,12 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                              '    if result["current_status"] == "取回驗證" and '
                                                              'not result["returned_on"]:\n'
                                                              '        raise APIError("取回驗證必須填回修日期")\n'
-                                                             '    if result["sent_on"] and result["sent_on"] '
-                                                             '< result["occurred_on"]:\n'
+                                                             '    if not historical and result["sent_on"] '
+                                                             'and result["sent_on"] < '
+                                                             'result["occurred_on"]:\n'
                                                              '        raise APIError("送修日期不得早於損壞日期")\n'
-                                                             '    if result["returned_on"] and (not '
+                                                             '    if not historical and '
+                                                             'result["returned_on"] and (not '
                                                              'result["sent_on"] or result["returned_on"] < '
                                                              'result["sent_on"]):\n'
                                                              '        raise '
@@ -3637,8 +4733,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                              '        rows = connection.execute("SELECT * '
                                                              'FROM record_change_history WHERE '
                                                              "source_table='repair_records' AND record_id=? "
-                                                             'ORDER BY changed_at DESC, id DESC", '
-                                                             '(record_id,))\n'
+                                                             'ORDER BY " + sql_instant(\'changed_at\') + " '
+                                                             'DESC, id DESC", (record_id,))\n'
                                                              '        result = []\n'
                                                              '        for row in rows:\n'
                                                              '            entry = dict(row)\n'
@@ -3646,7 +4742,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                              'json.loads(entry["changes"])\n'
                                                              '            result.append(entry)\n'
                                                              '        return {"data": result}\n',
-                                                  'sha256': '588df60ee090d3a8b19cce80a077ef884d13cea3b05d0bc90d0e56749d4a65f7'},
+                                                  'sha256': '935c02213097d12181e5c4299baf46ece2bf953449e56642a926c1444c0cdec0'},
            'company/server.py': {'content': '"""Local SPMS service. Python standard library only; no cloud '
                                             'connections."""\n'
                                             '\n'
@@ -3662,6 +4758,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '\n'
                                             'from database import migrate\n'
                                             'from errors import APIError\n'
+                                            'from edit_access import EditGate\n'
                                             'from modules.repairs import service as repairs\n'
                                             'from modules.repairs import operations\n'
                                             '\n'
@@ -3725,7 +4822,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '            "initialized_at": created_at,\n'
                                             '            "phase": 3,\n'
                                             '            "access": "localhost-only",\n'
-                                            '            "modules": {"repairs": 2, "machines": None},\n'
+                                            '            "modules": {"repairs": 2, "legacy_import": 1, '
+                                            '"machines": None},\n'
                                             '        }\n'
                                             '\n'
                                             '\n'
@@ -3734,6 +4832,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '\n'
                                             '    def __init__(self, address, database):\n'
                                             '        self.database = database\n'
+                                            '        self.edit_gate = EditGate(Path(database).parent / '
+                                            "'edit-password.json')\n"
                                             '        super().__init__(address, Handler)\n'
                                             '\n'
                                             '\n'
@@ -3806,7 +4906,9 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '        elif path.startswith("/api/"):\n'
                                             '            try:\n'
                                             '                query = parse_qs(parsed.query)\n'
-                                            '                if path == "/api/modules":\n'
+                                            "                if path == '/api/edit/status':\n"
+                                            '                    payload = self.server.edit_gate.status()\n'
+                                            '                elif path == "/api/modules":\n'
                                             '                    payload = {"repairs": {"installed": True, '
                                             '"url": "/repairs/", "stage": "local-feature-validation"},\n'
                                             '                               "machines": {"installed": False, '
@@ -3943,6 +5045,21 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '            if not isinstance(payload, dict):\n'
                                             '                raise APIError("JSON 須為物件")\n'
                                             '            path = urlsplit(self.path).path\n'
+                                            "            if path == '/api/edit/unlock' and self.command == "
+                                            "'POST':\n"
+                                            "                operations.keys(payload, ('password',))\n"
+                                            '                self.send_json(200, '
+                                            "self.server.edit_gate.unlock(payload.get('password')))\n"
+                                            '                return\n'
+                                            "            if path == '/api/edit/lock' and self.command == "
+                                            "'POST':\n"
+                                            '                operations.keys(payload, ())\n'
+                                            '                '
+                                            "self.server.edit_gate.revoke(self.headers.get('X-SPMS-Edit-Token'))\n"
+                                            "                self.send_json(200, {'locked': True})\n"
+                                            '                return\n'
+                                            '            '
+                                            "self.server.edit_gate.require(self.headers.get('X-SPMS-Edit-Token'))\n"
                                             '            parts = '
                                             "path.removeprefix('/api/repairs/').split('/') if "
                                             "path.startswith('/api/repairs/') else []\n"
@@ -4020,7 +5137,161 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '\n'
                                             'if __name__ == "__main__":\n'
                                             '    main()\n',
-                                 'sha256': '0a40557b2e94fb30ef3f0a476d2eaf1a651e2d10fa74d4b127cd9d8afccd5bf5'},
+                                 'sha256': '6422b331c2678f861e4512db779d9af7416bdaa8b99829292771e251454502f6'},
+           'company/test_edit_access.py': {'content': 'import json\n'
+                                                      'import tempfile\n'
+                                                      'import time\n'
+                                                      'import unittest\n'
+                                                      'from pathlib import Path\n'
+                                                      'from urllib.error import HTTPError\n'
+                                                      'from urllib.request import Request, urlopen\n'
+                                                      'from unittest.mock import patch\n'
+                                                      '\n'
+                                                      'from edit_access import EditGate, configure\n'
+                                                      'from errors import APIError\n'
+                                                      'import test_server as basic\n'
+                                                      'from test_repairs import example\n'
+                                                      '\n'
+                                                      '\n'
+                                                      'class EditGateTests(unittest.TestCase):\n'
+                                                      '    def setUp(self):\n'
+                                                      '        directory = tempfile.TemporaryDirectory()\n'
+                                                      '        self.addCleanup(directory.cleanup)\n'
+                                                      '        self.path = Path(directory.name) / '
+                                                      "'edit-password.json'\n"
+                                                      '        self.gate = EditGate(self.path)\n'
+                                                      '\n'
+                                                      '    def '
+                                                      'test_unconfigured_is_readonly_and_hash_only_config(self):\n'
+                                                      '        '
+                                                      "self.assertFalse(self.gate.status()['configured'])\n"
+                                                      '        with self.assertRaises(APIError):\n'
+                                                      "            self.gate.unlock('test')\n"
+                                                      "        configure(self.path, 'shared-test-password')\n"
+                                                      "        self.assertNotIn('shared-test-password', "
+                                                      'self.path.read_text())\n'
+                                                      '        '
+                                                      "self.assertTrue(self.gate.status()['configured'])\n"
+                                                      '\n'
+                                                      '    def '
+                                                      'test_bad_password_expiry_revoke_and_restart(self):\n'
+                                                      "        configure(self.path, 'shared-test-password')\n"
+                                                      '        with self.assertRaises(APIError):\n'
+                                                      "            self.gate.unlock('wrong')\n"
+                                                      '        token = '
+                                                      "self.gate.unlock('shared-test-password')['token']\n"
+                                                      '        self.gate.require(token)\n'
+                                                      '        self.gate.revoke(token)\n'
+                                                      '        with self.assertRaises(APIError):\n'
+                                                      '            self.gate.require(token)\n'
+                                                      '        token = '
+                                                      "self.gate.unlock('shared-test-password')['token']\n"
+                                                      '        with self.assertRaises(APIError):\n'
+                                                      '            EditGate(self.path).require(token)\n'
+                                                      "        with patch('edit_access.time.monotonic', "
+                                                      'return_value=time.monotonic() + 9 * 3600):\n'
+                                                      '            with self.assertRaises(APIError):\n'
+                                                      '                self.gate.require(token)\n'
+                                                      '\n'
+                                                      '    def '
+                                                      'test_password_rotation_and_corruption_fail_closed(self):\n'
+                                                      "        configure(self.path, 'old')\n"
+                                                      "        token = self.gate.unlock('old')['token']\n"
+                                                      "        configure(self.path, 'new')\n"
+                                                      '        with self.assertRaises(APIError):\n'
+                                                      '            self.gate.require(token)\n'
+                                                      "        self.path.write_text('{bad')\n"
+                                                      '        with self.assertRaises(APIError):\n'
+                                                      "            self.gate.unlock('new')\n"
+                                                      '\n'
+                                                      '    def test_attempt_cooldown(self):\n'
+                                                      "        configure(self.path, 'test')\n"
+                                                      '        for _ in range(5):\n'
+                                                      '            with self.assertRaises(APIError):\n'
+                                                      "                self.gate.unlock('wrong')\n"
+                                                      '        with self.assertRaises(APIError) as caught:\n'
+                                                      "            self.gate.unlock('test')\n"
+                                                      '        self.assertEqual(caught.exception.status, '
+                                                      '429)\n'
+                                                      "        with patch('edit_access.time.monotonic', "
+                                                      'return_value=time.monotonic() + 31):\n'
+                                                      '            '
+                                                      "self.gate.require(self.gate.unlock('test')['token'])\n"
+                                                      '\n'
+                                                      '\n'
+                                                      'class EditHTTPTests(unittest.TestCase):\n'
+                                                      '    setUp = basic.LocalServiceTests.setUp\n'
+                                                      '\n'
+                                                      "    def request(self, path, method='GET', "
+                                                      'payload=None, token=None, headers=None):\n'
+                                                      "        values = {'Content-Type':'application/json', "
+                                                      "'X-SPMS-Request':'1'}\n"
+                                                      '        if token:\n'
+                                                      "            values['X-SPMS-Edit-Token'] = token\n"
+                                                      '        values.update(headers or {})\n'
+                                                      '        body = json.dumps(payload).encode() if '
+                                                      'payload is not None else None\n'
+                                                      '        with urlopen(Request(self.base + path, '
+                                                      'data=body, method=method, headers=values), timeout=5) '
+                                                      'as response:\n'
+                                                      '            return json.load(response)\n'
+                                                      '\n'
+                                                      '    def '
+                                                      'test_all_mutations_denied_without_token_but_reads_work(self):\n'
+                                                      '        '
+                                                      "self.assertFalse(self.request('/api/edit/status')['configured'])\n"
+                                                      '        '
+                                                      "self.assertEqual(self.request('/api/repairs/records')['total'], "
+                                                      '0)\n'
+                                                      '        endpoints = '
+                                                      "[('/api/repairs/records','POST'),('/api/repairs/records/test','PUT'),\n"
+                                                      '                     '
+                                                      "('/api/repairs/records/test','DELETE'),('/api/repairs/dbn','POST'),('/api/repairs/dbn/test','PUT'),\n"
+                                                      '                     '
+                                                      "('/api/repairs/dbn/test','DELETE'),('/api/repairs/records/test/resolve','POST'),\n"
+                                                      '                     '
+                                                      "('/api/repairs/records/test/attachment','POST'),('/api/repairs/attachments/test','DELETE'),\n"
+                                                      '                     '
+                                                      "('/api/repairs/mappings','POST'),('/api/repairs/masters','POST')]\n"
+                                                      '        for path, method in endpoints:\n'
+                                                      '            with self.subTest(path=path, '
+                                                      'method=method), self.assertRaises(HTTPError) as '
+                                                      'caught:\n'
+                                                      '                self.request(path, method, {})\n'
+                                                      '            self.assertEqual(caught.exception.code, '
+                                                      '401)\n'
+                                                      '            caught.exception.close()\n'
+                                                      '\n'
+                                                      '    def '
+                                                      'test_unlock_write_lock_and_config_not_served(self):\n'
+                                                      '        configure(self.database.parent / '
+                                                      "'edit-password.json', 'http-test')\n"
+                                                      '        with self.assertRaises(HTTPError) as caught:\n'
+                                                      '            '
+                                                      "self.request('/api/edit/unlock','POST',{'password':'http-test'},headers={'Origin':'http://evil.example'})\n"
+                                                      '        self.assertEqual(caught.exception.code,403)\n'
+                                                      '        caught.exception.close()\n'
+                                                      '        token = '
+                                                      "self.request('/api/edit/unlock','POST',{'password':'http-test'})['token']\n"
+                                                      '        '
+                                                      "self.assertTrue(self.request('/api/repairs/records','POST',example(),token)['data'])\n"
+                                                      '        '
+                                                      "self.request('/api/edit/lock','POST',{},token)\n"
+                                                      "        for value in (token, 'forged'):\n"
+                                                      '            with self.assertRaises(HTTPError) as '
+                                                      'caught:\n'
+                                                      '                '
+                                                      "self.request('/api/repairs/records','POST',example(),value)\n"
+                                                      '            '
+                                                      'self.assertEqual(caught.exception.code,401)\n'
+                                                      '            caught.exception.close()\n'
+                                                      '        with self.assertRaises(HTTPError) as caught:\n'
+                                                      "            self.request('/data/edit-password.json')\n"
+                                                      '        self.assertEqual(caught.exception.code,404)\n'
+                                                      '        caught.exception.close()\n'
+                                                      "        self.assertNotIn('digest', "
+                                                      "self.request('/api/edit/status'))\n",
+                                           'sha256': '3135a482d70bc78aa137438f7fa374c3a7096a54bff4de5810fd1ed40394fc1f'},
            'company/test_features.py': {'content': 'import base64\n'
                                                    'import concurrent.futures\n'
                                                    'import json\n'
@@ -4994,6 +6265,343 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                       "if __name__ == '__main__':\n"
                                                       '    unittest.main()\n',
                                            'sha256': '8eb001c16c15aa65463a04b789a0f6171abe9b73d858c75d559ceaee60718553'},
+           'company/test_legacy_import.py': {'content': 'import csv\n'
+                                                        'import io\n'
+                                                        'import json\n'
+                                                        'import sqlite3\n'
+                                                        'import subprocess\n'
+                                                        'import sys\n'
+                                                        'import tempfile\n'
+                                                        'import unittest\n'
+                                                        'from pathlib import Path\n'
+                                                        '\n'
+                                                        'import legacy_import as legacy\n'
+                                                        'from database import connect\n'
+                                                        'from errors import APIError\n'
+                                                        'from maintenance import snapshot, verify\n'
+                                                        'from modules.repairs import operations as ops, '
+                                                        'service\n'
+                                                        'from server import initialize_database\n'
+                                                        'from test_repairs import example\n'
+                                                        '\n'
+                                                        '\n'
+                                                        'def fixture():\n'
+                                                        '    tables = {name: [] for name in legacy.TABLES}\n'
+                                                        '    repair = example()\n'
+                                                        "    repair.update(id='source-repair', "
+                                                        "model='T5377S', version='7', "
+                                                        "repair_amount='123.45',\n"
+                                                        "                  closed_on='', "
+                                                        "retry_of_record_id='', created_at='2026-10-01 "
+                                                        "01:00:00+00', updated_at='2026-10-02 02:00:00+00',\n"
+                                                        "                  legacy_extra='retain me', "
+                                                        "is_opened='true')\n"
+                                                        "    repair['sent_on'] = repair.get('sent_on') or "
+                                                        "''\n"
+                                                        "    repair['returned_on'] = "
+                                                        "repair.get('returned_on') or ''\n"
+                                                        "    tables['repair_records'] = [repair]\n"
+                                                        "    tables['serial_board_mappings'] = "
+                                                        "[dict(serial_no=repair['serial_no'],board_name=repair['description'],board_part_code=repair['board_part_code'],updated_at='2026-10-02T00:00:00Z')]\n"
+                                                        "    tables['dbn_records'] = [dict(id='source-dbn', "
+                                                        "serial_no=repair['serial_no'], "
+                                                        "machine_code='F45',model='T5377S',board_name=repair['description'],board_part_code=repair['board_part_code'],customer_code='AB',product_code='JAA118',station_code='CP1',issue_type='',dut='',issue_description='',socket_file_id='',dut_pin_snapshot='{}',created_at='2026-10-02 "
+                                                        "00:00:00+00')]\n"
+                                                        "    content = b'original bytes\\r\\n<not html>'\n"
+                                                        "    tables['repair_attachments'] = "
+                                                        "[dict(id='source-attachment',repair_record_id='source-repair',storage_path='source-repair/file.asc',filename='same-name.asc',file_size=str(len(content)),content_type='text/plain',created_at='2026-10-02T00:00:00Z')]\n"
+                                                        "    tables['record_change_history'] = "
+                                                        "[dict(id='1',changed_at='2026-10-02 "
+                                                        "01:00:00+00',source_table='repair_records',record_key='deleted-old-record',operation='DELETE',serial_no=repair['serial_no'],board_name=repair['description'],changes=json.dumps({'failure_description':{'old':'source','new':None}}),search_text='original "
+                                                        "search',dbn_before='',dbn_after='')]\n"
+                                                        '    return tables, content\n'
+                                                        '\n'
+                                                        '\n'
+                                                        'def bundle(tables, content):\n'
+                                                        '    files = {}\n'
+                                                        '    for table, rows in tables.items():\n'
+                                                        "        buffer = io.StringIO(newline='')\n"
+                                                        '        writer = csv.DictWriter(buffer, '
+                                                        "fieldnames=list(rows[0]) if rows else ['id'])\n"
+                                                        '        writer.writeheader()\n'
+                                                        '        writer.writerows(rows)\n'
+                                                        '        files[table] = '
+                                                        "legacy.encoded(buffer.getvalue().encode('utf-8-sig'))\n"
+                                                        '    return dict(format=legacy.FORMAT, '
+                                                        "source_description='synthetic fixture, not company "
+                                                        "data', source_files=files,\n"
+                                                        '                '
+                                                        "attachments={'source-repair/file.asc':legacy.encoded(content)})\n"
+                                                        '\n'
+                                                        '\n'
+                                                        'class LegacyImportTests(unittest.TestCase):\n'
+                                                        '    def setUp(self):\n'
+                                                        '        directory = tempfile.TemporaryDirectory()\n'
+                                                        '        self.addCleanup(directory.cleanup)\n'
+                                                        '        self.path = Path(directory.name) / '
+                                                        "'spms.sqlite3'\n"
+                                                        '        initialize_database(self.path)\n'
+                                                        '        self.tables, self.content = fixture()\n'
+                                                        '\n'
+                                                        '    def package(self):\n'
+                                                        '        return bundle(self.tables, self.content)\n'
+                                                        '\n'
+                                                        '    def '
+                                                        'test_preview_unchanged_apply_preserves_source_and_business_snapshots(self):\n'
+                                                        '        package = self.package()\n'
+                                                        '        preview = legacy.check(self.path, package)\n'
+                                                        "        self.assertEqual(preview['incomplete_dbn'], "
+                                                        '1)\n'
+                                                        '        '
+                                                        "self.assertEqual(service.list_records(self.path,{})['total'], "
+                                                        '0)\n'
+                                                        '        applied = legacy.apply(self.path, package)\n'
+                                                        '        '
+                                                        "self.assertTrue(Path(applied['backup']).is_file())\n"
+                                                        '        record = '
+                                                        "service.record_detail(self.path,'source-repair')['data']\n"
+                                                        '        '
+                                                        "self.assertEqual(record['repair_amount'],123.45)\n"
+                                                        "        self.assertEqual(record['version'],7)\n"
+                                                        '        '
+                                                        "self.assertEqual(record['created_at'],self.tables['repair_records'][0]['created_at'])\n"
+                                                        '        '
+                                                        "self.assertEqual(record['legacy_source']['legacy_extra'],'retain "
+                                                        "me')\n"
+                                                        '        '
+                                                        "self.assertEqual(ops.list_dbn(self.path,{})['total'],1)\n"
+                                                        '        '
+                                                        "self.assertIsNone(ops.list_dbn(self.path,{})['data'][0]['issue_type'])\n"
+                                                        '        with connect(self.path) as c:\n'
+                                                        '            saved = c.execute("SELECT * FROM '
+                                                        'repair_attachments WHERE '
+                                                        'id=\'source-attachment\'").fetchone()\n'
+                                                        "            self.assertEqual(saved['content'], "
+                                                        'self.content)\n'
+                                                        "            self.assertEqual(c.execute('SELECT "
+                                                        'count(*) FROM '
+                                                        "legacy_source_files').fetchone()[0],13)\n"
+                                                        '            self.assertEqual(c.execute("SELECT '
+                                                        'record_id FROM record_change_history WHERE id LIKE '
+                                                        '\'legacy-%\'").fetchone()[0],\'deleted-old-record\')\n'
+                                                        '        '
+                                                        "self.assertEqual(verify(self.path)['dbn_records'],1)\n"
+                                                        '        '
+                                                        "filtered=ops.history(self.path,{'start':['2026-10-02'],'end':['2026-10-02'],'operation':['DELETE']})\n"
+                                                        "        self.assertEqual(filtered['total'],1)\n"
+                                                        '        '
+                                                        "self.assertTrue(filtered['data'][0]['id'].startswith('legacy-'))\n"
+                                                        '        with '
+                                                        'self.assertRaises((ValueError,sqlite3.IntegrityError)):\n'
+                                                        '            legacy.apply(self.path, package)\n'
+                                                        '        '
+                                                        "self.assertEqual(verify(self.path)['repair_records'],1)\n"
+                                                        '\n'
+                                                        '    def '
+                                                        'test_date_anomaly_preserved_but_resolution_blocked(self):\n'
+                                                        "        row = self.tables['repair_records'][0]\n"
+                                                        '        '
+                                                        "row.update(current_status='取回驗證',occurred_on='2026-09-01',sent_on='2026-09-20',returned_on='2026-09-10')\n"
+                                                        '        legacy.apply(self.path,self.package())\n'
+                                                        '        record = '
+                                                        "service.record_detail(self.path,'source-repair')['data']\n"
+                                                        "        self.assertTrue(record['legacy_warnings'])\n"
+                                                        '        '
+                                                        "self.assertEqual(record['returned_on'],'2026-09-10')\n"
+                                                        '        with self.assertRaises(APIError):\n'
+                                                        '            '
+                                                        "ops.resolve(self.path,'source-repair',dict(expected_version=7,passed=True))\n"
+                                                        '        '
+                                                        "self.assertEqual(service.record_detail(self.path,'source-repair')['data']['current_status'],'取回驗證')\n"
+                                                        '\n'
+                                                        '    def '
+                                                        'test_legacy_dbn_requires_explicit_type_then_promotes_and_keeps_original(self):\n'
+                                                        '        legacy.apply(self.path,self.package())\n'
+                                                        "        row = self.tables['dbn_records'][0]\n"
+                                                        '        payload = {k:row[k] for k in '
+                                                        "('serial_no','machine_code','board_name','board_part_code','customer_code','product_code','station_code','issue_type','dut','issue_description')}\n"
+                                                        '        with self.assertRaises(APIError):\n'
+                                                        '            '
+                                                        "ops.save_dbn(self.path,dict(payload,expected_version=1),'source-dbn')\n"
+                                                        '        saved = '
+                                                        "ops.save_dbn(self.path,dict(payload,issue_type='RTE',issue_description='explicit "
+                                                        'reviewed '
+                                                        "description',expected_version=1),'source-dbn')['data']\n"
+                                                        "        self.assertEqual(saved['version'],2)\n"
+                                                        "        self.assertEqual(saved['id'],'source-dbn')\n"
+                                                        '        '
+                                                        "self.assertEqual(ops.list_dbn(self.path,{})['data'][0]['legacy_incomplete'],0)\n"
+                                                        '        with connect(self.path) as c:\n'
+                                                        "            self.assertEqual(c.execute('SELECT "
+                                                        'count(*) FROM '
+                                                        "legacy_dbn_records').fetchone()[0],0)\n"
+                                                        '            raw=c.execute("SELECT original_json '
+                                                        'FROM legacy_source_rows WHERE '
+                                                        'source_table=\'dbn_records\'").fetchone()[0]\n'
+                                                        '            '
+                                                        "self.assertEqual(json.loads(raw)['issue_type'],'')\n"
+                                                        '\n'
+                                                        '    def '
+                                                        'test_pin_snapshot_not_recomputed_and_mapping_preview_covers_legacy(self):\n'
+                                                        '        '
+                                                        "self.tables['dbn_records'].append(dict(self.tables['dbn_records'][0],id='typed-dbn',issue_type='Group',dut='1-2',dut_pin_snapshot=json.dumps({'1':['HISTORICAL'],'2':None})))\n"
+                                                        '        legacy.apply(self.path,self.package())\n'
+                                                        '        result=ops.list_dbn(self.path,{})\n'
+                                                        "        self.assertEqual(result['total'],2)\n"
+                                                        '        self.assertEqual(next(x for x in '
+                                                        "result['data'] if "
+                                                        "x['id']=='typed-dbn')['dut_pin_snapshot'],{'1':['HISTORICAL'],'2':None})\n"
+                                                        '        '
+                                                        "mapping=self.tables['serial_board_mappings'][0]\n"
+                                                        '        '
+                                                        "impact=ops.preview_mapping(self.path,dict(serial_no=mapping['serial_no'],board_name=mapping['board_name'],board_part_code='new-part'))\n"
+                                                        "        self.assertEqual(impact['dbn_count'],2)\n"
+                                                        '\n'
+                                                        '    def '
+                                                        'test_corrupt_missing_attachments_and_conflicts_rollback_everything(self):\n'
+                                                        '        package=self.package()\n'
+                                                        '        '
+                                                        "package['attachments']['source-repair/file.asc']['sha256']='0'*64\n"
+                                                        '        with self.assertRaises(ValueError): '
+                                                        'legacy.apply(self.path,package)\n'
+                                                        '        '
+                                                        "self.assertEqual(verify(self.path)['repair_records'],0)\n"
+                                                        '        '
+                                                        "self.assertEqual(ops.list_mappings(self.path,{})['total'],0)\n"
+                                                        '        with connect(self.path) as c:\n'
+                                                        "            self.assertEqual(c.execute('SELECT "
+                                                        'count(*) FROM '
+                                                        "legacy_import_batches').fetchone()[0],0)\n"
+                                                        '        package=self.package(); '
+                                                        "package['attachments'].clear()\n"
+                                                        '        with self.assertRaises(ValueError): '
+                                                        'legacy.check(self.path,package)\n'
+                                                        '        '
+                                                        "self.tables['repair_machine_models']=[dict(machine_code='F45',model='CONFLICT')]\n"
+                                                        '        with self.assertRaises(ValueError): '
+                                                        'legacy.apply(self.path,self.package())\n'
+                                                        '        '
+                                                        "self.assertEqual(verify(self.path)['repair_records'],0)\n"
+                                                        '\n'
+                                                        '    def '
+                                                        'test_source_archive_integrity_and_backup_includes_legacy(self):\n'
+                                                        '        legacy.apply(self.path,self.package())\n'
+                                                        '        '
+                                                        "target=self.path.with_name('backup.sqlite3')\n"
+                                                        '        snapshot(self.path,target)\n'
+                                                        '        '
+                                                        "self.assertEqual(verify(target)['dbn_records'],1)\n"
+                                                        '        with connect(target) as c:\n'
+                                                        '            c.execute("UPDATE legacy_source_files '
+                                                        "SET content=X'00' WHERE "
+                                                        'filename=\'repair_records_rows.csv\'")\n'
+                                                        '        with self.assertRaises(ValueError): '
+                                                        'verify(target)\n'
+                                                        '\n'
+                                                        '    def '
+                                                        'test_same_original_filename_different_cases_remains_separate(self):\n'
+                                                        '        '
+                                                        "other=dict(self.tables['repair_records'][0],id='source-other')\n"
+                                                        '        '
+                                                        "self.tables['repair_records'].append(other)\n"
+                                                        '        '
+                                                        "self.tables['repair_attachments'].append(dict(self.tables['repair_attachments'][0],id='other-attachment',repair_record_id='source-other',storage_path='source-other/file.asc',file_size='5'))\n"
+                                                        '        package=self.package(); '
+                                                        "package['attachments']['source-other/file.asc']=legacy.encoded(b'other')\n"
+                                                        '        legacy.apply(self.path,package)\n'
+                                                        '        with connect(self.path) as c:\n'
+                                                        "            rows=c.execute('SELECT filename,content "
+                                                        "FROM repair_attachments').fetchall()\n"
+                                                        '            self.assertEqual(len(rows),2)\n'
+                                                        "            self.assertEqual({r['content'] for r in "
+                                                        "rows},{self.content,b'other'})\n"
+                                                        '\n'
+                                                        '    def '
+                                                        'test_source_retry_chronology_is_flagged_without_rewriting(self):\n'
+                                                        "        parent=self.tables['repair_records'][0]\n"
+                                                        '        '
+                                                        "parent.update(current_status='結案（FAIL）',occurred_on='2026-05-01',sent_on='2026-05-02',returned_on='2026-05-03',closed_on='2026-10-01')\n"
+                                                        '        '
+                                                        "retry=dict(parent,id='source-retry',current_status='待送修',occurred_on='2026-07-01',sent_on='',returned_on='',closed_on='',retry_of_record_id=parent['id'])\n"
+                                                        '        '
+                                                        "self.tables['repair_records'].append(retry)\n"
+                                                        '        '
+                                                        'result=legacy.apply(self.path,self.package())\n'
+                                                        '        '
+                                                        "self.assertEqual(result['operational_repairs'],2)\n"
+                                                        '        '
+                                                        "record=service.record_detail(self.path,'source-retry')['data']\n"
+                                                        '        '
+                                                        "self.assertEqual(record['occurred_on'],'2026-07-01')\n"
+                                                        "        self.assertTrue(any('前輪結案' in warning for "
+                                                        "warning in record['legacy_warnings']))\n"
+                                                        '        '
+                                                        "self.assertEqual(len(ops.chain(self.path,'source-retry')['data']),2)\n"
+                                                        '\n'
+                                                        '    def '
+                                                        'test_postgres_short_offset_sorts_by_instant_and_null_zero_amounts_stay_distinct(self):\n'
+                                                        '        '
+                                                        "self.tables['repair_records'][0].update(repair_amount='',created_at='2026-10-01 "
+                                                        "10:00:00+08')\n"
+                                                        '        '
+                                                        "self.tables['repair_records'].append(dict(self.tables['repair_records'][0],id='later',repair_amount='0.00',created_at='2026-10-01 "
+                                                        "03:00:00+00'))\n"
+                                                        '        legacy.apply(self.path,self.package())\n'
+                                                        '        '
+                                                        "records=service.list_records(self.path,{})['data']\n"
+                                                        "        self.assertEqual(records[0]['id'],'later')\n"
+                                                        '        '
+                                                        "self.assertEqual(records[0]['repair_amount'],0)\n"
+                                                        '        '
+                                                        "self.assertIsNone(records[1]['repair_amount'])\n"
+                                                        '\n'
+                                                        '    def '
+                                                        'test_cli_preview_and_cancel_never_import(self):\n'
+                                                        '        path=self.path.parent / '
+                                                        "'source_bundle.json'\n"
+                                                        '        '
+                                                        "path.write_text(json.dumps(self.package()),encoding='utf-8')\n"
+                                                        '        script=Path(legacy.__file__)\n'
+                                                        "        for flags, answer, expected in (([], '', "
+                                                        "'CHECK ONLY'),(['--apply'],'NO\\n','Cancelled')):\n"
+                                                        '            '
+                                                        "completed=subprocess.run([sys.executable,str(script),'import',str(path),'--database',str(self.path),*flags],input=answer,text=True,capture_output=True,timeout=20)\n"
+                                                        '            '
+                                                        'self.assertEqual(completed.returncode,0,completed.stdout+completed.stderr)\n'
+                                                        '            '
+                                                        'self.assertIn(expected,completed.stdout)\n'
+                                                        '            '
+                                                        "self.assertEqual(verify(self.path)['repair_records'],0)\n"
+                                                        '\n'
+                                                        '    def '
+                                                        'test_additive_upgrade_from_existing_v2_keeps_business_data(self):\n'
+                                                        '        # Temporary test fixture only: simulate an '
+                                                        'installation predating the archive module.\n'
+                                                        '        service.save_record(self.path,example())\n'
+                                                        '        with connect(self.path) as c:\n'
+                                                        "            c.execute('DROP VIEW all_dbn_records')\n"
+                                                        '            for table in '
+                                                        "('legacy_dbn_records','legacy_source_rows','legacy_source_files','legacy_import_batches'):\n"
+                                                        "                c.execute('DROP TABLE '+table)\n"
+                                                        '            c.execute("DELETE FROM '
+                                                        'spms_module_migrations WHERE '
+                                                        'module=\'legacy_import\'")\n'
+                                                        '        initialize_database(self.path)\n'
+                                                        '        '
+                                                        "self.assertEqual(service.list_records(self.path,{})['total'],1)\n"
+                                                        '        '
+                                                        "backups=list((self.path.parent/'backups').glob('*.sqlite3'))\n"
+                                                        '        self.assertEqual(len(backups),1)\n'
+                                                        '        '
+                                                        "self.assertEqual(verify(backups[0])['repair_records'],1)\n"
+                                                        '        initialize_database(self.path)\n'
+                                                        '        '
+                                                        "self.assertEqual(len(list((self.path.parent/'backups').glob('*.sqlite3'))),1)\n"
+                                                        '\n'
+                                                        '\n'
+                                                        "if __name__ == '__main__':\n"
+                                                        '    unittest.main()\n',
+                                             'sha256': '13485398962103c61a05c30fea3639d3b6fac1f0a9d129aa293225c3206eb614'},
            'company/test_repairs.py': {'content': 'import concurrent.futures\n'
                                                   'import json\n'
                                                   'import sqlite3\n'
@@ -5257,6 +6865,11 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   '        initialize_database(self.path)\n'
                                                   '        self.server = LocalServer(("127.0.0.1", 0), '
                                                   'self.path)\n'
+                                                  '        from edit_access import configure\n'
+                                                  '        configure(self.path.parent / '
+                                                  "'edit-password.json', 'test-only-password')\n"
+                                                  '        self.edit_token = '
+                                                  "self.server.edit_gate.unlock('test-only-password')['token']\n"
                                                   '        thread = '
                                                   'threading.Thread(target=self.server.serve_forever, '
                                                   'daemon=True)\n'
@@ -5270,7 +6883,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   '    def request(self, path, method="GET", payload=None, '
                                                   'headers=None):\n'
                                                   '        defaults = {"Content-Type": "application/json", '
-                                                  '"X-SPMS-Request": "1"}\n'
+                                                  '"X-SPMS-Request": "1", "X-SPMS-Edit-Token": '
+                                                  'self.edit_token}\n'
                                                   '        defaults.update(headers or {})\n'
                                                   '        body = json.dumps(payload).encode() if payload is '
                                                   'not None else None\n'
@@ -5337,7 +6951,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   '\n'
                                                   'if __name__ == "__main__":\n'
                                                   '    unittest.main()\n',
-                                       'sha256': 'a473c25f9510d26909ca374481ab4d3549dfefcf0bf288fdeb405dd801ade285'},
+                                       'sha256': '9e6920a9091de9a160de9a4142162060793042c1fc121026d1eaafb1b2bf80dd'},
            'company/test_server.py': {'content': 'import concurrent.futures\n'
                                                  'import json\n'
                                                  'import sqlite3\n'
@@ -5532,8 +7146,9 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   "masters:'機台／板件／價格對應'};\n"
                                                   "const operationsDialog = byId('operations-modal');\n"
                                                   "const descriptions = {dbn:'DBN 紀錄獨立於送修案件；DUT／PIN "
-                                                  "保存當時快照。', mappings:'主檔只保存 S/N、板名與 PN；歷史同步須先預覽及確認，不重算金額。', "
-                                                  "history:'本機異動紀錄；尚未登入，這不是具名操作人員稽核。', "
+                                                  "保存當時快照。未記錄類型的舊案不猜測，編輯須補齊。', mappings:'主檔只保存 S/N、板名與 "
+                                                  "PN；歷史同步須先預覽及確認，不重算金額。', "
+                                                  "history:'本機及來源異動紀錄；共用密碼解鎖不代表具名操作人員稽核。', "
                                                   "statistics:'首輪損壞頻率與機台排行；依結案日期加總各輪已知金額。', "
                                                   "masters:'修改只影響後續選擇與儲存，不自動改寫既有案件、S/N 或價格快照。'};\n"
                                                   '\n'
@@ -5551,6 +7166,15 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   "= byId('detail-message').textContent = error.message;}\n"
                                                   '    finally {button.disabled = false;}\n'
                                                   '  });\n'
+                                                  '  return button;\n'
+                                                  '}\n'
+                                                  '\n'
+                                                  'function writeAction(label, handler, className = '
+                                                  "'button') {\n"
+                                                  '  const button = action(label, async () => '
+                                                  '{requireEditMode(); return handler();}, className);\n'
+                                                  "  button.dataset.editOnly = ''; button.hidden = "
+                                                  '!editToken;\n'
                                                   '  return button;\n'
                                                   '}\n'
                                                   '\n'
@@ -5597,6 +7221,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   "byId('create-attachment-field'));\n"
                                                   '\n'
                                                   'function openOperations(title, submit) {\n'
+                                                  '  requireEditMode();\n'
                                                   '  if (operationsSaving) throw new '
                                                   "Error('正在處理上一筆操作，請稍候');\n"
                                                   '  operationsSession++;\n'
@@ -5695,15 +7320,15 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   "'masters'].includes(kind);\n"
                                                   "  byId('history-filters').hidden = kind !== 'history';\n"
                                                   "  if (kind === 'dbn') "
-                                                  "byId('workspace-actions').append(action('＋ 新增 DBN', () => "
-                                                  'editDbn()));\n'
+                                                  "byId('workspace-actions').append(writeAction('＋ 新增 DBN', "
+                                                  '() => editDbn()));\n'
                                                   "  if (kind === 'mappings') "
-                                                  "byId('workspace-actions').append(action('＋ 新增 S/N 對應', () "
-                                                  '=> editMapping()));\n'
+                                                  "byId('workspace-actions').append(writeAction('＋ 新增 S/N "
+                                                  "對應', () => editMapping()));\n"
                                                   "  if (kind === 'masters') for (const [key, label] of "
                                                   "[['machine','機台'], ['board','板件'], ['price','價格']]) {\n"
-                                                  "    byId('workspace-actions').append(action('新增／修改' + "
-                                                  'label, () => editMaster(key)));\n'
+                                                  "    byId('workspace-actions').append(writeAction('新增／修改' "
+                                                  '+ label, () => editMaster(key)));\n'
                                                   '  }\n'
                                                   '  return loadWorkspace();\n'
                                                   '}\n'
@@ -5796,7 +7421,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   "        const card = element('div', 'serial-map-row');\n"
                                                   "        const actions = element('span', "
                                                   "'serial-map-actions'); actions.dataset.label = '操作'; "
-                                                  "actions.append(action('修改', () => editMapping(row)));\n"
+                                                  "actions.append(writeAction('修改', () => "
+                                                  'editMapping(row)));\n'
                                                   "        card.append(labeledCell('S/N', row.serial_no, "
                                                   "'serial-map-serial'), labeledCell('板件名稱', "
                                                   "row.board_name), labeledCell('Part Number', "
@@ -5851,11 +7477,13 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   '  for (const event of events) {\n'
                                                   '    const identity = `${event.serial_no || '
                                                   "'—'}－${event.board_name || '—'}`;\n"
-                                                  '    const prefix = [new '
-                                                  "Date(event.changed_at).toLocaleString('zh-TW', "
+                                                  '    const origin = String(event.id || '
+                                                  "'').startsWith('legacy-') ? '（來源歷史）' : '';\n"
+                                                  '    const prefix = '
+                                                  "[sourceDate(event.changed_at).toLocaleString('zh-TW', "
                                                   "{timeZone:'Asia/Taipei'}), `${sources[event.source_table] "
                                                   '|| event.source_table}／${operations[event.operation] || '
-                                                  'event.operation}`, identity];\n'
+                                                  'event.operation}${origin}`, identity];\n'
                                                   '    const changes = Object.entries(event.changes || '
                                                   '{}).filter(([field]) => '
                                                   "!['id','version','created_at','updated_at','source_system','source_record_id'].includes(field));\n"
@@ -5919,15 +7547,15 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   "  const row = element('div', 'dbn-row'), board = "
                                                   "labeledCell('板件名稱', record.board_name);\n"
                                                   "  board.append(element('div', 'dbn-issue-type', "
-                                                  'record.issue_type));\n'
+                                                  "record.issue_type || '舊資料：未記錄類型（未推測 PIN）'));\n"
                                                   '  if (record.dut) board.append(pinDetails(record));\n'
                                                   "  if (record.issue_description) board.append(element('p', "
                                                   "'detail-text', record.issue_description));\n"
                                                   "  const controls = labeledCell('操作', '', 'dbn-actions');\n"
                                                   '  const edit = () => '
-                                                  "controls.replaceChildren(action('修改內容', () => "
-                                                  "editDbn(record), 'button primary'), action('刪除', async () "
-                                                  '=> {\n'
+                                                  "controls.replaceChildren(writeAction('修改內容', () => "
+                                                  "editDbn(record), 'button primary'), writeAction('刪除', "
+                                                  'async () => {\n'
                                                   '    if (!window.confirm(`永久刪除這筆 '
                                                   'DBN（${record.serial_no}）？送修案件不受影響。`)) return;\n'
                                                   "    await api('/api/repairs/dbn/' + "
@@ -5936,15 +7564,16 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   'refreshFeatures();\n'
                                                   "  }, 'button danger'), action('取消', reset));\n"
                                                   '  const reset = () => '
-                                                  "controls.replaceChildren(action('編輯', edit)); reset();\n"
+                                                  "controls.replaceChildren(writeAction('編輯', edit)); "
+                                                  'reset();\n'
                                                   "  row.append(labeledCell('S/N', record.serial_no, "
                                                   "'dbn-serial'), board, labeledCell('機台', "
                                                   'record.machine_code),\n'
                                                   "    labeledCell('客戶', record.customer_code), "
                                                   "labeledCell('產品', record.product_code || '-'), "
                                                   "labeledCell('站點', record.station_code || '-'),\n"
-                                                  "    labeledCell('紀錄日期', new "
-                                                  "Date(record.created_at).toLocaleDateString('zh-TW', "
+                                                  "    labeledCell('紀錄日期', "
+                                                  "sourceDate(record.created_at).toLocaleDateString('zh-TW', "
                                                   "{timeZone:'Asia/Taipei'}), 'dbn-date'), controls);\n"
                                                   '  return row;\n'
                                                   '}\n'
@@ -6045,8 +7674,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   '  for (const row of dbn.data) {\n'
                                                   "    const card = element('article', "
                                                   "'quick-record-card');\n"
-                                                  "    card.append(element('div', 'quick-record-date', new "
-                                                  "Date(row.created_at).toLocaleString('zh-TW', "
+                                                  "    card.append(element('div', 'quick-record-date', "
+                                                  "sourceDate(row.created_at).toLocaleString('zh-TW', "
                                                   "{timeZone:'Asia/Taipei'})),\n"
                                                   "      element('div', 'quick-record-meta', "
                                                   '`機台：${row.machine_code} · ${row.model}`),\n'
@@ -6353,7 +7982,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   "{maximumFractionDigits:2}) + ' 元') : value));\n"
                                                   '      }\n'
                                                   "      const controls = element('td'); "
-                                                  "controls.append(action('修改', () => editMaster(kind, "
+                                                  "controls.append(writeAction('修改', () => editMaster(kind, "
                                                   'record))); row.append(controls); body.append(row);\n'
                                                   '    }\n'
                                                   '    wrapper.append(grid); section.append(wrapper);\n'
@@ -6499,7 +8128,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   "      if (!response.ok) throw new Error('附件讀取失敗'); "
                                                   'preview.textContent = await response.text(); '
                                                   'preview.hidden = false;\n'
-                                                  "    }), link, action('刪除附件', async () => {\n"
+                                                  "    }), link, writeAction('刪除附件', async () => {\n"
                                                   "      if (!window.confirm('永久刪除這筆附件？')) return;\n"
                                                   "      await api('/api/repairs/attachments/' + "
                                                   "encodeURIComponent(meta.data.id), 'DELETE', "
@@ -6514,8 +8143,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   "    picker.setAttribute('aria-label', '選擇此案 Fail Log');\n"
                                                   '    fileSection.append(picker); mountFilePicker(picker, '
                                                   'fileSection);\n'
-                                                  "    fileSection.append(action('上傳 Fail Log', async () => "
-                                                  '{\n'
+                                                  "    fileSection.append(writeAction('上傳 Fail Log', async "
+                                                  '() => {\n'
                                                   "      if (!picker.files?.[0]) throw new Error('請先選擇檔案');\n"
                                                   '      const attachment = await '
                                                   'encodeFile(picker.files[0]);\n'
@@ -6540,7 +8169,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   "  if (record.current_status === '取回驗證') {\n"
                                                   "    const resolve = element('section', 'detail-section'); "
                                                   "resolve.append(element('h3', '', '驗證結果'));\n"
-                                                  "    const passButton = action('PASS・成功維修', async () => {\n"
+                                                  "    const passButton = writeAction('PASS・成功維修', async () "
+                                                  '=> {\n'
                                                   "      if (!window.confirm('確認 PASS 結案？')) return;\n"
                                                   '      await '
                                                   'api(`/api/repairs/records/${encodeURIComponent(record.id)}/resolve`, '
@@ -6548,18 +8178,24 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   '      await refreshFeatures(); await '
                                                   'openDetail(record.id);\n'
                                                   '    });\n'
-                                                  "    const failButton = action('FAIL・建立下一筆維修', () => "
+                                                  "    const failButton = writeAction('FAIL・建立下一筆維修', () => "
                                                   "retryRepair(record), 'button danger');\n"
+                                                  '    const invalidDates = !record.sent_on || '
+                                                  '!record.returned_on || record.returned_on < '
+                                                  'record.sent_on || record.sent_on < record.occurred_on;\n'
                                                   '    passButton.disabled = failButton.disabled = '
                                                   'record.repair_amount == null || '
-                                                  'Boolean(chainResult.error);\n'
+                                                  'Boolean(chainResult.error) || invalidDates;\n'
+                                                  "    if (invalidDates) resolve.append(element('p', "
+                                                  "'notice', '來源日期缺漏或先後異常，請核對並明確更正後再結案。'));\n"
                                                   '    resolve.append(passButton, failButton);\n'
                                                   '    if (record.repair_amount == null) '
                                                   "resolve.append(element('p', 'hint', "
                                                   "'金額未設定，請先補齊價格，在編輯案件時勾選「重新套用目前價目」並儲存，再結案。'));\n"
                                                   '    container.append(resolve);\n'
                                                   '  }\n'
-                                                  "  const deleteButton = action('刪除此筆送修', async () => {\n"
+                                                  "  const deleteButton = writeAction('刪除此筆送修', async () => "
+                                                  '{\n'
                                                   '    if (!window.confirm(`永久刪除 ${record.serial_no} '
                                                   '的這筆送修及附件？連續送修鏈不允許刪除。`)) return;\n'
                                                   "    await api('/api/repairs/records/' + "
@@ -6804,7 +8440,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   '= index + 1; last = row.count; return [rank, row.machine, '
                                                   'row.count];}))); container.append(rankingCard);\n'
                                                   '}\n',
-                                       'sha256': '4a5fda75298c05542dc9823ad7f1710e4a14023ed2d3033c2e4a847926a3db3c'},
+                                       'sha256': 'bcc8064b7622727adf93225674e6f5915c0823b485d194783e5a80a3046ff4db'},
            'company/web/index.html': {'content': '<!doctype html>\n'
                                                  '<html lang="zh-Hant">\n'
                                                  '<head>\n'
@@ -7419,6 +9055,12 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   '.quick-summary{overflow-wrap:anywhere}\n'
                                                   '[hidden]{display:none!important}.app{min-height:100vh;display:grid;grid-template-columns:218px '
                                                   'minmax(0,1fr)}\n'
+                                                  '.edit-mode-controls{padding:10px 9px;border-top:1px solid '
+                                                  'var(--line);font-size:11px}.edit-mode-controls '
+                                                  'button{width:100%}.edit-mode-controls '
+                                                  'p{white-space:normal;overflow-wrap:anywhere}#edit-unlock{max-width:420px;padding:22px}#edit-unlock '
+                                                  'form{display:grid;gap:14px}#edit-unlock '
+                                                  'label{display:grid;gap:8px}\n'
                                                   '.sidebar{position:sticky;top:0;height:100vh;overflow:auto;display:flex;flex-direction:column;gap:6px;background:var(--side);border:0;border-right:1px '
                                                   'solid var(--line);border-radius:0;margin:0;padding:17px '
                                                   '11px;color:#aaaab0;font-size:12px}\n'
@@ -7534,7 +9176,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   'button{min-width:78px}.fields{grid-template-columns:1fr}dialog:not(.record-detail){width:96vw}.dialog-head{padding:13px '
                                                   '14px}#record-form{padding:0 14px '
                                                   '14px}.title-row{align-items:flex-start}}\n',
-                                       'sha256': '4b4159d20329ab1a54550e7b822b6592607c4609caa0c82fe437ede958c62d98'},
+                                       'sha256': 'dc5d1db4703b17b5b3146d18f6b6855e538ea8391aa1c202ebfc2ca252942457'},
            'company/web/repairs.html': {'content': '<!doctype html>\n'
                                                    '<html lang="zh-Hant">\n'
                                                    '<head>\n'
@@ -7606,6 +9248,10 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                    'class="nav-item" disabled>機台保養模組（未安裝）</button></nav>\n'
                                                    '    <a class="environment-link" href="/">SQLite '
                                                    '環境檢查</a>\n'
+                                                   '    <div class="edit-mode-controls"><p '
+                                                   'id="edit-mode-state" role="status">唯讀模式</p><button '
+                                                   'id="toggle-edit" type="button">開啟編輯</button><p '
+                                                   'id="edit-access-message" role="status"></p></div>\n'
                                                    '  </aside>\n'
                                                    '  <main class="content">\n'
                                                    '    <div id="startup-error" class="notice" role="alert" '
@@ -7614,8 +9260,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                    'type="button">重新讀取對應表</button></div>\n'
                                                    '    <details class="local-information"><summary>SQLite '
                                                    '本機移植版 · 不連接 Supabase</summary><p '
-                                                   'class="notice">公司端略過的驗證仍標為未驗收。舊資料尚未匯入；尚未完成畫面一致性及正式上線驗收。僅限本機，登入權限及公司內網部署待 '
-                                                   'IT 核准。</p></details>\n'
+                                                   'class="notice">公司端略過的驗證仍標為未驗收。密碼解鎖僅供防誤觸，不是個人登入或具名稽核。來源資料須另行確認匯入；畫面一致性及正式內網部署仍待驗收／IT '
+                                                   '核准。</p></details>\n'
                                                    '    <section id="quick-view" class="quick-search-view">\n'
                                                    '      <div '
                                                    'class="quick-search-intro"><h1>SPMS</h1><p>Enter a board '
@@ -7639,8 +9285,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                    '    <section id="records-view" hidden>\n'
                                                    '      <div class="title-row"><div><h1 '
                                                    'id="view-title">全部送修</h1><p>追蹤送修狀態、開單資訊及異常描述</p></div><button '
-                                                   'id="create" type="button" disabled>＋ '
-                                                   '新增送修</button></div>\n'
+                                                   'id="create" type="button" data-edit-only hidden '
+                                                   'disabled>＋ 新增送修</button></div>\n'
                                                    '      <form id="search-form" class="list-toolbar"><div '
                                                    'class="search-wrap"><span class="search-icon" '
                                                    'aria-hidden="true">⌕</span><input id="query" '
@@ -7730,7 +9376,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                    '  <div class="detail-body"><p id="detail-serial" '
                                                    'class="serial-text"></p><h2 id="detail-title"></h2><div '
                                                    'class="detail-actions"><button id="edit-detail" '
-                                                   'type="button">編輯／異動</button></div><div '
+                                                   'type="button" data-edit-only '
+                                                   'hidden>編輯／異動</button></div><div '
                                                    'id="detail-content"></div><p id="detail-message" '
                                                    'role="status"></p></div>\n'
                                                    '</dialog>\n'
@@ -7788,7 +9435,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                    '    </div>\n'
                                                    '    <p id="form-message" role="status" '
                                                    'aria-live="polite"></p>\n'
-                                                   '    <div class="actions"><button id="reload-record" '
+                                                   '    <div class="actions"><button id="editor-unlock" '
+                                                   'type="button">重新開啟編輯</button><button id="reload-record" '
                                                    'type="button" hidden>重新載入此案</button><button id="cancel" '
                                                    'type="button">取消</button><button id="save" '
                                                    'type="submit">儲存</button></div>\n'
@@ -7805,12 +9453,24 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                    'id="operations-form"><div id="operations-fields" '
                                                    'class="fields"></div><p id="operations-message" '
                                                    'role="status" aria-live="polite"></p><div '
-                                                   'class="actions"><button id="operations-cancel" '
-                                                   'type="button">取消</button><button id="operations-save" '
+                                                   'class="actions"><button id="operations-unlock" '
+                                                   'type="button">重新開啟編輯</button><button '
+                                                   'id="operations-cancel" type="button">取消</button><button '
+                                                   'id="operations-save" '
                                                    'type="submit">儲存</button></div></form></dialog>\n'
+                                                   '<dialog id="edit-unlock" '
+                                                   'aria-labelledby="edit-unlock-title"><h2 '
+                                                   'id="edit-unlock-title">開啟編輯模式</h2><form '
+                                                   'id="edit-unlock-form"><label>共用編輯密碼<input '
+                                                   'id="edit-password" type="password" maxlength="200" '
+                                                   'autocomplete="current-password" required></label><p '
+                                                   'id="edit-unlock-message" role="status"></p><div '
+                                                   'class="actions"><button id="edit-unlock-cancel" '
+                                                   'type="button">取消</button><button id="edit-unlock-submit" '
+                                                   'type="submit">開啟編輯</button></div></form></dialog>\n'
                                                    '</body>\n'
                                                    '</html>\n',
-                                        'sha256': '008b055846c3404846bbeaf7a091f52a57303b8dbab4676bf4438de5a018eca6'},
+                                        'sha256': '3691d54e1c9d3c590fb9a90ea0915cbe832c8116be1b6fe71d44192684b2f847'},
            'company/web/repairs.js': {'content': 'const byId = id => document.getElementById(id);\n'
                                                  'let catalogs, current = null, mapping = null, '
                                                  'mappingRequest = 0, saving = false;\n'
@@ -7820,6 +9480,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  "let quickSerial = '';\n"
                                                  'let editorSession = 0, editorReloading = false;\n'
                                                  'let catalogsLoading = false;\n'
+                                                 "let editToken = '', editAccessBusy = false, pendingEdits = "
+                                                 '0;\n'
                                                  "const editor = byId('editor');\n"
                                                  "const detail = byId('record-detail');\n"
                                                  "const fieldLabels = {serial_no:'S/N', machine_code:'機台', "
@@ -7833,22 +9495,116 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  "async function api(path, method = 'GET', body) {\n"
                                                  "  const options = {method, cache:'no-store', "
                                                  "headers:{'X-SPMS-Request':'1'}};\n"
+                                                 "  const writing = method !== 'GET' && "
+                                                 "!path.startsWith('/api/edit/');\n"
+                                                 '  if (writing) requireEditMode();\n'
+                                                 "  if (editToken) options.headers['X-SPMS-Edit-Token'] = "
+                                                 'editToken;\n'
                                                  "  if (body !== undefined) {options.headers['Content-Type'] "
                                                  "= 'application/json'; options.body = "
                                                  'JSON.stringify(body);}\n'
                                                  '  // Writes are not automatically retried: a lost response '
                                                  'must be checked first.\n'
-                                                 '  let response, data;\n'
-                                                 '  try {response = await fetch(path, options);}\n'
-                                                 "  catch (error) {throw new Error('本機服務連線失敗，請確認 Python "
+                                                 '  if (writing) pendingEdits++;\n'
+                                                 '  try {\n'
+                                                 '    let response, data;\n'
+                                                 '    try {response = await fetch(path, options);}\n'
+                                                 "    catch (error) {throw new Error('本機服務連線失敗，請確認 Python "
                                                  "服務仍在執行：' + error.message);}\n"
-                                                 '  try {data = await response.json();}\n'
-                                                 "  catch {throw new Error('本機服務回應不是有效 "
+                                                 '    try {data = await response.json();}\n'
+                                                 "    catch {throw new Error('本機服務回應不是有效 "
                                                  "JSON；請保留錯誤並確認服務版本。寫入結果未知時勿直接重送。');}\n"
-                                                 '  if (!response.ok) {const error = new Error(data.error || '
-                                                 "'操作失敗'); error.status = response.status; throw error;}\n"
-                                                 '  return data;\n'
+                                                 '    if (!response.ok) {\n'
+                                                 '      if (response.status === 401 && '
+                                                 "!path.startsWith('/api/edit/')) {editToken = ''; "
+                                                 'updateEditControls();}\n'
+                                                 "      const error = new Error(data.error || '操作失敗'); "
+                                                 'error.status = response.status; throw error;\n'
+                                                 '    }\n'
+                                                 '    return data;\n'
+                                                 '  } finally {if (writing) pendingEdits--;}\n'
                                                  '}\n'
+                                                 '\n'
+                                                 'function requireEditMode() {if (!editToken || '
+                                                 'editAccessBusy) throw new '
+                                                 "Error('目前為唯讀模式或正在切換，請輸入密碼開啟編輯');}\n"
+                                                 'function sourceDate(value) {\n'
+                                                 "  return new Date(String(value).replace(' ', "
+                                                 "'T').replace(/([+-]\\d{2})$/, "
+                                                 "'$1:00').replace(/(\\.\\d{3})\\d+/, '$1'));\n"
+                                                 '}\n'
+                                                 'function updateEditControls() {\n'
+                                                 "  byId('edit-mode-state').textContent = editToken ? "
+                                                 "'編輯模式（共用密碼，非個人帳號）' : '唯讀模式';\n"
+                                                 "  byId('toggle-edit').textContent = editToken ? '結束編輯' : "
+                                                 "'開啟編輯';\n"
+                                                 '  for (const button of '
+                                                 "document.querySelectorAll('[data-edit-only]')) "
+                                                 'button.hidden = !editToken;\n'
+                                                 "  for (const id of ['editor-unlock','operations-unlock']) "
+                                                 'byId(id).hidden = Boolean(editToken);\n'
+                                                 '}\n'
+                                                 'function openEditUnlock() {\n'
+                                                 '  if (editAccessBusy) return;\n'
+                                                 "  byId('edit-password').value = ''; "
+                                                 "byId('edit-unlock-message').textContent = '';\n"
+                                                 "  if (!byId('edit-unlock').open) "
+                                                 "byId('edit-unlock').showModal();\n"
+                                                 "  byId('edit-password').focus();\n"
+                                                 '}\n'
+                                                 "for (const id of ['editor-unlock','operations-unlock']) "
+                                                 "byId(id).addEventListener('click', openEditUnlock);\n"
+                                                 "byId('toggle-edit').addEventListener('click', async () => "
+                                                 '{\n'
+                                                 '  if (editAccessBusy) return;\n'
+                                                 "  byId('edit-access-message').textContent = '';\n"
+                                                 '  if (!editToken) {\n'
+                                                 '    openEditUnlock(); return;\n'
+                                                 '  }\n'
+                                                 '  if (saving || editorReloading || pendingEdits || (typeof '
+                                                 "operationsSaving !== 'undefined' && operationsSaving)) {\n"
+                                                 "    byId('edit-access-message').textContent = "
+                                                 "'操作正在處理，請稍候再結束編輯'; return;\n"
+                                                 '  }\n'
+                                                 "  if ((editor.open || byId('operations-modal').open) && "
+                                                 "!window.confirm('結束編輯並捨棄未儲存內容？')) return;\n"
+                                                 '  editAccessBusy = true;\n'
+                                                 "  try {await api('/api/edit/lock', 'POST', {});}\n"
+                                                 "  catch (error) {byId('edit-access-message').textContent = "
+                                                 "error.message + '；本頁已鎖定。';}\n"
+                                                 '  finally {\n'
+                                                 "    editToken = ''; editorSession++; mappingRequest++; "
+                                                 'editor.close();\n'
+                                                 "    if (typeof closeOperations === 'function') "
+                                                 'closeOperations();\n'
+                                                 '    updateEditControls(); editAccessBusy = false;\n'
+                                                 '  }\n'
+                                                 '});\n'
+                                                 "byId('edit-unlock-cancel').addEventListener('click', () => "
+                                                 "{if (!editAccessBusy) {byId('edit-password').value = ''; "
+                                                 "byId('edit-unlock').close();}});\n"
+                                                 "byId('edit-unlock').addEventListener('cancel', event => "
+                                                 '{if (editAccessBusy) event.preventDefault(); else '
+                                                 "byId('edit-password').value = '';});\n"
+                                                 "byId('edit-unlock-form').addEventListener('submit', async "
+                                                 'event => {\n'
+                                                 '  event.preventDefault(); if (editAccessBusy) return;\n'
+                                                 '  editAccessBusy = true; '
+                                                 "byId('edit-unlock-submit').disabled = true;\n"
+                                                 "  const password = byId('edit-password').value; "
+                                                 "byId('edit-password').value = '';\n"
+                                                 '  try {\n'
+                                                 "    const result = await api('/api/edit/unlock', 'POST', "
+                                                 '{password});\n'
+                                                 "    if (!result.token) throw new Error('服務未傳回編輯工作階段');\n"
+                                                 '    editToken = result.token; updateEditControls(); '
+                                                 "byId('edit-unlock').close();\n"
+                                                 "  } catch (error) {byId('edit-unlock-message').textContent "
+                                                 '= error.message;}\n'
+                                                 '  finally {editAccessBusy = false; '
+                                                 "byId('edit-unlock-submit').disabled = false;}\n"
+                                                 '});\n'
+                                                 'updateEditControls();\n'
                                                  '\n'
                                                  'function fillSelect(select, values, placeholder) {\n'
                                                  '  select.replaceChildren();\n'
@@ -8006,6 +9762,18 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  "element('div', 'detail-text', "
                                                  'record.failure_description));\n'
                                                  '    body.append(failure);\n'
+                                                 '    if (record.legacy_source) {\n'
+                                                 "      const source = element('details', 'detail-section'); "
+                                                 "source.append(element('summary', '', '唯讀來源欄位（匯入當時）'));\n"
+                                                 '      for (const [key, value] of '
+                                                 'Object.entries(record.legacy_source)) '
+                                                 "source.append(element('p', 'detail-text', `${key}: ${value "
+                                                 "|| '（空白）'}`));\n"
+                                                 '      body.append(source);\n'
+                                                 '    }\n'
+                                                 '    for (const warning of record.legacy_warnings || []) '
+                                                 "body.append(element('p', 'notice', '來源核對提醒（匯入時）：' + "
+                                                 'warning));\n'
                                                  '    if (!detail.open) detail.showModal();\n'
                                                  "    if (typeof renderDetailFeatures === 'function') await "
                                                  'renderDetailFeatures(record, body, () => request === '
@@ -8026,6 +9794,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  '{detailRequest++;});\n'
                                                  "byId('edit-detail').addEventListener('click', async () => "
                                                  '{\n'
+                                                 "  if (!editToken) {byId('detail-message').textContent = "
+                                                 "'請先開啟編輯模式'; return;}\n"
                                                  '  if (!selectedRecord) return;\n'
                                                  "  const button = byId('edit-detail');\n"
                                                  '  const id = selectedRecord.id, request = detailRequest;\n'
@@ -8301,6 +10071,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  "{byId('form-message').textContent = error.message;}));\n"
                                                  '\n'
                                                  'async function openEditor(record = null) {\n'
+                                                 '  requireEditMode();\n'
                                                  '  const session = ++editorSession;\n'
                                                  '  current = record;\n'
                                                  '  mapping = null;\n'
@@ -8352,8 +10123,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  'current?.id !== id) return;\n'
                                                  '      for (const event of result.data) {\n'
                                                  "        const item = document.createElement('li');\n"
-                                                 '        const time = new '
-                                                 "Date(event.changed_at).toLocaleString('zh-TW', "
+                                                 '        const time = '
+                                                 "sourceDate(event.changed_at).toLocaleString('zh-TW', "
                                                  "{timeZone:'Asia/Taipei', hour12:false});\n"
                                                  "        if (event.operation === 'INSERT') item.textContent "
                                                  '= `${time} 新增 ${event.serial_no}－${event.board_name}`;\n'
@@ -8534,7 +10305,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  "byId('reload-catalogs').addEventListener('click', "
                                                  'initializeApp);\n'
                                                  'initializeApp();\n',
-                                      'sha256': 'f2d90373623e377a2884b50bc7a258c783fa229eab452179dee66787b6872cf5'},
+                                      'sha256': '0f41f0e68b833bc9591187c6e47b09a52050ba0a5d80340b6e1ee8a4d74ee45a'},
            'company/web/style.css': {'content': ':root{color-scheme:dark;font-family:"Segoe '
                                                 'UI",sans-serif;background:#101113;color:#e7e7e8}\n'
                                                 '*{box-sizing:border-box}body{margin:0}main{max-width:850px;margin:60px '
@@ -8555,7 +10326,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                 '@media(max-width:600px){main{margin:25px auto;padding:0 '
                                                 '16px}h1{font-size:22px}section{padding:18px}dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:10px}}\n',
                                      'sha256': '064406c8758be5620dfe7440f59d59ec1de5f6307e74f5bad85dd03e018c0769'}},
- 'version': '2026-11-02-local-batch-review'}
+ 'version': '2026-11-02-edit-legacy'}
 
 
 def check_local_path(path):

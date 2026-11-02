@@ -7,7 +7,7 @@ const fieldContainers = new WeakMap();
 const filePickerUpdates = new WeakMap();
 const workspaceTitles = {dbn:'DBN 紀錄', mappings:'S/N 主檔維護', history:'全站異動紀錄', statistics:'統計資料', masters:'機台／板件／價格對應'};
 const operationsDialog = byId('operations-modal');
-const descriptions = {dbn:'DBN 紀錄獨立於送修案件；DUT／PIN 保存當時快照。', mappings:'主檔只保存 S/N、板名與 PN；歷史同步須先預覽及確認，不重算金額。', history:'本機異動紀錄；尚未登入，這不是具名操作人員稽核。', statistics:'首輪損壞頻率與機台排行；依結案日期加總各輪已知金額。', masters:'修改只影響後續選擇與儲存，不自動改寫既有案件、S/N 或價格快照。'};
+const descriptions = {dbn:'DBN 紀錄獨立於送修案件；DUT／PIN 保存當時快照。未記錄類型的舊案不猜測，編輯須補齊。', mappings:'主檔只保存 S/N、板名與 PN；歷史同步須先預覽及確認，不重算金額。', history:'本機及來源異動紀錄；共用密碼解鎖不代表具名操作人員稽核。', statistics:'首輪損壞頻率與機台排行；依結案日期加總各輪已知金額。', masters:'修改只影響後續選擇與儲存，不自動改寫既有案件、S/N 或價格快照。'};
 
 function invalidateFeatureRequests() {workspaceRequest++; operationRequest++;}
 
@@ -20,6 +20,12 @@ function action(label, handler, className = 'button') {
     catch (error) {byId('workspace-message').textContent = byId('detail-message').textContent = error.message;}
     finally {button.disabled = false;}
   });
+  return button;
+}
+
+function writeAction(label, handler, className = 'button') {
+  const button = action(label, async () => {requireEditMode(); return handler();}, className);
+  button.dataset.editOnly = ''; button.hidden = !editToken;
   return button;
 }
 
@@ -51,6 +57,7 @@ function mountFilePicker(input, container) {
 mountFilePicker(byId('create-attachment'), byId('create-attachment-field'));
 
 function openOperations(title, submit) {
+  requireEditMode();
   if (operationsSaving) throw new Error('正在處理上一筆操作，請稍候');
   operationsSession++;
   byId('operations-title').textContent = title;
@@ -112,10 +119,10 @@ function openWorkspace(kind, number = '') {
   byId('stats-controls').hidden = kind !== 'statistics';
   byId('workspace-pager').hidden = ['statistics', 'masters'].includes(kind);
   byId('history-filters').hidden = kind !== 'history';
-  if (kind === 'dbn') byId('workspace-actions').append(action('＋ 新增 DBN', () => editDbn()));
-  if (kind === 'mappings') byId('workspace-actions').append(action('＋ 新增 S/N 對應', () => editMapping()));
+  if (kind === 'dbn') byId('workspace-actions').append(writeAction('＋ 新增 DBN', () => editDbn()));
+  if (kind === 'mappings') byId('workspace-actions').append(writeAction('＋ 新增 S/N 對應', () => editMapping()));
   if (kind === 'masters') for (const [key, label] of [['machine','機台'], ['board','板件'], ['price','價格']]) {
-    byId('workspace-actions').append(action('新增／修改' + label, () => editMaster(key)));
+    byId('workspace-actions').append(writeAction('新增／修改' + label, () => editMaster(key)));
   }
   return loadWorkspace();
 }
@@ -166,7 +173,7 @@ async function loadWorkspace() {
       if (kind === 'dbn') content.append(renderDbnRow(row));
       else if (kind === 'mappings') {
         const card = element('div', 'serial-map-row');
-        const actions = element('span', 'serial-map-actions'); actions.dataset.label = '操作'; actions.append(action('修改', () => editMapping(row)));
+        const actions = element('span', 'serial-map-actions'); actions.dataset.label = '操作'; actions.append(writeAction('修改', () => editMapping(row)));
         card.append(labeledCell('S/N', row.serial_no, 'serial-map-serial'), labeledCell('板件名稱', row.board_name), labeledCell('Part Number', row.board_part_code), actions);
         content.append(card);
       }
@@ -196,7 +203,8 @@ function renderHistory(events, container) {
   const rows = [];
   for (const event of events) {
     const identity = `${event.serial_no || '—'}－${event.board_name || '—'}`;
-    const prefix = [new Date(event.changed_at).toLocaleString('zh-TW', {timeZone:'Asia/Taipei'}), `${sources[event.source_table] || event.source_table}／${operations[event.operation] || event.operation}`, identity];
+    const origin = String(event.id || '').startsWith('legacy-') ? '（來源歷史）' : '';
+    const prefix = [sourceDate(event.changed_at).toLocaleString('zh-TW', {timeZone:'Asia/Taipei'}), `${sources[event.source_table] || event.source_table}／${operations[event.operation] || event.operation}${origin}`, identity];
     const changes = Object.entries(event.changes || {}).filter(([field]) => !['id','version','created_at','updated_at','source_system','source_record_id'].includes(field));
     for (const [field, change] of changes) rows.push([...prefix, labels[field] || field, value(field, change.old), value(field, change.new)]);
     if (!changes.length) rows.push([...prefix, '—', '—', '—']);
@@ -235,18 +243,18 @@ function labeledCell(label, value, className = '') {
 
 function renderDbnRow(record) {
   const row = element('div', 'dbn-row'), board = labeledCell('板件名稱', record.board_name);
-  board.append(element('div', 'dbn-issue-type', record.issue_type));
+  board.append(element('div', 'dbn-issue-type', record.issue_type || '舊資料：未記錄類型（未推測 PIN）'));
   if (record.dut) board.append(pinDetails(record));
   if (record.issue_description) board.append(element('p', 'detail-text', record.issue_description));
   const controls = labeledCell('操作', '', 'dbn-actions');
-  const edit = () => controls.replaceChildren(action('修改內容', () => editDbn(record), 'button primary'), action('刪除', async () => {
+  const edit = () => controls.replaceChildren(writeAction('修改內容', () => editDbn(record), 'button primary'), writeAction('刪除', async () => {
     if (!window.confirm(`永久刪除這筆 DBN（${record.serial_no}）？送修案件不受影響。`)) return;
     await api('/api/repairs/dbn/' + encodeURIComponent(record.id), 'DELETE', {expected_version:record.version}); await refreshFeatures();
   }, 'button danger'), action('取消', reset));
-  const reset = () => controls.replaceChildren(action('編輯', edit)); reset();
+  const reset = () => controls.replaceChildren(writeAction('編輯', edit)); reset();
   row.append(labeledCell('S/N', record.serial_no, 'dbn-serial'), board, labeledCell('機台', record.machine_code),
     labeledCell('客戶', record.customer_code), labeledCell('產品', record.product_code || '-'), labeledCell('站點', record.station_code || '-'),
-    labeledCell('紀錄日期', new Date(record.created_at).toLocaleDateString('zh-TW', {timeZone:'Asia/Taipei'}), 'dbn-date'), controls);
+    labeledCell('紀錄日期', sourceDate(record.created_at).toLocaleDateString('zh-TW', {timeZone:'Asia/Taipei'}), 'dbn-date'), controls);
   return row;
 }
 
@@ -294,7 +302,7 @@ function renderQuickResults(summary, records, dbn, container) {
   const dbnList = group('DBN 紀錄', dbn);
   for (const row of dbn.data) {
     const card = element('article', 'quick-record-card');
-    card.append(element('div', 'quick-record-date', new Date(row.created_at).toLocaleString('zh-TW', {timeZone:'Asia/Taipei'})),
+    card.append(element('div', 'quick-record-date', sourceDate(row.created_at).toLocaleString('zh-TW', {timeZone:'Asia/Taipei'})),
       element('div', 'quick-record-meta', `機台：${row.machine_code} · ${row.model}`),
       element('div', 'quick-dbn-tags', `客戶：${row.customer_code} · 產品：${row.product_code || '-'} · 站點：${row.station_code || '-'}`), element('p', '', row.issue_type));
     if (row.dut) card.append(pinDetails(row)); if (row.issue_description) card.append(element('p', 'detail-text', row.issue_description)); dbnList.append(card);
@@ -456,7 +464,7 @@ function renderMasters(result, container, query = '') {
         const value = record[field];
         row.append(element('td', '', field.endsWith('_cents') ? (value == null ? '未設定' : (value / 100).toLocaleString('zh-TW', {maximumFractionDigits:2}) + ' 元') : value));
       }
-      const controls = element('td'); controls.append(action('修改', () => editMaster(kind, record))); row.append(controls); body.append(row);
+      const controls = element('td'); controls.append(writeAction('修改', () => editMaster(kind, record))); row.append(controls); body.append(row);
     }
     wrapper.append(grid); section.append(wrapper);
     if (!records.length) section.append(element('p', 'hint', result[key].length ? '沒有符合搜尋條件的對應；清空搜尋後可顯示全部。' : '尚無對應資料，可使用上方按鈕新增。'));
@@ -531,7 +539,7 @@ async function renderDetailFeatures(record, container, stillCurrent) {
     fileSection.append(action('檢視文字', async () => {
       const response = await fetch('/api/repairs/attachments/' + encodeURIComponent(meta.data.id), {cache:'no-store'});
       if (!response.ok) throw new Error('附件讀取失敗'); preview.textContent = await response.text(); preview.hidden = false;
-    }), link, action('刪除附件', async () => {
+    }), link, writeAction('刪除附件', async () => {
       if (!window.confirm('永久刪除這筆附件？')) return;
       await api('/api/repairs/attachments/' + encodeURIComponent(meta.data.id), 'DELETE', {expected_version:record.version});
       await openDetail(record.id);
@@ -541,7 +549,7 @@ async function renderDetailFeatures(record, container, stillCurrent) {
     const picker = element('input'); picker.type = 'file'; picker.accept = '.txt,.asc';
     picker.setAttribute('aria-label', '選擇此案 Fail Log');
     fileSection.append(picker); mountFilePicker(picker, fileSection);
-    fileSection.append(action('上傳 Fail Log', async () => {
+    fileSection.append(writeAction('上傳 Fail Log', async () => {
       if (!picker.files?.[0]) throw new Error('請先選擇檔案');
       const attachment = await encodeFile(picker.files[0]);
       await api(`/api/repairs/records/${encodeURIComponent(record.id)}/attachment`, 'POST', {expected_version:record.version, attachment});
@@ -555,18 +563,20 @@ async function renderDetailFeatures(record, container, stillCurrent) {
   container.append(action('查看此 S/N 的 DBN', () => {detail.close(); return openWorkspace('dbn', record.serial_no);}));
   if (record.current_status === '取回驗證') {
     const resolve = element('section', 'detail-section'); resolve.append(element('h3', '', '驗證結果'));
-    const passButton = action('PASS・成功維修', async () => {
+    const passButton = writeAction('PASS・成功維修', async () => {
       if (!window.confirm('確認 PASS 結案？')) return;
       await api(`/api/repairs/records/${encodeURIComponent(record.id)}/resolve`, 'POST', {expected_version:record.version, passed:true});
       await refreshFeatures(); await openDetail(record.id);
     });
-    const failButton = action('FAIL・建立下一筆維修', () => retryRepair(record), 'button danger');
-    passButton.disabled = failButton.disabled = record.repair_amount == null || Boolean(chainResult.error);
+    const failButton = writeAction('FAIL・建立下一筆維修', () => retryRepair(record), 'button danger');
+    const invalidDates = !record.sent_on || !record.returned_on || record.returned_on < record.sent_on || record.sent_on < record.occurred_on;
+    passButton.disabled = failButton.disabled = record.repair_amount == null || Boolean(chainResult.error) || invalidDates;
+    if (invalidDates) resolve.append(element('p', 'notice', '來源日期缺漏或先後異常，請核對並明確更正後再結案。'));
     resolve.append(passButton, failButton);
     if (record.repair_amount == null) resolve.append(element('p', 'hint', '金額未設定，請先補齊價格，在編輯案件時勾選「重新套用目前價目」並儲存，再結案。'));
     container.append(resolve);
   }
-  const deleteButton = action('刪除此筆送修', async () => {
+  const deleteButton = writeAction('刪除此筆送修', async () => {
     if (!window.confirm(`永久刪除 ${record.serial_no} 的這筆送修及附件？連續送修鏈不允許刪除。`)) return;
     await api('/api/repairs/records/' + encodeURIComponent(record.id), 'DELETE', {expected_version:record.version});
     detail.close(); selectedRecord = null; await refreshFeatures();

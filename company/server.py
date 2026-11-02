@@ -11,6 +11,7 @@ from urllib.parse import parse_qs, quote, urlsplit
 
 from database import migrate
 from errors import APIError
+from edit_access import EditGate
 from modules.repairs import service as repairs
 from modules.repairs import operations
 
@@ -62,7 +63,7 @@ def database_status(path):
             "initialized_at": created_at,
             "phase": 3,
             "access": "localhost-only",
-            "modules": {"repairs": 2, "machines": None},
+            "modules": {"repairs": 2, "legacy_import": 1, "machines": None},
         }
 
 
@@ -71,6 +72,7 @@ class LocalServer(ThreadingHTTPServer):
 
     def __init__(self, address, database):
         self.database = database
+        self.edit_gate = EditGate(Path(database).parent / 'edit-password.json')
         super().__init__(address, Handler)
 
 
@@ -130,7 +132,9 @@ class Handler(BaseHTTPRequestHandler):
         elif path.startswith("/api/"):
             try:
                 query = parse_qs(parsed.query)
-                if path == "/api/modules":
+                if path == '/api/edit/status':
+                    payload = self.server.edit_gate.status()
+                elif path == "/api/modules":
                     payload = {"repairs": {"installed": True, "url": "/repairs/", "stage": "local-feature-validation"},
                                "machines": {"installed": False, "url": None}}
                 elif path == "/api/repairs/catalog":
@@ -224,6 +228,16 @@ class Handler(BaseHTTPRequestHandler):
             if not isinstance(payload, dict):
                 raise APIError("JSON 須為物件")
             path = urlsplit(self.path).path
+            if path == '/api/edit/unlock' and self.command == 'POST':
+                operations.keys(payload, ('password',))
+                self.send_json(200, self.server.edit_gate.unlock(payload.get('password')))
+                return
+            if path == '/api/edit/lock' and self.command == 'POST':
+                operations.keys(payload, ())
+                self.server.edit_gate.revoke(self.headers.get('X-SPMS-Edit-Token'))
+                self.send_json(200, {'locked': True})
+                return
+            self.server.edit_gate.require(self.headers.get('X-SPMS-Edit-Token'))
             parts = path.removeprefix('/api/repairs/').split('/') if path.startswith('/api/repairs/') else []
             if self.command == 'POST' and len(parts) == 3 and parts[0] == 'records' and parts[2] in ('resolve', 'attachment'):
                 operation = operations.resolve if parts[2] == 'resolve' else operations.upload_attachment

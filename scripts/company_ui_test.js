@@ -71,6 +71,12 @@ const document = {
     if (selector === '[data-status]') return navigation;
     if (selector === '[data-count]') return counters;
     if (selector === '[data-workspace]') return workspaces;
+    if (selector === '[data-edit-only]') {
+      const result = new Set([nodes.create,nodes['edit-detail']]);
+      const visit = node => {if ('editOnly' in node.dataset) result.add(node); for (const child of node.children) visit(child);};
+      for (const node of Object.values(nodes)) visit(node);
+      return [...result];
+    }
     throw Error('Unmocked selector: ' + selector);
   }
 };
@@ -85,10 +91,13 @@ async function fetch(path, options = {}) {
   requests.push({path:String(path), options});
   for (const [prefix, gate] of gatePrefixes) if (String(path).startsWith(prefix)) await gate;
   for (const [prefix, failure] of faultPrefixes) if (String(path).startsWith(prefix)) {
+    if (failure === 'UNAUTHORIZED') return {ok:false,status:401,json:async()=>({error:'請重新解鎖'})};
     if (failure === 'INVALID_JSON') return {ok:true,json:async()=>{throw Error('invalid JSON');}};
     throw Error(failure);
   }
   let data;
+  if (path === '/api/edit/unlock') return {ok:true,json:async()=>({token:'mock-edit-token'})};
+  if (path === '/api/edit/lock') return {ok:true,json:async()=>({locked:true})};
   if (options.method === 'PUT') {
     if (recordWritesSucceed && String(path).startsWith('/api/repairs/records/')) {
       liveRecord = {...liveRecord,...JSON.parse(options.body),version:liveRecord.version + 1};

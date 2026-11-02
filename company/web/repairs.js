@@ -5,22 +5,83 @@ let quickRequest = 0, detailRequest = 0, selectedRecord = null, serialFilter = '
 let quickSerial = '';
 let editorSession = 0, editorReloading = false;
 let catalogsLoading = false;
+let editToken = '', editAccessBusy = false, pendingEdits = 0;
 const editor = byId('editor');
 const detail = byId('record-detail');
 const fieldLabels = {serial_no:'S/N', machine_code:'機台', model:'機型', description:'板件名稱', board_part_code:'Part Number', failure_tag:'異常類別', failure_description:'異常描述', repair_type:'維修分類', repair_amount:'維修金額', current_status:'狀態', is_opened:'已開單', occurred_on:'損壞日期', sent_on:'送修日期', returned_on:'回修日期', attachment:'Fail Log', closed_on:'結案日期', retry_of_record_id:'前次案件'};
 
 async function api(path, method = 'GET', body) {
   const options = {method, cache:'no-store', headers:{'X-SPMS-Request':'1'}};
+  const writing = method !== 'GET' && !path.startsWith('/api/edit/');
+  if (writing) requireEditMode();
+  if (editToken) options.headers['X-SPMS-Edit-Token'] = editToken;
   if (body !== undefined) {options.headers['Content-Type'] = 'application/json'; options.body = JSON.stringify(body);}
   // Writes are not automatically retried: a lost response must be checked first.
-  let response, data;
-  try {response = await fetch(path, options);}
-  catch (error) {throw new Error('本機服務連線失敗，請確認 Python 服務仍在執行：' + error.message);}
-  try {data = await response.json();}
-  catch {throw new Error('本機服務回應不是有效 JSON；請保留錯誤並確認服務版本。寫入結果未知時勿直接重送。');}
-  if (!response.ok) {const error = new Error(data.error || '操作失敗'); error.status = response.status; throw error;}
-  return data;
+  if (writing) pendingEdits++;
+  try {
+    let response, data;
+    try {response = await fetch(path, options);}
+    catch (error) {throw new Error('本機服務連線失敗，請確認 Python 服務仍在執行：' + error.message);}
+    try {data = await response.json();}
+    catch {throw new Error('本機服務回應不是有效 JSON；請保留錯誤並確認服務版本。寫入結果未知時勿直接重送。');}
+    if (!response.ok) {
+      if (response.status === 401 && !path.startsWith('/api/edit/')) {editToken = ''; updateEditControls();}
+      const error = new Error(data.error || '操作失敗'); error.status = response.status; throw error;
+    }
+    return data;
+  } finally {if (writing) pendingEdits--;}
 }
+
+function requireEditMode() {if (!editToken || editAccessBusy) throw new Error('目前為唯讀模式或正在切換，請輸入密碼開啟編輯');}
+function sourceDate(value) {
+  return new Date(String(value).replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00').replace(/(\.\d{3})\d+/, '$1'));
+}
+function updateEditControls() {
+  byId('edit-mode-state').textContent = editToken ? '編輯模式（共用密碼，非個人帳號）' : '唯讀模式';
+  byId('toggle-edit').textContent = editToken ? '結束編輯' : '開啟編輯';
+  for (const button of document.querySelectorAll('[data-edit-only]')) button.hidden = !editToken;
+  for (const id of ['editor-unlock','operations-unlock']) byId(id).hidden = Boolean(editToken);
+}
+function openEditUnlock() {
+  if (editAccessBusy) return;
+  byId('edit-password').value = ''; byId('edit-unlock-message').textContent = '';
+  if (!byId('edit-unlock').open) byId('edit-unlock').showModal();
+  byId('edit-password').focus();
+}
+for (const id of ['editor-unlock','operations-unlock']) byId(id).addEventListener('click', openEditUnlock);
+byId('toggle-edit').addEventListener('click', async () => {
+  if (editAccessBusy) return;
+  byId('edit-access-message').textContent = '';
+  if (!editToken) {
+    openEditUnlock(); return;
+  }
+  if (saving || editorReloading || pendingEdits || (typeof operationsSaving !== 'undefined' && operationsSaving)) {
+    byId('edit-access-message').textContent = '操作正在處理，請稍候再結束編輯'; return;
+  }
+  if ((editor.open || byId('operations-modal').open) && !window.confirm('結束編輯並捨棄未儲存內容？')) return;
+  editAccessBusy = true;
+  try {await api('/api/edit/lock', 'POST', {});}
+  catch (error) {byId('edit-access-message').textContent = error.message + '；本頁已鎖定。';}
+  finally {
+    editToken = ''; editorSession++; mappingRequest++; editor.close();
+    if (typeof closeOperations === 'function') closeOperations();
+    updateEditControls(); editAccessBusy = false;
+  }
+});
+byId('edit-unlock-cancel').addEventListener('click', () => {if (!editAccessBusy) {byId('edit-password').value = ''; byId('edit-unlock').close();}});
+byId('edit-unlock').addEventListener('cancel', event => {if (editAccessBusy) event.preventDefault(); else byId('edit-password').value = '';});
+byId('edit-unlock-form').addEventListener('submit', async event => {
+  event.preventDefault(); if (editAccessBusy) return;
+  editAccessBusy = true; byId('edit-unlock-submit').disabled = true;
+  const password = byId('edit-password').value; byId('edit-password').value = '';
+  try {
+    const result = await api('/api/edit/unlock', 'POST', {password});
+    if (!result.token) throw new Error('服務未傳回編輯工作階段');
+    editToken = result.token; updateEditControls(); byId('edit-unlock').close();
+  } catch (error) {byId('edit-unlock-message').textContent = error.message;}
+  finally {editAccessBusy = false; byId('edit-unlock-submit').disabled = false;}
+});
+updateEditControls();
 
 function fillSelect(select, values, placeholder) {
   select.replaceChildren();
@@ -131,6 +192,12 @@ async function openDetail(id) {
     const failure = element('section', 'detail-section');
     failure.append(element('h3', '', '異常描述'), element('div', 'detail-text', record.failure_description));
     body.append(failure);
+    if (record.legacy_source) {
+      const source = element('details', 'detail-section'); source.append(element('summary', '', '唯讀來源欄位（匯入當時）'));
+      for (const [key, value] of Object.entries(record.legacy_source)) source.append(element('p', 'detail-text', `${key}: ${value || '（空白）'}`));
+      body.append(source);
+    }
+    for (const warning of record.legacy_warnings || []) body.append(element('p', 'notice', '來源核對提醒（匯入時）：' + warning));
     if (!detail.open) detail.showModal();
     if (typeof renderDetailFeatures === 'function') await renderDetailFeatures(record, body, () => request === detailRequest);
     if (request !== detailRequest) return;
@@ -144,6 +211,7 @@ async function openDetail(id) {
 byId('close-detail').addEventListener('click', () => {detailRequest++; detail.close();});
 detail.addEventListener('cancel', () => {detailRequest++;});
 byId('edit-detail').addEventListener('click', async () => {
+  if (!editToken) {byId('detail-message').textContent = '請先開啟編輯模式'; return;}
   if (!selectedRecord) return;
   const button = byId('edit-detail');
   const id = selectedRecord.id, request = detailRequest;
@@ -315,6 +383,7 @@ byId('serial').addEventListener('input', () => {mappingRequest++; mapping = null
 byId('serial').addEventListener('blur', () => lookupMapping().catch(error => {byId('form-message').textContent = error.message;}));
 
 async function openEditor(record = null) {
+  requireEditMode();
   const session = ++editorSession;
   current = record;
   mapping = null;
@@ -352,7 +421,7 @@ async function openEditor(record = null) {
       if (session !== editorSession || !editor.open || current?.id !== id) return;
       for (const event of result.data) {
         const item = document.createElement('li');
-        const time = new Date(event.changed_at).toLocaleString('zh-TW', {timeZone:'Asia/Taipei', hour12:false});
+        const time = sourceDate(event.changed_at).toLocaleString('zh-TW', {timeZone:'Asia/Taipei', hour12:false});
         if (event.operation === 'INSERT') item.textContent = `${time} 新增 ${event.serial_no}－${event.board_name}`;
         else item.textContent = `${time} ${event.operation === 'IMPORT' ? '匯入' : '修改'}\n` + Object.entries(event.changes).map(([field, change]) => `${fieldLabels[field] || field}：${typeof change.old === 'object' && change.old !== null ? JSON.stringify(change.old) : change.old ?? '—'} → ${typeof change.new === 'object' && change.new !== null ? JSON.stringify(change.new) : change.new ?? '—'}`).join('\n');
         byId('history').append(item);
