@@ -77,10 +77,22 @@ const testRecord = {id:'record-1', serial_no:'002850948', machine_code:'F45', mo
 const testDbn = {id:'dbn-1',serial_no:'002850948',machine_code:'F45',model:'T5377S',board_name:'HVDR PE',board_part_code:'BPR-030837',customer_code:'AB',product_code:'JAA118',station_code:'CP1',issue_type:'Group',dut:'1-2',dut_pin_snapshot:{'1':['COMMON','ONE'], '2':['COMMON','TWO']},socket_file_id:'socket-1',created_at:'2026-11-02T00:00:00Z',version:1};
 const requests = [];
 let featureChain = null;
+let recordWritesSucceed = false, recordReadFails = false, liveRecord = {...testRecord};
+let recordReadGate = null;
 async function fetch(path, options = {}) {
   requests.push({path:String(path), options});
   let data;
-  if (options.method === 'PUT') return {ok:false, json:async()=>({error:'此紀錄已被其他人修改'})};
+  if (options.method === 'PUT') {
+    if (recordWritesSucceed && String(path).startsWith('/api/repairs/records/')) {
+      liveRecord = {...liveRecord,...JSON.parse(options.body),version:liveRecord.version + 1};
+      return {ok:true,json:async()=>({data:{...liveRecord}})};
+    }
+    return {ok:false, json:async()=>({error:'此紀錄已被其他人修改'})};
+  }
+  if (options.method === 'POST' && path === '/api/repairs/records') {
+    liveRecord = {...testRecord,...JSON.parse(options.body),id:'created-1'};
+    return {ok:true,json:async()=>({data:{...liveRecord}})};
+  }
   if (options.method === 'POST' && path === '/api/repairs/dbn') return {ok:true,json:async()=>({data:{id:'new-dbn'}})};
   if (options.method === 'POST' && path === '/api/repairs/mappings/impact') return {ok:true,json:async()=>({repair_count:1,dbn_count:0,token:'impact-token'})};
   if (options.method === 'POST' && path === '/api/repairs/mappings') return {ok:true,json:async()=>({data:{serial_no:'002850948'}})};
@@ -97,7 +109,11 @@ async function fetch(path, options = {}) {
   else if (String(path).startsWith('/api/repairs/statistics?')) data = {frequency:{'2026-11':1},amounts_cents:{'2026-11':{'板修':0,'外修':0,'合約':0,'保固':0}},ranking:[{machine:'F45',count:1}],missing_amounts:0};
   else if (String(path).startsWith('/api/repairs/masters')) data = {machines:[{machine_code:'F45',model:'T5377S'}],boards:[{model:'T5377S',board_name:'HVDR PE',board_part_code:'BPR-030837'}],prices:[{model:'T5377S',board_name:'HVDR PE',board_part_code:'BPR-030837',board_repair_cents:0}],token:'master-token'};
   else if (String(path).startsWith('/api/repairs/records?')) data = {data:[{...testRecord}], total:1, page:1, page_size:20, status_counts:{'待送修':1}};
-  else if (String(path).endsWith('/record-1')) data = {data:{...testRecord}};
+  else if (String(path).endsWith('/record-1') || String(path).endsWith('/created-1')) {
+    if (recordReadGate) await recordReadGate;
+    if (recordReadFails) throw Error('模擬讀取失敗');
+    data = {data:{...liveRecord}};
+  }
   else if (String(path).endsWith('/retry-2')) data = {data:{...testRecord,id:'retry-2'}};
   else throw Error('Unexpected API path: ' + path);
   return {ok:true, json:async()=>data};
@@ -285,6 +301,44 @@ function assert(ok, message) {if (!ok) throw Error(message);}
   const mappingWrite = requests.find(request => request.path === '/api/repairs/mappings' && request.options.method === 'POST');
   assert(mappingWrite && JSON.parse(mappingWrite.options.body).impact_token === 'impact-token', 'S/N write uses preview token');
   assert(JSON.parse(mappingWrite.options.body).sync_history === true, 'History synchronization is explicitly confirmed');
+  operationsDialog.close();
+  await openDetail(testRecord.id);
+  await nodes['edit-detail'].listeners.click[0]();
+  nodes['failure-description'].value = '尚未儲存的內容';
+  const beforeReload = requests.length;
+  window.confirm = () => false;
+  await nodes['reload-record'].listeners.click[0]();
+  assert(requests.length === beforeReload && nodes['failure-description'].value === '尚未儲存的內容', 'Declining reload preserves input without reading or writing');
+  window.confirm = () => true; recordReadFails = true;
+  await nodes['reload-record'].listeners.click[0]();
+  assert(nodes.editor.open && nodes['failure-description'].value === '尚未儲存的內容' && !editorReloading && !nodes.save.disabled, 'Failed reload preserves input and restores controls');
+  recordReadFails = false; liveRecord = {...testRecord,version:2,failure_description:'其他分頁已更新'};
+  await nodes['reload-record'].listeners.click[0]();
+  assert(current.version === 2 && nodes['failure-description'].value === '其他分頁已更新', 'Confirmed reload uses newest record/version');
+  assert(nodes.board.disabled, 'Reload preserves mapped-board lock');
+  let releaseRead;
+  recordReadGate = new Promise(resolve => {releaseRead = resolve;});
+  const pendingReload = nodes['reload-record'].listeners.click[0]();
+  assert(editorReloading && nodes.save.disabled && nodes.cancel.disabled, 'Reload locks write and close controls during its request');
+  const duringReload = requests.length;
+  await nodes['record-form'].listeners.submit[0]({preventDefault(){}});
+  await closeEditor();
+  assert(requests.length === duringReload && nodes.editor.open, 'Concurrent submit/cancel cannot interrupt reload');
+  recordReadGate = null; releaseRead(); await pendingReload;
+  await nodes.cancel.listeners.click[0]();
+  assert(!nodes.editor.open && nodes['record-detail'].open && selectedRecord.version === 2, 'Cancelling edit returns to freshly read record details');
+  await nodes['edit-detail'].listeners.click[0]();
+  nodes['failure-description'].value = '成功更新後返回詳細資料'; recordWritesSucceed = true;
+  await nodes['record-form'].listeners.submit[0]({preventDefault(){}});
+  assert(!nodes.editor.open && nodes['record-detail'].open && selectedRecord.version === 3 && selectedRecord.failure_description === '成功更新後返回詳細資料', 'Successful edit returns to updated details');
+  nodes['record-detail'].close();
+  await openEditor();
+  assert(nodes['reload-record'].hidden, 'New records do not offer reload of an existing case');
+  nodes.machine.value = 'F45'; updateBoards(); nodes.board.value = 'HVDR PE'; updateBoards();
+  nodes.serial.value = testRecord.serial_no; nodes['repair-type'].value = '板修'; nodes['failure-tag'].value = 'RTE'; nodes['failure-description'].value = '新增後查看';
+  await nodes['record-form'].listeners.submit[0]({preventDefault(){}});
+  assert(!nodes.editor.open && nodes['record-detail'].open && selectedRecord.id === 'created-1', 'Successful creation opens the newly saved record details');
+  nodes['record-detail'].close();
   setView(true);
   assert(nodes['workspace-view'].hidden && !nodes['quick-view'].hidden, 'Navigation leaves management workspace');
   assert(requests.every(request => request.path.startsWith('/api/')), 'All UI data requests are local');

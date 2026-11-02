@@ -3,6 +3,7 @@ let catalogs, current = null, mapping = null, mappingRequest = 0, saving = false
 let page = 1, total = 0, listingRequest = 0;
 let quickRequest = 0, detailRequest = 0, selectedRecord = null, serialFilter = '';
 let quickSerial = '';
+let editorSession = 0, editorReloading = false;
 const editor = byId('editor');
 const detail = byId('record-detail');
 const fieldLabels = {serial_no:'S/N', machine_code:'機台', model:'機型', description:'板件名稱', board_part_code:'Part Number', failure_tag:'異常類別', failure_description:'異常描述', repair_type:'維修分類', repair_amount:'維修金額', current_status:'狀態', is_opened:'已開單', occurred_on:'損壞日期', sent_on:'送修日期', returned_on:'回修日期', attachment:'Fail Log', closed_on:'結案日期', retry_of_record_id:'前次案件'};
@@ -230,10 +231,38 @@ async function lookupMapping() {
   return true;
 }
 
-function closeEditor() {if (!saving) editor.close();}
+async function closeEditor() {
+  if (saving || editorReloading) return;
+  const id = current?.id;
+  editorSession++; mappingRequest++; current = null;
+  editor.close();
+  if (id) await openDetail(id);
+}
 editor.addEventListener('cancel', event => event.preventDefault());
 byId('close').addEventListener('click', closeEditor);
 byId('cancel').addEventListener('click', closeEditor);
+byId('reload-record').addEventListener('click', async () => {
+  if (saving || editorReloading || !current) return;
+  if (!window.confirm('重新載入會捨棄這個表單尚未儲存的內容，改讀取最新案件。確定繼續？')) return;
+  const id = current.id, session = editorSession;
+  editorReloading = true; mappingRequest++;
+  let frozen = [...byId('record-form').elements].map(input => [input, input.disabled]);
+  frozen.forEach(([input]) => {input.disabled = true;});
+  for (const key of ['save','cancel','close','reload-record']) byId(key).disabled = true;
+  try {
+    byId('form-message').textContent = '正在重新載入最新案件…';
+    const result = await api('/api/repairs/records/' + encodeURIComponent(id));
+    if (session !== editorSession || !editor.open) return;
+    frozen.forEach(([input, disabled]) => {input.disabled = disabled;}); frozen = [];
+    await openEditor(result.data);
+  } catch (error) {
+    if (session === editorSession) byId('form-message').textContent = error.message + '\n重新載入失敗；原輸入已保留。';
+  } finally {
+    frozen.forEach(([input, disabled]) => {input.disabled = disabled;});
+    editorReloading = false;
+    for (const key of ['save','cancel','close','reload-record']) byId(key).disabled = false;
+  }
+});
 byId('machine').addEventListener('change', () => updateBoards());
 byId('board').addEventListener('change', () => updateBoards());
 byId('repair-type').addEventListener('change', updatePricePreview);
@@ -242,12 +271,14 @@ byId('serial').addEventListener('input', () => {mappingRequest++; mapping = null
 byId('serial').addEventListener('blur', () => lookupMapping().catch(error => {byId('form-message').textContent = error.message;}));
 
 async function openEditor(record = null) {
+  const session = ++editorSession;
   current = record;
   mapping = null;
   mappingRequest++;
   byId('record-form').reset();
   byId('reprice').checked = false;
   byId('reprice-field').hidden = !record;
+  byId('reload-record').hidden = !record;
   byId('create-attachment-field').hidden = Boolean(record);
   byId('create-attachment').value = '';
   filePickerUpdates.get(byId('create-attachment'))?.();
@@ -265,14 +296,15 @@ async function openEditor(record = null) {
   }
   if (!record) byId('occurred-on').value = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit'}).format(new Date());
   updateBoards(record?.description || '');
-  editor.showModal();
+  if (!editor.open) editor.showModal();
   byId('serial').focus();
   const id = record?.id;
   try {
     await lookupMapping();
+    if (session !== editorSession || !editor.open) return;
     if (id) {
       const result = await api(`/api/repairs/records/${encodeURIComponent(id)}/history`);
-      if (current?.id !== id) return;
+      if (session !== editorSession || !editor.open || current?.id !== id) return;
       for (const event of result.data) {
         const item = document.createElement('li');
         const time = new Date(event.changed_at).toLocaleString('zh-TW', {timeZone:'Asia/Taipei', hour12:false});
@@ -281,15 +313,15 @@ async function openEditor(record = null) {
         byId('history').append(item);
       }
     }
-  } catch (error) {byId('form-message').textContent = error.message;}
+  } catch (error) {if (session === editorSession && editor.open) byId('form-message').textContent = error.message;}
 }
 
 byId('create').addEventListener('click', () => openEditor());
 byId('record-form').addEventListener('submit', async event => {
   event.preventDefault();
-  if (saving) return;
+  if (saving || editorReloading) return;
   saving = true;
-  for (const id of ['save', 'cancel', 'close']) byId(id).disabled = true;
+  for (const id of ['save', 'cancel', 'close', 'reload-record']) byId(id).disabled = true;
   byId('form-message').textContent = '正在儲存…';
   let frozen = [];
   try {
@@ -308,17 +340,20 @@ byId('record-form').addEventListener('submit', async event => {
     frozen = [...byId('record-form').elements].map(input => [input, input.disabled]);
     for (const [input] of frozen) input.disabled = true;
     const url = '/api/repairs/records' + (current ? '/' + encodeURIComponent(current.id) : '');
-    await api(url, current ? 'PUT' : 'POST', payload);
+    const result = await api(url, current ? 'PUT' : 'POST', payload);
+    const savedId = result.data.id;
+    editorSession++; mappingRequest++; current = null;
     editor.close();
     page = 1;
     await loadRecords();
     if (quickSerial) await searchSerial();
+    await openDetail(savedId);
   } catch (error) {
     byId('form-message').textContent = error.message + '\n輸入內容已保留。若為連線中斷，請先查詢確認是否已儲存，避免重複新增。';
   } finally {
     for (const [input, disabled] of frozen) input.disabled = disabled;
     saving = false;
-    for (const id of ['save', 'cancel', 'close']) byId(id).disabled = false;
+    for (const id of ['save', 'cancel', 'close', 'reload-record']) byId(id).disabled = false;
   }
 });
 

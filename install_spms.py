@@ -41,6 +41,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             'Model／板名／PN／維修分類，或明確勾選「重新套用目前價目」時才重新計價；預覽顯示保留原價或目前價目。已結案案件也適用此規則，明確重計會影響歷史統計並記錄異動。補齊價目後要更新原先 '
                                             'NULL 案件，須勾選重新套用，再進行結案。\n'
                                             '- 修改必須提供讀取時的版本；過期版本回傳 409，不覆蓋他人修改。\n'
+                                            '- '
+                                            '送修新增／編輯儲存後直接開啟該案詳細資料；取消既有案件編輯時，重新讀取並返回詳細資料。衝突或失敗仍保留表單輸入；「重新載入此案」須先確認捨棄未儲存內容，讀取失敗不清空輸入，成功則取得最新版本與主檔鎖定。儲存／重載期間停用重複操作；過期的編輯歷史回應不會填入其他表單。\n'
                                             '- 機台管理是預留模組（未安裝），與備品管理分開。共用 SQLite 連線與模組遷移紀錄，之後以新增遷移擴充，不重建資料庫。\n'
                                             '- DBN：獨立新增／編輯／刪除，驗證客戶→產品→站點與機台／板件；支援 Group（連續 1–8 DUT）、Single '
                                             'Dut、RTE、Other。後兩者描述必填。DUT／PIN 為當時 Socket 快照，產品與 DUT 不變時保留舊快照；未有 '
@@ -299,7 +301,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             '產生；公司版程式更新後必須重新產生。\n'
                                             '安裝測試：`python -m unittest discover -s scripts -p '
                                             '"test_company_installer.py" -v`。\n',
-                                 'sha256': 'df36e537488409aa660c62092142eef40a4053742f598f45b0e0fd434ba7e42a'},
+                                 'sha256': '10ad533be458c4fecd3390e0ef2d907f229d4aa22c61030404f4f77e59c0a3b8'},
            'company/database.py': {'content': '"""Shared SQLite connections and additive, backed-up module '
                                               'migrations."""\n'
                                               'import json\n'
@@ -7538,7 +7540,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    '    </div>\n'
                                                    '    <p id="form-message" role="status" '
                                                    'aria-live="polite"></p>\n'
-                                                   '    <div class="actions"><button id="cancel" '
+                                                   '    <div class="actions"><button id="reload-record" '
+                                                   'type="button" hidden>重新載入此案</button><button id="cancel" '
                                                    'type="button">取消</button><button id="save" '
                                                    'type="submit">儲存</button></div>\n'
                                                    '  </form>\n'
@@ -7559,7 +7562,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    'type="submit">儲存</button></div></form></dialog>\n'
                                                    '</body>\n'
                                                    '</html>\n',
-                                        'sha256': '4ae26e426bcc221c3003646dcbdaacf0b00d97b204dd0bda25204986a32b67f1'},
+                                        'sha256': '8432fb723cc697062c547c67baa344c0c079c45a873a0cd4f1a524284f4b2ce6'},
            'company/web/repairs.js': {'content': 'const byId = id => document.getElementById(id);\n'
                                                  'let catalogs, current = null, mapping = null, '
                                                  'mappingRequest = 0, saving = false;\n'
@@ -7567,6 +7570,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  'let quickRequest = 0, detailRequest = 0, selectedRecord = '
                                                  "null, serialFilter = '';\n"
                                                  "let quickSerial = '';\n"
+                                                 'let editorSession = 0, editorReloading = false;\n'
                                                  "const editor = byId('editor');\n"
                                                  "const detail = byId('record-detail');\n"
                                                  "const fieldLabels = {serial_no:'S/N', machine_code:'機台', "
@@ -7904,11 +7908,52 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  '  return true;\n'
                                                  '}\n'
                                                  '\n'
-                                                 'function closeEditor() {if (!saving) editor.close();}\n'
+                                                 'async function closeEditor() {\n'
+                                                 '  if (saving || editorReloading) return;\n'
+                                                 '  const id = current?.id;\n'
+                                                 '  editorSession++; mappingRequest++; current = null;\n'
+                                                 '  editor.close();\n'
+                                                 '  if (id) await openDetail(id);\n'
+                                                 '}\n'
                                                  "editor.addEventListener('cancel', event => "
                                                  'event.preventDefault());\n'
                                                  "byId('close').addEventListener('click', closeEditor);\n"
                                                  "byId('cancel').addEventListener('click', closeEditor);\n"
+                                                 "byId('reload-record').addEventListener('click', async () "
+                                                 '=> {\n'
+                                                 '  if (saving || editorReloading || !current) return;\n'
+                                                 "  if (!window.confirm('重新載入會捨棄這個表單尚未儲存的內容，改讀取最新案件。確定繼續？')) "
+                                                 'return;\n'
+                                                 '  const id = current.id, session = editorSession;\n'
+                                                 '  editorReloading = true; mappingRequest++;\n'
+                                                 "  let frozen = [...byId('record-form').elements].map(input "
+                                                 '=> [input, input.disabled]);\n'
+                                                 '  frozen.forEach(([input]) => {input.disabled = true;});\n'
+                                                 '  for (const key of '
+                                                 "['save','cancel','close','reload-record']) "
+                                                 'byId(key).disabled = true;\n'
+                                                 '  try {\n'
+                                                 "    byId('form-message').textContent = '正在重新載入最新案件…';\n"
+                                                 "    const result = await api('/api/repairs/records/' + "
+                                                 'encodeURIComponent(id));\n'
+                                                 '    if (session !== editorSession || !editor.open) '
+                                                 'return;\n'
+                                                 '    frozen.forEach(([input, disabled]) => {input.disabled '
+                                                 '= disabled;}); frozen = [];\n'
+                                                 '    await openEditor(result.data);\n'
+                                                 '  } catch (error) {\n'
+                                                 '    if (session === editorSession) '
+                                                 "byId('form-message').textContent = error.message + "
+                                                 "'\\n重新載入失敗；原輸入已保留。';\n"
+                                                 '  } finally {\n'
+                                                 '    frozen.forEach(([input, disabled]) => {input.disabled '
+                                                 '= disabled;});\n'
+                                                 '    editorReloading = false;\n'
+                                                 '    for (const key of '
+                                                 "['save','cancel','close','reload-record']) "
+                                                 'byId(key).disabled = false;\n'
+                                                 '  }\n'
+                                                 '});\n'
                                                  "byId('machine').addEventListener('change', () => "
                                                  'updateBoards());\n'
                                                  "byId('board').addEventListener('change', () => "
@@ -7924,12 +7969,14 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  "{byId('form-message').textContent = error.message;}));\n"
                                                  '\n'
                                                  'async function openEditor(record = null) {\n'
+                                                 '  const session = ++editorSession;\n'
                                                  '  current = record;\n'
                                                  '  mapping = null;\n'
                                                  '  mappingRequest++;\n'
                                                  "  byId('record-form').reset();\n"
                                                  "  byId('reprice').checked = false;\n"
                                                  "  byId('reprice-field').hidden = !record;\n"
+                                                 "  byId('reload-record').hidden = !record;\n"
                                                  "  byId('create-attachment-field').hidden = "
                                                  'Boolean(record);\n'
                                                  "  byId('create-attachment').value = '';\n"
@@ -7958,15 +8005,18 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  "year:'numeric', month:'2-digit', "
                                                  "day:'2-digit'}).format(new Date());\n"
                                                  "  updateBoards(record?.description || '');\n"
-                                                 '  editor.showModal();\n'
+                                                 '  if (!editor.open) editor.showModal();\n'
                                                  "  byId('serial').focus();\n"
                                                  '  const id = record?.id;\n'
                                                  '  try {\n'
                                                  '    await lookupMapping();\n'
+                                                 '    if (session !== editorSession || !editor.open) '
+                                                 'return;\n'
                                                  '    if (id) {\n'
                                                  '      const result = await '
                                                  'api(`/api/repairs/records/${encodeURIComponent(id)}/history`);\n'
-                                                 '      if (current?.id !== id) return;\n'
+                                                 '      if (session !== editorSession || !editor.open || '
+                                                 'current?.id !== id) return;\n'
                                                  '      for (const event of result.data) {\n'
                                                  "        const item = document.createElement('li');\n"
                                                  '        const time = new '
@@ -7986,7 +8036,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  "        byId('history').append(item);\n"
                                                  '      }\n'
                                                  '    }\n'
-                                                 "  } catch (error) {byId('form-message').textContent = "
+                                                 '  } catch (error) {if (session === editorSession && '
+                                                 "editor.open) byId('form-message').textContent = "
                                                  'error.message;}\n'
                                                  '}\n'
                                                  '\n'
@@ -7995,10 +8046,10 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  "byId('record-form').addEventListener('submit', async event "
                                                  '=> {\n'
                                                  '  event.preventDefault();\n'
-                                                 '  if (saving) return;\n'
+                                                 '  if (saving || editorReloading) return;\n'
                                                  '  saving = true;\n'
-                                                 "  for (const id of ['save', 'cancel', 'close']) "
-                                                 'byId(id).disabled = true;\n'
+                                                 "  for (const id of ['save', 'cancel', 'close', "
+                                                 "'reload-record']) byId(id).disabled = true;\n"
                                                  "  byId('form-message').textContent = '正在儲存…';\n"
                                                  '  let frozen = [];\n'
                                                  '  try {\n'
@@ -8029,11 +8080,15 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  '    for (const [input] of frozen) input.disabled = true;\n'
                                                  "    const url = '/api/repairs/records' + (current ? '/' + "
                                                  "encodeURIComponent(current.id) : '');\n"
-                                                 "    await api(url, current ? 'PUT' : 'POST', payload);\n"
+                                                 "    const result = await api(url, current ? 'PUT' : "
+                                                 "'POST', payload);\n"
+                                                 '    const savedId = result.data.id;\n'
+                                                 '    editorSession++; mappingRequest++; current = null;\n'
                                                  '    editor.close();\n'
                                                  '    page = 1;\n'
                                                  '    await loadRecords();\n'
                                                  '    if (quickSerial) await searchSerial();\n'
+                                                 '    await openDetail(savedId);\n'
                                                  '  } catch (error) {\n'
                                                  "    byId('form-message').textContent = error.message + "
                                                  "'\\n輸入內容已保留。若為連線中斷，請先查詢確認是否已儲存，避免重複新增。';\n"
@@ -8041,8 +8096,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  '    for (const [input, disabled] of frozen) input.disabled '
                                                  '= disabled;\n'
                                                  '    saving = false;\n'
-                                                 "    for (const id of ['save', 'cancel', 'close']) "
-                                                 'byId(id).disabled = false;\n'
+                                                 "    for (const id of ['save', 'cancel', 'close', "
+                                                 "'reload-record']) byId(id).disabled = false;\n"
                                                  '  }\n'
                                                  '});\n'
                                                  '\n'
@@ -8123,7 +8178,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  "  } catch (error) {byId('message').textContent = "
                                                  "error.message; byId('message').dataset.error = 'true';}\n"
                                                  '})();\n',
-                                      'sha256': '01c08b3cdc2d8a2e9940bb24081e115f8f1d93bd1935cdb9fd85133d90e02b47'},
+                                      'sha256': 'f324b129b68733b6aef024c986f949c1c7dc300aaeabe5c5450d98b2c6a4fbb6'},
            'company/web/style.css': {'content': ':root{color-scheme:dark;font-family:"Segoe '
                                                 'UI",sans-serif;background:#101113;color:#e7e7e8}\n'
                                                 '*{box-sizing:border-box}body{margin:0}main{max-width:850px;margin:60px '
@@ -8144,7 +8199,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                 '@media(max-width:600px){main{margin:25px auto;padding:0 '
                                                 '16px}h1{font-size:22px}section{padding:18px}dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:10px}}\n',
                                      'sha256': '064406c8758be5620dfe7440f59d59ec1de5f6307e74f5bad85dd03e018c0769'}},
- 'version': '2026-11-02-master-search'}
+ 'version': '2026-11-02-editor-workflow'}
 
 
 def check_local_path(path):
