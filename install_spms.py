@@ -52,6 +52,9 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             '未設定另計，不當成零；提供長條圖及表格。現有統計沒有登入後的人員區分。\n'
                                             '- 主檔對應維護不會自動重算或同步舊案件；S/N 的同步需從 S/N 主檔頁明確操作。價格以整數分寫入，保固只允許 '
                                             'NULL／0。\n'
+                                            '- 異動紀錄提供資料類型、操作、開始／結束日期篩選及舊值／新值六欄表格；日期依台北時區、包含結束日，搜尋包含異動內容並將 '
+                                            '`%`／`_` 視為文字。以每頁 20 個事件分頁，同一事件的變更欄位一併顯示（不同於原版每頁 10 '
+                                            '個欄位）；新增／刪除也保留各欄細節，不隱藏來源紀錄。尚非具名人員稽核。\n'
                                             '- 離線 JSON 匯入、SQLite '
                                             '備份驗證與復原到新檔工具已提供（下方）。**真實舊資料尚未匯入**：仍須提供公司核准的匯出檔，先審核轉換與核對筆數；程式不會讀雲端取得資料。\n'
                                             '- **尚未實作登入／角色權限、正式內網部署與排程／異地備份；尚未完成 Windows '
@@ -280,7 +283,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             '產生；公司版程式更新後必須重新產生。\n'
                                             '安裝測試：`python -m unittest discover -s scripts -p '
                                             '"test_company_installer.py" -v`。\n',
-                                 'sha256': 'ff0788d00eb29534c17435fda52a1719a5b1d3ea81782fe133af8f5c26846fff'},
+                                 'sha256': 'f2b1e465df8639d7511f9210c3f5bf61a149bb5b3d9d20d1eda0a7ab8140df1f'},
            'company/database.py': {'content': '"""Shared SQLite connections and additive, backed-up module '
                                               'migrations."""\n'
                                               'import json\n'
@@ -1987,7 +1990,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                                 '\n'
                                                                 '\n'
                                                                 'def paginate(connection, table, query, '
-                                                                'columns, order, transform=dict):\n'
+                                                                'columns, order, transform=dict, filters=(), '
+                                                                'parameters=()):\n'
                                                                 '    try:\n'
                                                                 "        page = int(query.get('page', "
                                                                 "['1'])[0])\n"
@@ -1995,7 +1999,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                                 "        raise APIError('頁碼格式錯誤')\n"
                                                                 '    if not 1 <= page <= 1000000:\n'
                                                                 "        raise APIError('頁碼超出範圍')\n"
-                                                                '    where, args = [], []\n'
+                                                                '    where, args = list(filters), '
+                                                                'list(parameters)\n'
                                                                 "    if query.get('serial', [''])[0]:\n"
                                                                 "        where.append('serial_no=?')\n"
                                                                 '        '
@@ -2685,6 +2690,53 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                                 '\n'
                                                                 '\n'
                                                                 'def history(path, query):\n'
+                                                                '    where, args = [], []\n'
+                                                                '    for key, column, allowed in (\n'
+                                                                "        ('source', 'source_table', "
+                                                                "('repair_records', 'dbn_records', "
+                                                                "'serial_board_mappings', "
+                                                                "'repair_machine_models', "
+                                                                "'repair_model_boards', "
+                                                                "'repair_board_prices', "
+                                                                "'repair_attachments')),\n"
+                                                                "        ('operation', 'operation', "
+                                                                "('INSERT', 'UPDATE', 'DELETE')),\n"
+                                                                '    ):\n'
+                                                                "        value = query.get(key, [''])[0]\n"
+                                                                '        if value:\n'
+                                                                '            if value not in allowed:\n'
+                                                                "                raise APIError('異動篩選格式錯誤')\n"
+                                                                "            where.append(column + '=?')\n"
+                                                                '            args.append(value)\n'
+                                                                '    dates = {}\n'
+                                                                "    for key in ('start', 'end'):\n"
+                                                                "        value = query.get(key, [''])[0]\n"
+                                                                '        if value:\n'
+                                                                '            try:\n'
+                                                                '                if not '
+                                                                "re.fullmatch(r'\\d{4}-\\d{2}-\\d{2}', "
+                                                                'value):\n'
+                                                                '                    raise ValueError()\n'
+                                                                '                dates[key] = '
+                                                                'datetime.strptime(value, '
+                                                                "'%Y-%m-%d').replace(tzinfo=timezone(timedelta(hours=8)))\n"
+                                                                '            except ValueError:\n'
+                                                                "                raise APIError('異動日期格式錯誤')\n"
+                                                                "    if 'start' in dates and 'end' in dates "
+                                                                "and dates['start'] > dates['end']:\n"
+                                                                "        raise APIError('開始日期不可晚於結束日期')\n"
+                                                                "    if 'start' in dates:\n"
+                                                                '        '
+                                                                "where.append('julianday(changed_at)>=julianday(?)')\n"
+                                                                '        '
+                                                                "args.append(dates['start'].isoformat())\n"
+                                                                "    if 'end' in dates:\n"
+                                                                '        # Inclusive Taipei calendar date; '
+                                                                'avoid overflow on 9999-12-31.\n'
+                                                                '        '
+                                                                "where.append('julianday(changed_at)<julianday(?)+1')\n"
+                                                                '        '
+                                                                "args.append(dates['end'].isoformat())\n"
                                                                 '    with connect(path) as connection:\n'
                                                                 "        connection.execute('BEGIN')\n"
                                                                 '        def decode(row):\n'
@@ -2693,8 +2745,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                                 '        return paginate(connection, '
                                                                 "'record_change_history', query, "
                                                                 "('serial_no', 'board_name', 'source_table', "
-                                                                "'operation'), 'changed_at DESC,id DESC', "
-                                                                'decode)\n'
+                                                                "'operation', 'changes'), 'changed_at "
+                                                                "DESC,id DESC', decode, where, args)\n"
                                                                 '\n'
                                                                 '\n'
                                                                 'def statistics(path, query):\n'
@@ -2881,7 +2933,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                                 "identity, 'UPDATE' if old else 'INSERT', "
                                                                 'dict(old) if old else None, after)\n'
                                                                 "        return {'data': after}\n",
-                                                     'sha256': '79088969105fe2697ae7ef045b42036a36b9f53a1d02127d77d07f3e4ee36620'},
+                                                     'sha256': '3a7a1e23e5ff6bc7f40c6419501b27fad8285a3f5e2f7d52848efa76780ec8c6'},
            'company/modules/repairs/schema.sql': {'content': 'CREATE TABLE repair_machine_models (\n'
                                                              '    machine_code TEXT PRIMARY KEY,\n'
                                                              '    model TEXT NOT NULL\n'
@@ -3903,6 +3955,40 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    '        self.assertEqual(service.list_records(self.path, '
                                                    "{'q':['板修']})['total'], 21)\n"
                                                    '\n'
+                                                   '    def '
+                                                   'test_history_filters_taipei_boundaries_and_change_search(self):\n'
+                                                   '        with connect(self.path) as connection:\n'
+                                                   '            for index, stamp in '
+                                                   "enumerate(('2026-11-01T15:59:59Z', "
+                                                   "'2026-11-01T16:00:00Z', '2026-11-02T15:59:59Z', "
+                                                   "'2026-11-02T16:00:00Z')):\n"
+                                                   '                service.audit(connection, '
+                                                   "'repair_records', str(index), 'UPDATE', "
+                                                   "{'failure_description':'old'}, "
+                                                   "{'failure_description':'unique%_text'})\n"
+                                                   "                connection.execute('UPDATE "
+                                                   'record_change_history SET changed_at=? WHERE '
+                                                   "record_id=?', (stamp, str(index)))\n"
+                                                   "        query = {'source':['repair_records'], "
+                                                   "'operation':['UPDATE'], 'start':['2026-11-02'], "
+                                                   "'end':['2026-11-02'], 'q':['unique%_text']}\n"
+                                                   '        result = ops.history(self.path, query)\n'
+                                                   "        self.assertEqual(result['total'], 2)\n"
+                                                   "        self.assertEqual({row['record_id'] for row in "
+                                                   "result['data']}, {'1','2'})\n"
+                                                   '        self.assertEqual(ops.history(self.path, '
+                                                   "dict(query, operation=['DELETE']))['total'], 0)\n"
+                                                   '        self.assertEqual(ops.history(self.path, '
+                                                   "dict(query, source=['dbn_records']))['total'], 0)\n"
+                                                   '        self.assertEqual(ops.history(self.path, '
+                                                   "dict(query, end=['9999-12-31']))['total'], 3)\n"
+                                                   "        for invalid in ({'source':['bad']}, "
+                                                   "{'operation':['bad']}, {'start':['2026-02-30']}, "
+                                                   "{'end':['11/02']}, {'start':['2026-11-03'], "
+                                                   "'end':['2026-11-02']}):\n"
+                                                   '            with self.assertRaises(APIError):\n'
+                                                   '                ops.history(self.path, invalid)\n'
+                                                   '\n'
                                                    '    def test_dbn_snapshot_is_historical(self):\n'
                                                    "        row = ops.save_dbn(self.path, dbn())['data']\n"
                                                    "        self.assertEqual(row['serial_no'], '002850948')\n"
@@ -4462,7 +4548,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    '\n'
                                                    "if __name__ == '__main__':\n"
                                                    '    unittest.main()\n',
-                                        'sha256': 'a2844bdc48c8d9d7f53d81714aa73898b8597d93bae6dcb0ea6969898de2bbb3'},
+                                        'sha256': 'c730d695a1f2c0343cf0d7a1976f44bae1d2f431db2592f7809d22a2eb18493d'},
            'company/test_import_data.py': {'content': 'import json\n'
                                                       'import sqlite3\n'
                                                       'import unittest\n'
@@ -5274,6 +5360,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   "  byId('stats-controls').hidden = kind !== 'statistics';\n"
                                                   "  byId('workspace-pager').hidden = ['statistics', "
                                                   "'masters'].includes(kind);\n"
+                                                  "  byId('history-filters').hidden = kind !== 'history';\n"
                                                   "  if (kind === 'dbn') "
                                                   "byId('workspace-actions').append(action('＋ 新增 DBN', () => "
                                                   'editDbn()));\n'
@@ -5339,6 +5426,9 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   'page:workspacePage});\n'
                                                   "    if (workspaceSerial) query.set('serial', "
                                                   'workspaceSerial);\n'
+                                                  "    if (kind === 'history') for (const key of "
+                                                  "['source','operation','start','end']) query.set(key, "
+                                                  "byId('history-' + key).value);\n"
                                                   "    if (kind === 'statistics') {query.set('mode', "
                                                   "statisticsMode); query.set('period', statisticsMode === "
                                                   "'year' ? statisticsYear : statisticsMonth);}\n"
@@ -5369,6 +5459,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   "    if (kind === 'mappings') "
                                                   "content.append(workspaceHeading(['S/N','板件名稱','Part "
                                                   "Number','操作'], 'serial-map-heading'));\n"
+                                                  "    if (kind === 'history') renderHistory(result.data, "
+                                                  'content);\n'
                                                   '    for (const row of result.data) {\n'
                                                   "      if (kind === 'dbn') "
                                                   'content.append(renderDbnRow(row));\n'
@@ -5382,28 +5474,14 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   "row.board_name), labeledCell('Part Number', "
                                                   'row.board_part_code), actions);\n'
                                                   '        content.append(card);\n'
-                                                  '      } else {\n'
-                                                  "        const card = element('section', "
-                                                  "'quick-summary');\n"
-                                                  "        card.append(element('strong', '', "
-                                                  '`${row.operation} · ${row.source_table} · ${row.serial_no '
-                                                  "|| '—'}`),\n"
-                                                  "          element('p', '', new "
-                                                  "Date(row.changed_at).toLocaleString('zh-TW', "
-                                                  "{timeZone:'Asia/Taipei'})),\n"
-                                                  "          element('pre', 'detail-text', "
-                                                  'Object.entries(row.changes).map(([key, change]) => '
-                                                  '`${fieldLabels[key] || key}：${JSON.stringify(change.old) '
-                                                  "?? '—'} → ${JSON.stringify(change.new) ?? "
-                                                  "'—'}`).join('\\n')));\n"
-                                                  '        content.append(card);\n'
                                                   '      }\n'
                                                   '    }\n'
                                                   "    if (!result.total) content.append(element('p', "
                                                   "'serial-map-empty', '沒有符合條件的紀錄。'));\n"
                                                   "    byId('workspace-message').textContent = "
                                                   "`${workspaceSerial ? 'S/N ' + workspaceSerial + ' · ' : "
-                                                  "''}共 ${result.total} 筆`;\n"
+                                                  "''}共 ${result.total} 筆${kind === 'history' ? '異動事件（每頁最多 "
+                                                  "20 事件，展開各變更欄位）' : ''}`;\n"
                                                   "    byId('workspace-page').textContent = `第 "
                                                   '${result.page}／${Math.max(1, Math.ceil(result.total / '
                                                   '20))} 頁`;\n'
@@ -5416,6 +5494,53 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   "    byId('workspace-content').replaceChildren(); "
                                                   "byId('workspace-message').textContent = error.message;\n"
                                                   '  }\n'
+                                                  '}\n'
+                                                  '\n'
+                                                  'function renderHistory(events, container) {\n'
+                                                  '  const sources = '
+                                                  "{repair_records:'送修',dbn_records:'DBN',serial_board_mappings:'S/N "
+                                                  "對應',repair_machine_models:'機台對應',repair_model_boards:'板件對應',repair_board_prices:'價格',repair_attachments:'附件'};\n"
+                                                  '  const operations = '
+                                                  "{INSERT:'新增',UPDATE:'修改',DELETE:'刪除'};\n"
+                                                  '  const labels = '
+                                                  "{...fieldLabels,board_name:'板件名稱',customer_code:'客戶',product_code:'產品',station_code:'站點',issue_type:'DBN "
+                                                  "類型',issue_description:'異常描述',dut:'DUT',socket_file_id:'Socket "
+                                                  'File '
+                                                  "版本',dut_pin_snapshot:'PIN',board_repair_cents:'板修金額（分）',external_repair_cents:'外修金額（分）',contract_repair_cents:'合約金額（分）',warranty_repair_cents:'保固金額（分）'};\n"
+                                                  '  function value(field, data) {\n'
+                                                  "    if (data == null) return '—';\n"
+                                                  "    if (data === '') return '（空白）';\n"
+                                                  "    if (field === 'is_opened') return data ? '已開單' : "
+                                                  "'未開單';\n"
+                                                  "    if (field === 'dut_pin_snapshot') return "
+                                                  'Object.entries(data).map(([dut,pins]) => `DUT${dut}: '
+                                                  "${Array.isArray(pins) ? pins.join(', ') : "
+                                                  "'尚無對應'}`).join('\\n') || '（空白）';\n"
+                                                  "    return typeof data === 'object' ? "
+                                                  'JSON.stringify(data) : String(data);\n'
+                                                  '  }\n'
+                                                  '  const rows = [];\n'
+                                                  '  for (const event of events) {\n'
+                                                  '    const identity = `${event.serial_no || '
+                                                  "'—'}－${event.board_name || '—'}`;\n"
+                                                  '    const prefix = [new '
+                                                  "Date(event.changed_at).toLocaleString('zh-TW', "
+                                                  "{timeZone:'Asia/Taipei'}), `${sources[event.source_table] "
+                                                  '|| event.source_table}／${operations[event.operation] || '
+                                                  'event.operation}`, identity];\n'
+                                                  '    const changes = Object.entries(event.changes || '
+                                                  '{}).filter(([field]) => '
+                                                  "!['id','version','created_at','updated_at','source_system','source_record_id'].includes(field));\n"
+                                                  '    for (const [field, change] of changes) '
+                                                  'rows.push([...prefix, labels[field] || field, '
+                                                  'value(field, change.old), value(field, change.new)]);\n'
+                                                  "    if (!changes.length) rows.push([...prefix, '—', '—', "
+                                                  "'—']);\n"
+                                                  '  }\n'
+                                                  '  const result = '
+                                                  "table(['時間','類型／操作','S/N－板件名稱','變更欄位','舊值','新值'], rows);\n"
+                                                  "  result.className = 'table-wrap history-table'; "
+                                                  'container.append(result);\n'
                                                   '}\n'
                                                   '\n'
                                                   'function pinDetails(record) {\n'
@@ -6173,7 +6298,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '= index + 1; last = row.count; return [rank, row.machine, '
                                                   'row.count];}))); container.append(rankingCard);\n'
                                                   '}\n',
-                                       'sha256': 'cef089e8f8b0953b719534a33f117bb7272ff8125a40410b18cc48105f632d01'},
+                                       'sha256': 'ab3a225d3a8a56da11ef6e31956cceb742b0bf0516080fe5337ac03bcc3b75a6'},
            'company/web/index.html': {'content': '<!doctype html>\n'
                                                  '<html lang="zh-Hant">\n'
                                                  '<head>\n'
@@ -6626,6 +6751,14 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                         'sha256': 'a013059aa4730821abc3225f4ffe161bafe79a298545c045af9b9905af95a325'},
            'company/web/parity.css': {'content': '/* Local bindings for the unchanged original SPMS visual '
                                                  'components. */\n'
+                                                 '.history-filters{display:flex;flex-wrap:wrap;gap:12px;margin:12px '
+                                                 '0;align-items:flex-end}\n'
+                                                 '.history-filters label{font-size:11px}.history-filters '
+                                                 'input,.history-filters select{height:36px}\n'
+                                                 '.history-table td:nth-child(5),.history-table '
+                                                 'td:nth-child(6){white-space:pre-wrap;overflow-wrap:anywhere;max-width:340px}\n'
+                                                 '.history-table td:first-child{white-space:nowrap;font:11px '
+                                                 'ui-monospace,monospace}\n'
                                                  '.brand-mark{border:0;border-radius:0;background:transparent}\n'
                                                  '.brand-mark '
                                                  'img{display:block;width:36px;height:36px;object-fit:contain;filter:invert(1)}\n'
@@ -6711,7 +6844,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  'nav{display:flex}.local-information{font-size:10px}.content{padding:19px '
                                                  '12px 40px}.quick-search-view{margin:8px auto '
                                                  '0}.issue-copy{gap:8px}.issue-open-status{gap:3px}.stats-card{padding:13px}.stats-controls{gap:6px}}\n',
-                                      'sha256': 'a8db95ff7b96f67ab32c165b930e9d221026454017aff3ae7089bb65976d3116'},
+                                      'sha256': '20fd1207bbdcef92bd11c8efc7ce8008e3b2ea974a3aa0d59566c33bb1be04bc'},
            'company/web/repairs.css': {'content': ':root{color-scheme:dark;font-family:"Segoe '
                                                   'UI",sans-serif;background:#101113;color:#e7e7e8;font-size:14px}\n'
                                                   '*{box-sizing:border-box}body{margin:0}header{display:flex;gap:36px;align-items:center;background:#191a1c;border-bottom:1px '
@@ -7015,6 +7148,29 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    'id="workspace-query" type="search" placeholder="搜尋 '
                                                    'S/N、板名或相關資訊" '
                                                    'aria-label="管理清單搜尋"><button>查詢</button></form>\n'
+                                                   '      <div id="history-filters" class="history-filters" '
+                                                   'hidden>\n'
+                                                   '        <label>資料類型<select id="history-source" '
+                                                   'form="workspace-search"><option '
+                                                   'value="">全部</option><option '
+                                                   'value="repair_records">送修</option><option '
+                                                   'value="dbn_records">DBN</option><option '
+                                                   'value="serial_board_mappings">S/N 對應</option><option '
+                                                   'value="repair_machine_models">機台對應</option><option '
+                                                   'value="repair_model_boards">板件對應</option><option '
+                                                   'value="repair_board_prices">價格</option><option '
+                                                   'value="repair_attachments">附件</option></select></label>\n'
+                                                   '        <label>操作<select id="history-operation" '
+                                                   'form="workspace-search"><option '
+                                                   'value="">全部</option><option '
+                                                   'value="INSERT">新增</option><option '
+                                                   'value="UPDATE">修改</option><option '
+                                                   'value="DELETE">刪除</option></select></label>\n'
+                                                   '        <label>開始日期<input id="history-start" type="date" '
+                                                   'form="workspace-search"></label>\n'
+                                                   '        <label>結束日期<input id="history-end" type="date" '
+                                                   'form="workspace-search"></label>\n'
+                                                   '      </div>\n'
                                                    '      <div id="stats-controls" class="stats-controls" '
                                                    'hidden><div class="stats-mode" role="group" '
                                                    'aria-label="統計期間"><button id="stats-mode-year" '
@@ -7118,7 +7274,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    'type="submit">儲存</button></div></form></dialog>\n'
                                                    '</body>\n'
                                                    '</html>\n',
-                                        'sha256': 'a5dd6b8ab540e545423dbe017c0e44e5878a52a6a90fe70b1c90e4aaa4fb9ee1'},
+                                        'sha256': '6121e22f1c681b9d0f8bae10946c07d1f08639ca87e197aaae7800cbc3cdc58f'},
            'company/web/repairs.js': {'content': 'const byId = id => document.getElementById(id);\n'
                                                  'let catalogs, current = null, mapping = null, '
                                                  'mappingRequest = 0, saving = false;\n'
@@ -7684,7 +7840,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                 '@media(max-width:600px){main{margin:25px auto;padding:0 '
                                                 '16px}h1{font-size:22px}section{padding:18px}dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:10px}}\n',
                                      'sha256': '064406c8758be5620dfe7440f59d59ec1de5f6307e74f5bad85dd03e018c0769'}},
- 'version': '2026-11-02-original-ui-stage2'}
+ 'version': '2026-11-02-history-filters'}
 
 
 def check_local_path(path):

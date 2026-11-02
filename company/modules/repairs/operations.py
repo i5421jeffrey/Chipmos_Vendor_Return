@@ -46,14 +46,14 @@ def get_row(connection, table, identity):
     return row
 
 
-def paginate(connection, table, query, columns, order, transform=dict):
+def paginate(connection, table, query, columns, order, transform=dict, filters=(), parameters=()):
     try:
         page = int(query.get('page', ['1'])[0])
     except ValueError:
         raise APIError('頁碼格式錯誤')
     if not 1 <= page <= 1000000:
         raise APIError('頁碼超出範圍')
-    where, args = [], []
+    where, args = list(filters), list(parameters)
     if query.get('serial', [''])[0]:
         where.append('serial_no=?')
         args.append(serial(query['serial'][0]))
@@ -368,11 +368,41 @@ def save_mapping(path, payload):
 
 
 def history(path, query):
+    where, args = [], []
+    for key, column, allowed in (
+        ('source', 'source_table', ('repair_records', 'dbn_records', 'serial_board_mappings', 'repair_machine_models', 'repair_model_boards', 'repair_board_prices', 'repair_attachments')),
+        ('operation', 'operation', ('INSERT', 'UPDATE', 'DELETE')),
+    ):
+        value = query.get(key, [''])[0]
+        if value:
+            if value not in allowed:
+                raise APIError('異動篩選格式錯誤')
+            where.append(column + '=?')
+            args.append(value)
+    dates = {}
+    for key in ('start', 'end'):
+        value = query.get(key, [''])[0]
+        if value:
+            try:
+                if not re.fullmatch(r'\d{4}-\d{2}-\d{2}', value):
+                    raise ValueError()
+                dates[key] = datetime.strptime(value, '%Y-%m-%d').replace(tzinfo=timezone(timedelta(hours=8)))
+            except ValueError:
+                raise APIError('異動日期格式錯誤')
+    if 'start' in dates and 'end' in dates and dates['start'] > dates['end']:
+        raise APIError('開始日期不可晚於結束日期')
+    if 'start' in dates:
+        where.append('julianday(changed_at)>=julianday(?)')
+        args.append(dates['start'].isoformat())
+    if 'end' in dates:
+        # Inclusive Taipei calendar date; avoid overflow on 9999-12-31.
+        where.append('julianday(changed_at)<julianday(?)+1')
+        args.append(dates['end'].isoformat())
     with connect(path) as connection:
         connection.execute('BEGIN')
         def decode(row):
             return {**dict(row), 'changes': json.loads(row['changes'])}
-        return paginate(connection, 'record_change_history', query, ('serial_no', 'board_name', 'source_table', 'operation'), 'changed_at DESC,id DESC', decode)
+        return paginate(connection, 'record_change_history', query, ('serial_no', 'board_name', 'source_table', 'operation', 'changes'), 'changed_at DESC,id DESC', decode, where, args)
 
 
 def statistics(path, query):

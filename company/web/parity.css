@@ -1,4 +1,8 @@
 /* Local bindings for the unchanged original SPMS visual components. */
+.history-filters{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0;align-items:flex-end}
+.history-filters label{font-size:11px}.history-filters input,.history-filters select{height:36px}
+.history-table td:nth-child(5),.history-table td:nth-child(6){white-space:pre-wrap;overflow-wrap:anywhere;max-width:340px}
+.history-table td:first-child{white-space:nowrap;font:11px ui-monospace,monospace}
 .brand-mark{border:0;border-radius:0;background:transparent}
 .brand-mark img{display:block;width:36px;height:36px;object-fit:contain;filter:invert(1)}
 .sidebar{gap:10px}.sidebar .system-switcher{margin-bottom:8px}

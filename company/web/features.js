@@ -83,6 +83,7 @@ function openWorkspace(kind, number = '') {
   byId('workspace-search').hidden = ['statistics', 'masters'].includes(kind);
   byId('stats-controls').hidden = kind !== 'statistics';
   byId('workspace-pager').hidden = ['statistics', 'masters'].includes(kind);
+  byId('history-filters').hidden = kind !== 'history';
   if (kind === 'dbn') byId('workspace-actions').append(action('＋ 新增 DBN', () => editDbn()));
   if (kind === 'mappings') byId('workspace-actions').append(action('＋ 新增 S/N 對應', () => editMapping()));
   if (kind === 'masters') for (const [key, label] of [['machine','機台'], ['board','板件'], ['price','價格']]) {
@@ -118,6 +119,7 @@ async function loadWorkspace() {
   try {
     const query = new URLSearchParams({q:byId('workspace-query').value, page:workspacePage});
     if (workspaceSerial) query.set('serial', workspaceSerial);
+    if (kind === 'history') for (const key of ['source','operation','start','end']) query.set(key, byId('history-' + key).value);
     if (kind === 'statistics') {query.set('mode', statisticsMode); query.set('period', statisticsMode === 'year' ? statisticsYear : statisticsMonth);}
     const result = await api('/api/repairs/' + kind + '?' + query);
     if (request !== workspaceRequest || kind !== workspace) return;
@@ -133,6 +135,7 @@ async function loadWorkspace() {
     workspacePage = result.page;
     if (kind === 'dbn') content.append(workspaceHeading(['S/N','板件名稱','機台','客戶','產品','站點','紀錄日期','操作'], 'dbn-heading'));
     if (kind === 'mappings') content.append(workspaceHeading(['S/N','板件名稱','Part Number','操作'], 'serial-map-heading'));
+    if (kind === 'history') renderHistory(result.data, content);
     for (const row of result.data) {
       if (kind === 'dbn') content.append(renderDbnRow(row));
       else if (kind === 'mappings') {
@@ -140,16 +143,10 @@ async function loadWorkspace() {
         const actions = element('span', 'serial-map-actions'); actions.dataset.label = '操作'; actions.append(action('修改', () => editMapping(row)));
         card.append(labeledCell('S/N', row.serial_no, 'serial-map-serial'), labeledCell('板件名稱', row.board_name), labeledCell('Part Number', row.board_part_code), actions);
         content.append(card);
-      } else {
-        const card = element('section', 'quick-summary');
-        card.append(element('strong', '', `${row.operation} · ${row.source_table} · ${row.serial_no || '—'}`),
-          element('p', '', new Date(row.changed_at).toLocaleString('zh-TW', {timeZone:'Asia/Taipei'})),
-          element('pre', 'detail-text', Object.entries(row.changes).map(([key, change]) => `${fieldLabels[key] || key}：${JSON.stringify(change.old) ?? '—'} → ${JSON.stringify(change.new) ?? '—'}`).join('\n')));
-        content.append(card);
       }
     }
     if (!result.total) content.append(element('p', 'serial-map-empty', '沒有符合條件的紀錄。'));
-    byId('workspace-message').textContent = `${workspaceSerial ? 'S/N ' + workspaceSerial + ' · ' : ''}共 ${result.total} 筆`;
+    byId('workspace-message').textContent = `${workspaceSerial ? 'S/N ' + workspaceSerial + ' · ' : ''}共 ${result.total} 筆${kind === 'history' ? '異動事件（每頁最多 20 事件，展開各變更欄位）' : ''}`;
     byId('workspace-page').textContent = `第 ${result.page}／${Math.max(1, Math.ceil(result.total / 20))} 頁`;
     byId('workspace-previous').disabled = result.page <= 1;
     byId('workspace-next').disabled = result.page * 20 >= result.total;
@@ -157,6 +154,29 @@ async function loadWorkspace() {
     if (request !== workspaceRequest) return;
     byId('workspace-content').replaceChildren(); byId('workspace-message').textContent = error.message;
   }
+}
+
+function renderHistory(events, container) {
+  const sources = {repair_records:'送修',dbn_records:'DBN',serial_board_mappings:'S/N 對應',repair_machine_models:'機台對應',repair_model_boards:'板件對應',repair_board_prices:'價格',repair_attachments:'附件'};
+  const operations = {INSERT:'新增',UPDATE:'修改',DELETE:'刪除'};
+  const labels = {...fieldLabels,board_name:'板件名稱',customer_code:'客戶',product_code:'產品',station_code:'站點',issue_type:'DBN 類型',issue_description:'異常描述',dut:'DUT',socket_file_id:'Socket File 版本',dut_pin_snapshot:'PIN',board_repair_cents:'板修金額（分）',external_repair_cents:'外修金額（分）',contract_repair_cents:'合約金額（分）',warranty_repair_cents:'保固金額（分）'};
+  function value(field, data) {
+    if (data == null) return '—';
+    if (data === '') return '（空白）';
+    if (field === 'is_opened') return data ? '已開單' : '未開單';
+    if (field === 'dut_pin_snapshot') return Object.entries(data).map(([dut,pins]) => `DUT${dut}: ${Array.isArray(pins) ? pins.join(', ') : '尚無對應'}`).join('\n') || '（空白）';
+    return typeof data === 'object' ? JSON.stringify(data) : String(data);
+  }
+  const rows = [];
+  for (const event of events) {
+    const identity = `${event.serial_no || '—'}－${event.board_name || '—'}`;
+    const prefix = [new Date(event.changed_at).toLocaleString('zh-TW', {timeZone:'Asia/Taipei'}), `${sources[event.source_table] || event.source_table}／${operations[event.operation] || event.operation}`, identity];
+    const changes = Object.entries(event.changes || {}).filter(([field]) => !['id','version','created_at','updated_at','source_system','source_record_id'].includes(field));
+    for (const [field, change] of changes) rows.push([...prefix, labels[field] || field, value(field, change.old), value(field, change.new)]);
+    if (!changes.length) rows.push([...prefix, '—', '—', '—']);
+  }
+  const result = table(['時間','類型／操作','S/N－板件名稱','變更欄位','舊值','新值'], rows);
+  result.className = 'table-wrap history-table'; container.append(result);
 }
 
 function pinDetails(record) {

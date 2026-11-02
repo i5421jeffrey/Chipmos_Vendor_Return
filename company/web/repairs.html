@@ -48,6 +48,12 @@
     <section id="workspace-view" hidden>
       <div class="title-row"><div><h1 id="workspace-title"></h1><p id="workspace-description"></p></div><div id="workspace-actions" class="actions"></div></div>
       <form id="workspace-search" class="toolbar"><input id="workspace-query" type="search" placeholder="搜尋 S/N、板名或相關資訊" aria-label="管理清單搜尋"><button>查詢</button></form>
+      <div id="history-filters" class="history-filters" hidden>
+        <label>資料類型<select id="history-source" form="workspace-search"><option value="">全部</option><option value="repair_records">送修</option><option value="dbn_records">DBN</option><option value="serial_board_mappings">S/N 對應</option><option value="repair_machine_models">機台對應</option><option value="repair_model_boards">板件對應</option><option value="repair_board_prices">價格</option><option value="repair_attachments">附件</option></select></label>
+        <label>操作<select id="history-operation" form="workspace-search"><option value="">全部</option><option value="INSERT">新增</option><option value="UPDATE">修改</option><option value="DELETE">刪除</option></select></label>
+        <label>開始日期<input id="history-start" type="date" form="workspace-search"></label>
+        <label>結束日期<input id="history-end" type="date" form="workspace-search"></label>
+      </div>
       <div id="stats-controls" class="stats-controls" hidden><div class="stats-mode" role="group" aria-label="統計期間"><button id="stats-mode-year" type="button" aria-pressed="true">年度</button><button id="stats-mode-month" type="button" aria-pressed="false">月份</button></div><select id="stats-year" class="stats-select" aria-label="選擇年度"></select><select id="stats-month" class="stats-select" aria-label="選擇月份" hidden></select><select id="ranking-sort" class="stats-select" aria-label="機台損壞排序"><option value="desc">最多</option><option value="asc">最少</option></select></div>
       <p id="workspace-message" role="status" aria-live="polite"></p><div id="workspace-content"></div>
       <div class="pager" id="workspace-pager"><button id="workspace-previous" type="button">上一頁</button><span id="workspace-page"></span><button id="workspace-next" type="button">下一頁</button></div>

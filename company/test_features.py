@@ -62,6 +62,22 @@ class FeatureTests(unittest.TestCase):
         self.assertEqual(service.list_records(self.path, {'q':['RTE']})['total'], 21)
         self.assertEqual(service.list_records(self.path, {'q':['板修']})['total'], 21)
 
+    def test_history_filters_taipei_boundaries_and_change_search(self):
+        with connect(self.path) as connection:
+            for index, stamp in enumerate(('2026-11-01T15:59:59Z', '2026-11-01T16:00:00Z', '2026-11-02T15:59:59Z', '2026-11-02T16:00:00Z')):
+                service.audit(connection, 'repair_records', str(index), 'UPDATE', {'failure_description':'old'}, {'failure_description':'unique%_text'})
+                connection.execute('UPDATE record_change_history SET changed_at=? WHERE record_id=?', (stamp, str(index)))
+        query = {'source':['repair_records'], 'operation':['UPDATE'], 'start':['2026-11-02'], 'end':['2026-11-02'], 'q':['unique%_text']}
+        result = ops.history(self.path, query)
+        self.assertEqual(result['total'], 2)
+        self.assertEqual({row['record_id'] for row in result['data']}, {'1','2'})
+        self.assertEqual(ops.history(self.path, dict(query, operation=['DELETE']))['total'], 0)
+        self.assertEqual(ops.history(self.path, dict(query, source=['dbn_records']))['total'], 0)
+        self.assertEqual(ops.history(self.path, dict(query, end=['9999-12-31']))['total'], 3)
+        for invalid in ({'source':['bad']}, {'operation':['bad']}, {'start':['2026-02-30']}, {'end':['11/02']}, {'start':['2026-11-03'], 'end':['2026-11-02']}):
+            with self.assertRaises(APIError):
+                ops.history(self.path, invalid)
+
     def test_dbn_snapshot_is_historical(self):
         row = ops.save_dbn(self.path, dbn())['data']
         self.assertEqual(row['serial_no'], '002850948')
