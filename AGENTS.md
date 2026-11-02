@@ -9,3 +9,8 @@
 - The user sends reference-file emails to themself with a subject containing `opencode_MMDD_01` (MMDD = month/day). When asked to find these, use the Gmail attachments MCP with a rolling 7-day search for mail to the user with attachments and `opencode` in the subject, then verify the subject contains the requested pattern. Save attachments to `/Users/liuweiran/OpenCode/參考資料`; check the expected output filename before downloading and skip already-present files. The Gmail MCP downloads all attachments in a thread, so do not invoke it for a thread if that would redownload an existing attachment. When answering relevant questions, search this folder as a reference source and cite filenames.
 - Whenever modifying a Markdown file, commit that Markdown change to Git. Stage only the intended Markdown file(s); do not include unrelated files in the commit.
 - Do not invent project commands or architecture; update this file when the repository provides verifiable development guidance.
+
+## Company-local phase one
+
+- `company/server.py` is a standard-library-only Python/SQLite environment check; it has no business-data migration or Supabase connection. Run `python company/server.py` from the repository root and open `http://127.0.0.1:8765`. It intentionally binds to localhost only, not the company LAN.
+- Test with `python -m unittest discover -s company -p "test_*.py" -v`. Windows setup and verification steps are in `company/README.md`. Runtime SQLite files in `company/data/` must not be committed.
