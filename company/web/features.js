@@ -128,9 +128,7 @@ async function loadWorkspace() {
     if (kind === 'statistics') {renderStatistics(result, content); return;}
     if (kind === 'masters') {
       masterData = result;
-      for (const [key, title] of [['machines','機台／機型'], ['boards','板件對應'], ['prices','價格（單位：分，NULL＝未設定）']]) {
-        content.append(element('h2', '', title), table(Object.keys(result[key][0] || {}), result[key].map(row => Object.values(row).map(value => value ?? 'NULL'))));
-      }
+      renderMasters(result, content);
       byId('workspace-message').textContent = '主檔不自動改寫歷史案件。'; return;
     }
     workspacePage = result.page;
@@ -399,10 +397,36 @@ async function editMapping(record = null) {
   board.addEventListener('change', preview); preview(); number.focus();
 }
 
-async function editMaster(kind) {
+function renderMasters(result, container) {
+  const groups = [
+    ['machines','machine','機台／機型', [['machine_code','機台'],['model','Model']]],
+    ['boards','board','板件對應', [['model','Model'],['board_name','板件名稱'],['board_part_code','Part Number']]],
+    ['prices','price','價格（元；未設定不等於零元）', [['model','Model'],['board_name','板件名稱'],['board_part_code','Part Number'],['board_repair_cents','板修'],['external_repair_cents','外修'],['contract_repair_cents','合約'],['warranty_repair_cents','保固']]]
+  ];
+  for (const [key, kind, title, columns] of groups) {
+    const section = element('section', 'master-section'); section.append(element('h2', '', title));
+    const wrapper = element('div', 'table-wrap'), grid = element('table'), head = element('thead'), header = element('tr'), body = element('tbody');
+    for (const label of [...columns.map(([,label]) => label), '操作']) header.append(element('th', '', label));
+    head.append(header); grid.append(head, body);
+    for (const record of result[key]) {
+      const row = element('tr');
+      for (const [field] of columns) {
+        const value = record[field];
+        row.append(element('td', '', field.endsWith('_cents') ? (value == null ? '未設定' : (value / 100).toLocaleString('zh-TW', {maximumFractionDigits:2}) + ' 元') : value));
+      }
+      const controls = element('td'); controls.append(action('修改', () => editMaster(kind, record))); row.append(controls); body.append(row);
+    }
+    wrapper.append(grid); section.append(wrapper);
+    if (!result[key].length) section.append(element('p', 'hint', '尚無對應資料，可使用上方按鈕新增。'));
+    container.append(section);
+  }
+}
+
+async function editMaster(kind, record = null) {
   const original = await api('/api/repairs/masters');
+  if (record && original.token !== masterData?.token) throw new Error('主檔已變更，請重新查詢清單再修改');
   const fields = {};
-  openOperations('新增／修改' + {machine:'機台對應', board:'板件對應', price:'價格'}[kind], async freeze => {
+  openOperations((record ? '修改' : '新增／修改') + {machine:'機台對應', board:'板件對應', price:'價格'}[kind], async freeze => {
     const value = Object.fromEntries(Object.entries(fields).map(([key, input]) => [key, input.value.trim()]));
     if (kind === 'price') for (const key of ['board_repair_cents','external_repair_cents','contract_repair_cents','warranty_repair_cents']) {
       const entered = value[key];
@@ -431,7 +455,15 @@ async function editMaster(kind) {
       if (kind === 'price') for (const key of ['board_repair_cents','external_repair_cents','contract_repair_cents','warranty_repair_cents']) fields[key].value = row[key] == null ? '' : (row[key] / 100).toFixed(2);
     }
   }
-  for (const key of ['machine_code', 'model', 'board_name', 'board_part_code']) fields[key]?.addEventListener('change', autofill);
+  if (!record) for (const key of ['machine_code', 'model', 'board_name', 'board_part_code']) fields[key]?.addEventListener('change', autofill);
+  for (const [key, input] of Object.entries(fields)) {
+    input.dataset.field = key;
+    if (record) input.value = key.endsWith('_cents') ? (record[key] == null ? '' : (record[key] / 100).toFixed(2)) : record[key] ?? '';
+    // Row edits must keep their original identity; use the add form for new keys.
+    if (record) input.readOnly = kind === 'machine' ? key === 'machine_code' : ['model','board_name'].includes(key) || (kind === 'price' && key === 'board_part_code');
+  }
+  const hint = element('p', 'wide hint', '修改只影響後續選擇與儲存；不改寫歷史案件、S/N 主檔、金額或 PIN 快照。');
+  byId('operations-fields').append(hint);
 }
 
 async function renderDetailFeatures(record, container, stillCurrent) {

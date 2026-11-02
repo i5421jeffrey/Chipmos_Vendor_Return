@@ -1,4 +1,6 @@
 /* Local bindings for the unchanged original SPMS visual components. */
+.master-section{margin:18px 0 28px}.master-section td{vertical-align:middle}
+.master-section td:last-child .button{white-space:nowrap}
 .history-filters{display:flex;flex-wrap:wrap;gap:12px;margin:12px 0;align-items:flex-end}
 .history-filters label{font-size:11px}.history-filters input,.history-filters select{height:36px}
 .history-table td:nth-child(5),.history-table td:nth-child(6){white-space:pre-wrap;overflow-wrap:anywhere;max-width:340px}

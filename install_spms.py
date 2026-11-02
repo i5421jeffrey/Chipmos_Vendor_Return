@@ -52,6 +52,9 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             '未設定另計，不當成零；提供長條圖及表格。現有統計沒有登入後的人員區分。\n'
                                             '- 主檔對應維護不會自動重算或同步舊案件；S/N 的同步需從 S/N 主檔頁明確操作。價格以整數分寫入，保固只允許 '
                                             'NULL／0。\n'
+                                            '- 機台／板件／價格清單使用中文欄名，價格以元顯示並區分未設定與零元；逐列「修改」帶入原值並鎖定識別欄位。板件的 PN、機台的 '
+                                            'Model 仍可修改；價格只能改該組識別下的金額。清單讀取後若主檔 token 改變，阻止開啟舊列編輯；儲存仍有後端 '
+                                            'token 衝突保護。新增識別使用上方新增／修改表單。尚未經公司端驗收。\n'
                                             '- 異動紀錄提供資料類型、操作、開始／結束日期篩選及舊值／新值六欄表格；日期依台北時區、包含結束日，搜尋包含異動內容並將 '
                                             '`%`／`_` 視為文字。以每頁 20 個事件分頁，同一事件的變更欄位一併顯示（不同於原版每頁 10 '
                                             '個欄位）；新增／刪除也保留各欄細節，不隱藏來源紀錄。尚非具名人員稽核。\n'
@@ -286,7 +289,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             '產生；公司版程式更新後必須重新產生。\n'
                                             '安裝測試：`python -m unittest discover -s scripts -p '
                                             '"test_company_installer.py" -v`。\n',
-                                 'sha256': '8d721b4a1626fb03f97057db1ec8d6773cfc2ae8720fc3ab835b50e8a60a6036'},
+                                 'sha256': 'f413b2bb44e66129cf86b07c0cdd6742ac9d03cc16873d6397fba3c095e337a4'},
            'company/database.py': {'content': '"""Shared SQLite connections and additive, backed-up module '
                                               'migrations."""\n'
                                               'import json\n'
@@ -5446,13 +5449,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   'content); return;}\n'
                                                   "    if (kind === 'masters') {\n"
                                                   '      masterData = result;\n'
-                                                  "      for (const [key, title] of [['machines','機台／機型'], "
-                                                  "['boards','板件對應'], ['prices','價格（單位：分，NULL＝未設定）']]) {\n"
-                                                  "        content.append(element('h2', '', title), "
-                                                  'table(Object.keys(result[key][0] || {}), '
-                                                  'result[key].map(row => Object.values(row).map(value => '
-                                                  "value ?? 'NULL'))));\n"
-                                                  '      }\n'
+                                                  '      renderMasters(result, content);\n'
                                                   "      byId('workspace-message').textContent = "
                                                   "'主檔不自動改寫歷史案件。'; return;\n"
                                                   '    }\n'
@@ -5970,11 +5967,54 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   'number.focus();\n'
                                                   '}\n'
                                                   '\n'
-                                                  'async function editMaster(kind) {\n'
+                                                  'function renderMasters(result, container) {\n'
+                                                  '  const groups = [\n'
+                                                  "    ['machines','machine','機台／機型', "
+                                                  "[['machine_code','機台'],['model','Model']]],\n"
+                                                  "    ['boards','board','板件對應', "
+                                                  "[['model','Model'],['board_name','板件名稱'],['board_part_code','Part "
+                                                  "Number']]],\n"
+                                                  "    ['prices','price','價格（元；未設定不等於零元）', "
+                                                  "[['model','Model'],['board_name','板件名稱'],['board_part_code','Part "
+                                                  "Number'],['board_repair_cents','板修'],['external_repair_cents','外修'],['contract_repair_cents','合約'],['warranty_repair_cents','保固']]]\n"
+                                                  '  ];\n'
+                                                  '  for (const [key, kind, title, columns] of groups) {\n'
+                                                  "    const section = element('section', 'master-section'); "
+                                                  "section.append(element('h2', '', title));\n"
+                                                  "    const wrapper = element('div', 'table-wrap'), grid = "
+                                                  "element('table'), head = element('thead'), header = "
+                                                  "element('tr'), body = element('tbody');\n"
+                                                  '    for (const label of [...columns.map(([,label]) => '
+                                                  "label), '操作']) header.append(element('th', '', label));\n"
+                                                  '    head.append(header); grid.append(head, body);\n'
+                                                  '    for (const record of result[key]) {\n'
+                                                  "      const row = element('tr');\n"
+                                                  '      for (const [field] of columns) {\n'
+                                                  '        const value = record[field];\n'
+                                                  "        row.append(element('td', '', "
+                                                  "field.endsWith('_cents') ? (value == null ? '未設定' : "
+                                                  "(value / 100).toLocaleString('zh-TW', "
+                                                  "{maximumFractionDigits:2}) + ' 元') : value));\n"
+                                                  '      }\n'
+                                                  "      const controls = element('td'); "
+                                                  "controls.append(action('修改', () => editMaster(kind, "
+                                                  'record))); row.append(controls); body.append(row);\n'
+                                                  '    }\n'
+                                                  '    wrapper.append(grid); section.append(wrapper);\n'
+                                                  "    if (!result[key].length) section.append(element('p', "
+                                                  "'hint', '尚無對應資料，可使用上方按鈕新增。'));\n"
+                                                  '    container.append(section);\n'
+                                                  '  }\n'
+                                                  '}\n'
+                                                  '\n'
+                                                  'async function editMaster(kind, record = null) {\n'
                                                   "  const original = await api('/api/repairs/masters');\n"
+                                                  '  if (record && original.token !== masterData?.token) '
+                                                  "throw new Error('主檔已變更，請重新查詢清單再修改');\n"
                                                   '  const fields = {};\n'
-                                                  "  openOperations('新增／修改' + {machine:'機台對應', board:'板件對應', "
-                                                  "price:'價格'}[kind], async freeze => {\n"
+                                                  "  openOperations((record ? '修改' : '新增／修改') + "
+                                                  "{machine:'機台對應', board:'板件對應', price:'價格'}[kind], async "
+                                                  'freeze => {\n'
                                                   '    const value = '
                                                   'Object.fromEntries(Object.entries(fields).map(([key, '
                                                   'input]) => [key, input.value.trim()]));\n'
@@ -6033,9 +6073,23 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '100).toFixed(2);\n'
                                                   '    }\n'
                                                   '  }\n'
-                                                  "  for (const key of ['machine_code', 'model', "
-                                                  "'board_name', 'board_part_code']) "
+                                                  "  if (!record) for (const key of ['machine_code', "
+                                                  "'model', 'board_name', 'board_part_code']) "
                                                   "fields[key]?.addEventListener('change', autofill);\n"
+                                                  '  for (const [key, input] of Object.entries(fields)) {\n'
+                                                  '    input.dataset.field = key;\n'
+                                                  "    if (record) input.value = key.endsWith('_cents') ? "
+                                                  "(record[key] == null ? '' : (record[key] / "
+                                                  "100).toFixed(2)) : record[key] ?? '';\n"
+                                                  '    // Row edits must keep their original identity; use '
+                                                  'the add form for new keys.\n'
+                                                  "    if (record) input.readOnly = kind === 'machine' ? key "
+                                                  "=== 'machine_code' : ['model','board_name'].includes(key) "
+                                                  "|| (kind === 'price' && key === 'board_part_code');\n"
+                                                  '  }\n'
+                                                  "  const hint = element('p', 'wide hint', "
+                                                  "'修改只影響後續選擇與儲存；不改寫歷史案件、S/N 主檔、金額或 PIN 快照。');\n"
+                                                  "  byId('operations-fields').append(hint);\n"
                                                   '}\n'
                                                   '\n'
                                                   'async function renderDetailFeatures(record, container, '
@@ -6345,7 +6399,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '= index + 1; last = row.count; return [rank, row.machine, '
                                                   'row.count];}))); container.append(rankingCard);\n'
                                                   '}\n',
-                                       'sha256': '3c5e1585a1da4f882ab71ed8aa05592a86204cb76cda023e828d9d886fbee2a0'},
+                                       'sha256': '8c7421b89960ecbfa0b6e821912735752b90b5f81d7fd5ca92df9f8ebe30974b'},
            'company/web/index.html': {'content': '<!doctype html>\n'
                                                  '<html lang="zh-Hant">\n'
                                                  '<head>\n'
@@ -6798,6 +6852,9 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                         'sha256': 'a013059aa4730821abc3225f4ffe161bafe79a298545c045af9b9905af95a325'},
            'company/web/parity.css': {'content': '/* Local bindings for the unchanged original SPMS visual '
                                                  'components. */\n'
+                                                 '.master-section{margin:18px 0 28px}.master-section '
+                                                 'td{vertical-align:middle}\n'
+                                                 '.master-section td:last-child .button{white-space:nowrap}\n'
                                                  '.history-filters{display:flex;flex-wrap:wrap;gap:12px;margin:12px '
                                                  '0;align-items:flex-end}\n'
                                                  '.history-filters label{font-size:11px}.history-filters '
@@ -6901,7 +6958,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  'nav{display:flex}.local-information{font-size:10px}.content{padding:19px '
                                                  '12px 40px}.quick-search-view{margin:8px auto '
                                                  '0}.issue-copy{gap:8px}.issue-open-status{gap:3px}.stats-card{padding:13px}.stats-controls{gap:6px}}\n',
-                                      'sha256': 'e5fea42849b54d16f073ec8bb74160111864a68ed116137ce95178d8fb8683d4'},
+                                      'sha256': '9cec30e118426f3e1ca351bda04a6d1e462eb0f0e6bb2b48ae7e7f8b618f8727'},
            'company/web/repairs.css': {'content': ':root{color-scheme:dark;font-family:"Segoe '
                                                   'UI",sans-serif;background:#101113;color:#e7e7e8;font-size:14px}\n'
                                                   '*{box-sizing:border-box}body{margin:0}header{display:flex;gap:36px;align-items:center;background:#191a1c;border-bottom:1px '
@@ -7897,7 +7954,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                 '@media(max-width:600px){main{margin:25px auto;padding:0 '
                                                 '16px}h1{font-size:22px}section{padding:18px}dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:10px}}\n',
                                      'sha256': '064406c8758be5620dfe7440f59d59ec1de5f6307e74f5bad85dd03e018c0769'}},
- 'version': '2026-11-02-detail-history'}
+ 'version': '2026-11-02-master-editing'}
 
 
 def check_local_path(path):
