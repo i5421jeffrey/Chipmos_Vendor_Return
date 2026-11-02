@@ -28,6 +28,7 @@ class TestNode {
   focus() {}
   click() {this.clicks = (this.clicks || 0) + 1;}
   reportValidity() {return true;}
+  setCustomValidity(message) {this.validationMessage = message;}
   get elements() {
     if (this._elements) return this._elements;
     const result = [];
@@ -182,6 +183,25 @@ function assert(ok, message) {if (!ok) throw Error(message);}
   await nodes['edit-detail'].listeners.click[0]();
   assert(!nodes['record-detail'].open && nodes.editor.open, 'Detail transitions to edit dialog');
   assert(nodes.board.disabled && nodes.part.value === 'BPR-030837', 'Serial mapping locks board and PN');
+  const dateInputs = [nodes['occurred-on'],nodes['sent-on'],nodes['returned-on']];
+  const originalDates = dateInputs.map(input => input.value);
+  nodes['record-status'].value = '已送修';
+  assert(!updateEditorDates() && nodes['sent-on'].required && !nodes['returned-on'].required, 'Sent status requires only sent date');
+  const beforeInvalidDates = requests.filter(request => request.options.method === 'PUT').length;
+  await nodes['record-form'].listeners.submit[0]({preventDefault(){}});
+  assert(requests.filter(request => request.options.method === 'PUT').length === beforeInvalidDates && nodes.editor.open, 'Missing required dates do not send writes or discard form');
+  assert(dateInputs.map(input => input.value).join('|') === originalDates.join('|'), 'Changing status never invents or clears dates');
+  nodes['sent-on'].value = '2026-11-02'; assert(updateEditorDates(), 'Same-day sending is valid');
+  nodes['record-status'].value = '取回驗證'; assert(!updateEditorDates() && nodes['returned-on'].required, 'Verification requires return date');
+  nodes['returned-on'].value = '2026-11-01';
+  assert(!updateEditorDates() && nodes['returned-on'].min === '2026-11-02', 'Return date cannot precede sent date');
+  nodes['returned-on'].value = '2026-11-02'; assert(updateEditorDates(), 'Same-day return is valid');
+  current = {...testRecord,current_status:'結案（PASS）',closed_on:'2026-11-02'}; nodes['record-status'].value = '結案（PASS）';
+  nodes['returned-on'].value = '2026-11-03';
+  assert(!updateEditorDates() && nodes['returned-on'].max === '2026-11-02', 'Closed record return is bounded by original closing date');
+  current = testRecord; nodes['record-status'].value = testRecord.current_status;
+  dateInputs.forEach((input,index) => {input.value = originalDates[index];});
+  assert(updateEditorDates() && !nodes['sent-on'].required && !nodes['returned-on'].required && nodes['returned-on'].max === '9999-12-31', 'Switching back clears stale validation and closed-date limits');
   assert(nodes['repair-amount-preview'].textContent.includes('0 元（保留原金額）'), 'Edit preview keeps recorded zero even without current price');
   nodes.reprice.checked = true; nodes.reprice.listeners.change[0]();
   assert(nodes['repair-amount-preview'].textContent.includes('未設定（目前價目）'), 'Explicit reprice switches to current catalog preview');

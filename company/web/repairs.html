@@ -81,9 +81,10 @@
       <label class="wide">異常描述<textarea name="failure_description" id="failure-description" maxlength="10000" required></textarea></label>
       <label>狀態<select name="current_status" id="record-status" required></select></label>
       <label class="check"><input type="checkbox" name="is_opened" id="is-opened">已開單</label>
-      <label>損壞日期<input type="date" name="occurred_on" id="occurred-on" required></label>
-      <label>送修日期<input type="date" name="sent_on" id="sent-on"></label>
-      <label>回修日期<input type="date" name="returned_on" id="returned-on"></label>
+      <label>損壞日期<input type="date" name="occurred_on" id="occurred-on" aria-describedby="date-hint" required></label>
+      <label>送修日期<input type="date" name="sent_on" id="sent-on" aria-describedby="date-hint"></label>
+      <label>回修日期<input type="date" name="returned_on" id="returned-on" aria-describedby="date-hint"></label>
+      <p id="date-hint" class="wide hint" role="status" aria-live="polite"></p>
       <div id="create-attachment-field" class="wide"><label for="create-attachment">Fail Log（新增時選填）</label><input type="file" id="create-attachment" accept=".txt,.asc"><p class="hint">每筆限一個非空 .txt／.asc，最大 5 MB；編輯附件請至詳細資料。</p></div>
       <p class="hint">新增依本機價目計價；一般編輯保留原金額。未設定不等於 0 元。</p>
     </div>

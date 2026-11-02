@@ -220,6 +220,29 @@ function repairPrice(model, board, part, type) {
   return price?.[column] ?? null;
 }
 
+function updateEditorDates() {
+  const occurred = byId('occurred-on'), sent = byId('sent-on'), returned = byId('returned-on');
+  const status = byId('record-status').value;
+  const closed = ['結案（PASS）','結案（FAIL）'].includes(current?.current_status) ? current.closed_on || '' : '';
+  const verified = ['取回驗證','結案（PASS）','結案（FAIL）'].includes(status);
+  occurred.required = true; sent.required = verified || status === '已送修' || Boolean(returned.value); returned.required = verified;
+  const earliest = values => values.filter(Boolean).sort()[0] || '9999-12-31';
+  occurred.min = '0001-01-01'; occurred.max = earliest([sent.value, returned.value, closed]);
+  sent.min = occurred.value || '0001-01-01'; sent.max = earliest([returned.value, closed]);
+  returned.min = sent.value || occurred.value || '0001-01-01'; returned.max = closed || '9999-12-31';
+  for (const input of [occurred, sent, returned]) input.setCustomValidity('');
+  const errors = [];
+  const invalid = (input, message) => {input.setCustomValidity(message); errors.push(message);};
+  if (!occurred.value) invalid(occurred, '損壞日期必填');
+  if (sent.required && !sent.value) invalid(sent, '目前狀態或回修日期需要送修日期');
+  if (returned.required && !returned.value) invalid(returned, '取回驗證／已結案必須填回修日期');
+  if (sent.value && occurred.value && sent.value < occurred.value) invalid(sent, '送修日期不得早於損壞日期');
+  if (returned.value && sent.value && returned.value < sent.value) invalid(returned, '回修日期不得早於送修日期');
+  if (closed && returned.value > closed) invalid(returned, '回修日期不得晚於結案日期');
+  byId('date-hint').textContent = errors.length ? errors.join('；') : `日期順序：損壞 → 送修 → 回修${closed ? ' → 結案 ' + closed : ''}。${verified ? '目前送修／回修日期皆必填。' : sent.required ? '目前送修日期必填。' : '送修／回修日期選填。'}不會自動更改日期。`;
+  return errors.length === 0;
+}
+
 async function lookupMapping() {
   const request = ++mappingRequest;
   const serial = byId('serial').value.trim().toUpperCase();
@@ -267,6 +290,10 @@ byId('machine').addEventListener('change', () => updateBoards());
 byId('board').addEventListener('change', () => updateBoards());
 byId('repair-type').addEventListener('change', updatePricePreview);
 byId('reprice').addEventListener('change', updatePricePreview);
+for (const id of ['record-status','occurred-on','sent-on','returned-on']) {
+  byId(id).addEventListener('change', updateEditorDates);
+  if (id !== 'record-status') byId(id).addEventListener('input', updateEditorDates);
+}
 byId('serial').addEventListener('input', () => {mappingRequest++; mapping = null; updateBoards();});
 byId('serial').addEventListener('blur', () => lookupMapping().catch(error => {byId('form-message').textContent = error.message;}));
 
@@ -296,6 +323,7 @@ async function openEditor(record = null) {
   }
   if (!record) byId('occurred-on').value = new Intl.DateTimeFormat('en-CA', {timeZone:'Asia/Taipei', year:'numeric', month:'2-digit', day:'2-digit'}).format(new Date());
   updateBoards(record?.description || '');
+  updateEditorDates();
   if (!editor.open) editor.showModal();
   byId('serial').focus();
   const id = record?.id;
@@ -326,7 +354,9 @@ byId('record-form').addEventListener('submit', async event => {
   let frozen = [];
   try {
     if (!await lookupMapping()) throw new Error('S/N 查詢已變更，請再檢查後儲存');
+    const datesValid = updateEditorDates();
     if (!byId('record-form').reportValidity()) throw new Error('請填妥必填欄位');
+    if (!datesValid) throw new Error(byId('date-hint').textContent);
     const payload = Object.fromEntries(new FormData(byId('record-form')));
     // Disabled locked fields are deliberately omitted by FormData.
     payload.description = byId('board').value;

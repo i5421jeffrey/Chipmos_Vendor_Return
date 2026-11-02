@@ -110,6 +110,14 @@ class FeatureTests(unittest.TestCase):
         self.assertEqual(repriced['repair_amount'], 234.56)
         self.assertEqual(repriced['current_status'], closed['current_status'])
 
+    def test_closed_return_date_must_not_exceed_original_closure(self):
+        row = self.ready(repair_type='合約')
+        closed = ops.resolve(self.path, row['id'], {'expected_version':row['version'], 'passed':True})['data']
+        after_close = (datetime.fromisoformat(closed['closed_on']) + timedelta(days=1)).date().isoformat()
+        with self.assertRaises(APIError):
+            service.save_record(self.path, example(repair_type='合約', current_status=closed['current_status'], sent_on='2026-11-02', returned_on=after_close, expected_version=closed['version']), row['id'])
+        self.assertEqual(service.record_detail(self.path, row['id'])['data'], closed)
+
     def test_dbn_snapshot_is_historical(self):
         row = ops.save_dbn(self.path, dbn())['data']
         self.assertEqual(row['serial_no'], '002850948')

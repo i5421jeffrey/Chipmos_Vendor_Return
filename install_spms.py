@@ -42,6 +42,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             'NULL 案件，須勾選重新套用，再進行結案。\n'
                                             '- 修改必須提供讀取時的版本；過期版本回傳 409，不覆蓋他人修改。\n'
                                             '- '
+                                            '狀態／日期表單連動：已送修要求送修日期；取回驗證／已結案要求送修與回修日期；填回修時也必須有送修日期。日期選擇器與文字提示限制損壞≤送修≤回修，已結案時回修不可晚於原結案日。不自動填入、清空或修正歷史日期；後端仍獨立驗證。\n'
+                                            '- '
                                             '送修新增／編輯儲存後直接開啟該案詳細資料；取消既有案件編輯時，重新讀取並返回詳細資料。衝突或失敗仍保留表單輸入；「重新載入此案」須先確認捨棄未儲存內容，讀取失敗不清空輸入，成功則取得最新版本與主檔鎖定。儲存／重載期間停用重複操作；過期的編輯歷史回應不會填入其他表單。\n'
                                             '- 機台管理是預留模組（未安裝），與備品管理分開。共用 SQLite 連線與模組遷移紀錄，之後以新增遷移擴充，不重建資料庫。\n'
                                             '- DBN：獨立新增／編輯／刪除，驗證客戶→產品→站點與機台／板件；支援 Group（連續 1–8 DUT）、Single '
@@ -301,7 +303,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             '產生；公司版程式更新後必須重新產生。\n'
                                             '安裝測試：`python -m unittest discover -s scripts -p '
                                             '"test_company_installer.py" -v`。\n',
-                                 'sha256': '10ad533be458c4fecd3390e0ef2d907f229d4aa22c61030404f4f77e59c0a3b8'},
+                                 'sha256': '4fc5e1509227f8862f6eb0979244e8c8a4b11388c8f7a6d372663bf0c65b19c6'},
            'company/database.py': {'content': '"""Shared SQLite connections and additive, backed-up module '
                                               'migrations."""\n'
                                               'import json\n'
@@ -4089,6 +4091,25 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    "        self.assertEqual(repriced['current_status'], "
                                                    "closed['current_status'])\n"
                                                    '\n'
+                                                   '    def '
+                                                   'test_closed_return_date_must_not_exceed_original_closure(self):\n'
+                                                   "        row = self.ready(repair_type='合約')\n"
+                                                   "        closed = ops.resolve(self.path, row['id'], "
+                                                   "{'expected_version':row['version'], "
+                                                   "'passed':True})['data']\n"
+                                                   '        after_close = '
+                                                   "(datetime.fromisoformat(closed['closed_on']) + "
+                                                   'timedelta(days=1)).date().isoformat()\n'
+                                                   '        with self.assertRaises(APIError):\n'
+                                                   '            service.save_record(self.path, '
+                                                   "example(repair_type='合約', "
+                                                   "current_status=closed['current_status'], "
+                                                   "sent_on='2026-11-02', returned_on=after_close, "
+                                                   "expected_version=closed['version']), row['id'])\n"
+                                                   '        '
+                                                   'self.assertEqual(service.record_detail(self.path, '
+                                                   "row['id'])['data'], closed)\n"
+                                                   '\n'
                                                    '    def test_dbn_snapshot_is_historical(self):\n'
                                                    "        row = ops.save_dbn(self.path, dbn())['data']\n"
                                                    "        self.assertEqual(row['serial_no'], '002850948')\n"
@@ -4648,7 +4669,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    '\n'
                                                    "if __name__ == '__main__':\n"
                                                    '    unittest.main()\n',
-                                        'sha256': '28546f1d667af5007a7d9f0323cce21bcac991b670ebb9dbf1441065c2b3612b'},
+                                        'sha256': 'bb731b1652c369da53cb3cf793d0305f4b57962ca5c94a0b6c3a309697f27ce5'},
            'company/test_import_data.py': {'content': 'import json\n'
                                                       'import sqlite3\n'
                                                       'import unittest\n'
@@ -7524,11 +7545,14 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    '      <label class="check"><input type="checkbox" '
                                                    'name="is_opened" id="is-opened">已開單</label>\n'
                                                    '      <label>損壞日期<input type="date" name="occurred_on" '
-                                                   'id="occurred-on" required></label>\n'
+                                                   'id="occurred-on" aria-describedby="date-hint" '
+                                                   'required></label>\n'
                                                    '      <label>送修日期<input type="date" name="sent_on" '
-                                                   'id="sent-on"></label>\n'
+                                                   'id="sent-on" aria-describedby="date-hint"></label>\n'
                                                    '      <label>回修日期<input type="date" name="returned_on" '
-                                                   'id="returned-on"></label>\n'
+                                                   'id="returned-on" aria-describedby="date-hint"></label>\n'
+                                                   '      <p id="date-hint" class="wide hint" role="status" '
+                                                   'aria-live="polite"></p>\n'
                                                    '      <div id="create-attachment-field" '
                                                    'class="wide"><label for="create-attachment">Fail '
                                                    'Log（新增時選填）</label><input type="file" '
@@ -7562,7 +7586,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    'type="submit">儲存</button></div></form></dialog>\n'
                                                    '</body>\n'
                                                    '</html>\n',
-                                        'sha256': '8432fb723cc697062c547c67baa344c0c079c45a873a0cd4f1a524284f4b2ce6'},
+                                        'sha256': 'c44d15aeb62868dd1c6768666e72265180a17ed7ec1f791496f1a4a7a8d32bb8'},
            'company/web/repairs.js': {'content': 'const byId = id => document.getElementById(id);\n'
                                                  'let catalogs, current = null, mapping = null, '
                                                  'mappingRequest = 0, saving = false;\n'
@@ -7894,6 +7918,50 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  '  return price?.[column] ?? null;\n'
                                                  '}\n'
                                                  '\n'
+                                                 'function updateEditorDates() {\n'
+                                                 "  const occurred = byId('occurred-on'), sent = "
+                                                 "byId('sent-on'), returned = byId('returned-on');\n"
+                                                 "  const status = byId('record-status').value;\n"
+                                                 '  const closed = '
+                                                 "['結案（PASS）','結案（FAIL）'].includes(current?.current_status) "
+                                                 "? current.closed_on || '' : '';\n"
+                                                 '  const verified = '
+                                                 "['取回驗證','結案（PASS）','結案（FAIL）'].includes(status);\n"
+                                                 '  occurred.required = true; sent.required = verified || '
+                                                 "status === '已送修' || Boolean(returned.value); "
+                                                 'returned.required = verified;\n'
+                                                 '  const earliest = values => '
+                                                 "values.filter(Boolean).sort()[0] || '9999-12-31';\n"
+                                                 "  occurred.min = '0001-01-01'; occurred.max = "
+                                                 'earliest([sent.value, returned.value, closed]);\n'
+                                                 "  sent.min = occurred.value || '0001-01-01'; sent.max = "
+                                                 'earliest([returned.value, closed]);\n'
+                                                 '  returned.min = sent.value || occurred.value || '
+                                                 "'0001-01-01'; returned.max = closed || '9999-12-31';\n"
+                                                 '  for (const input of [occurred, sent, returned]) '
+                                                 "input.setCustomValidity('');\n"
+                                                 '  const errors = [];\n'
+                                                 '  const invalid = (input, message) => '
+                                                 '{input.setCustomValidity(message); '
+                                                 'errors.push(message);};\n'
+                                                 "  if (!occurred.value) invalid(occurred, '損壞日期必填');\n"
+                                                 '  if (sent.required && !sent.value) invalid(sent, '
+                                                 "'目前狀態或回修日期需要送修日期');\n"
+                                                 '  if (returned.required && !returned.value) '
+                                                 "invalid(returned, '取回驗證／已結案必須填回修日期');\n"
+                                                 '  if (sent.value && occurred.value && sent.value < '
+                                                 "occurred.value) invalid(sent, '送修日期不得早於損壞日期');\n"
+                                                 '  if (returned.value && sent.value && returned.value < '
+                                                 "sent.value) invalid(returned, '回修日期不得早於送修日期');\n"
+                                                 '  if (closed && returned.value > closed) invalid(returned, '
+                                                 "'回修日期不得晚於結案日期');\n"
+                                                 "  byId('date-hint').textContent = errors.length ? "
+                                                 "errors.join('；') : `日期順序：損壞 → 送修 → 回修${closed ? ' → 結案 ' + "
+                                                 "closed : ''}。${verified ? '目前送修／回修日期皆必填。' : sent.required "
+                                                 "? '目前送修日期必填。' : '送修／回修日期選填。'}不會自動更改日期。`;\n"
+                                                 '  return errors.length === 0;\n'
+                                                 '}\n'
+                                                 '\n'
                                                  'async function lookupMapping() {\n'
                                                  '  const request = ++mappingRequest;\n'
                                                  '  const serial = '
@@ -7962,6 +8030,13 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  'updatePricePreview);\n'
                                                  "byId('reprice').addEventListener('change', "
                                                  'updatePricePreview);\n'
+                                                 'for (const id of '
+                                                 "['record-status','occurred-on','sent-on','returned-on']) "
+                                                 '{\n'
+                                                 "  byId(id).addEventListener('change', updateEditorDates);\n"
+                                                 "  if (id !== 'record-status') "
+                                                 "byId(id).addEventListener('input', updateEditorDates);\n"
+                                                 '}\n'
                                                  "byId('serial').addEventListener('input', () => "
                                                  '{mappingRequest++; mapping = null; updateBoards();});\n'
                                                  "byId('serial').addEventListener('blur', () => "
@@ -8005,6 +8080,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  "year:'numeric', month:'2-digit', "
                                                  "day:'2-digit'}).format(new Date());\n"
                                                  "  updateBoards(record?.description || '');\n"
+                                                 '  updateEditorDates();\n'
                                                  '  if (!editor.open) editor.showModal();\n'
                                                  "  byId('serial').focus();\n"
                                                  '  const id = record?.id;\n'
@@ -8055,8 +8131,11 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  '  try {\n'
                                                  "    if (!await lookupMapping()) throw new Error('S/N "
                                                  "查詢已變更，請再檢查後儲存');\n"
+                                                 '    const datesValid = updateEditorDates();\n'
                                                  "    if (!byId('record-form').reportValidity()) throw new "
                                                  "Error('請填妥必填欄位');\n"
+                                                 '    if (!datesValid) throw new '
+                                                 "Error(byId('date-hint').textContent);\n"
                                                  '    const payload = Object.fromEntries(new '
                                                  "FormData(byId('record-form')));\n"
                                                  '    // Disabled locked fields are deliberately omitted by '
@@ -8178,7 +8257,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  "  } catch (error) {byId('message').textContent = "
                                                  "error.message; byId('message').dataset.error = 'true';}\n"
                                                  '})();\n',
-                                      'sha256': 'f324b129b68733b6aef024c986f949c1c7dc300aaeabe5c5450d98b2c6a4fbb6'},
+                                      'sha256': '421cd3132b16f42500e404b970507430a93fbe278cf143dedf5b044cfea0b959'},
            'company/web/style.css': {'content': ':root{color-scheme:dark;font-family:"Segoe '
                                                 'UI",sans-serif;background:#101113;color:#e7e7e8}\n'
                                                 '*{box-sizing:border-box}body{margin:0}main{max-width:850px;margin:60px '
@@ -8199,7 +8278,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                 '@media(max-width:600px){main{margin:25px auto;padding:0 '
                                                 '16px}h1{font-size:22px}section{padding:18px}dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:10px}}\n',
                                      'sha256': '064406c8758be5620dfe7440f59d59ec1de5f6307e74f5bad85dd03e018c0769'}},
- 'version': '2026-11-02-editor-workflow'}
+ 'version': '2026-11-02-status-dates'}
 
 
 def check_local_path(path):
