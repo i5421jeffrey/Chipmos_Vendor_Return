@@ -63,6 +63,10 @@ def list_records(path, query):
     if not 1 <= page <= 1000000:
         raise APIError("頁碼超過可接受範圍")
     where, arguments = [], []
+    serial = query.get("serial", [""])[0].strip()
+    if serial:
+        where.append("serial_no=?")
+        arguments.append(normalize_serial(serial))
     if text:
         text = "%" + text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
         where.append("(serial_no LIKE ? ESCAPE '\\' OR description LIKE ? ESCAPE '\\' OR machine_code LIKE ? ESCAPE '\\' OR failure_description LIKE ? ESCAPE '\\')")
@@ -77,10 +81,13 @@ def list_records(path, query):
         # Keep the count and the page in the same read snapshot.
         connection.execute("BEGIN")
         total = connection.execute("SELECT count(*) FROM repair_records" + condition, arguments).fetchone()[0]
+        counts = {row["current_status"]: row["count"] for row in connection.execute(
+            "SELECT current_status, count(*) AS count FROM repair_records GROUP BY current_status")}
         page = min(page, max(1, (total + 19) // 20))
         rows = connection.execute("SELECT * FROM repair_records" + condition + " ORDER BY occurred_on DESC, created_at DESC, id LIMIT 20 OFFSET ?",
                                   [*arguments, (page - 1) * 20]).fetchall()
-        return {"data": [public_record(row) for row in rows], "total": total, "page": page, "page_size": 20}
+        return {"data": [public_record(row) for row in rows], "total": total, "page": page, "page_size": 20,
+                "status_counts": counts}
 
 
 def record_detail(path, record_id):

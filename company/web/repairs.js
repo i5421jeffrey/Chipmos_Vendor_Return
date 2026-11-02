@@ -1,7 +1,10 @@
 const byId = id => document.getElementById(id);
 let catalogs, current = null, mapping = null, mappingRequest = 0, saving = false;
 let page = 1, total = 0, listingRequest = 0;
+let quickRequest = 0, detailRequest = 0, selectedRecord = null, serialFilter = '';
+let quickSerial = '';
 const editor = byId('editor');
+const detail = byId('record-detail');
 const fieldLabels = {serial_no:'S/N', machine_code:'機台', model:'機型', description:'板件名稱', board_part_code:'Part Number', failure_tag:'異常類別', failure_description:'異常描述', repair_type:'維修分類', repair_amount:'維修金額', current_status:'狀態', is_opened:'已開單', occurred_on:'損壞日期', sent_on:'送修日期', returned_on:'回修日期'};
 
 async function api(path, method = 'GET', body) {
@@ -19,6 +22,163 @@ function fillSelect(select, values, placeholder) {
   if (placeholder) select.add(new Option(placeholder, ''));
   for (const value of values) select.add(new Option(value, value));
 }
+
+function element(tag, className, text) {
+  const node = document.createElement(tag);
+  if (className) node.className = className;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+
+function statusTone(status) {
+  return {'已送修':'sent', '取回驗證':'verify', '結案（PASS）':'pass', '結案（FAIL）':'fail'}[status] || 'pending';
+}
+
+function statusPill(status) {
+  return element('span', 'status-pill tone-' + statusTone(status), status);
+}
+
+function updateCounts(counts) {
+  for (const node of document.querySelectorAll('[data-count]')) {
+    node.textContent = node.dataset.count === 'all'
+      ? Object.values(counts).reduce((sum, number) => sum + number, 0) : counts[node.dataset.count] || 0;
+  }
+}
+
+function setView(quick, status = '') {
+  byId('quick-view').hidden = !quick;
+  byId('records-view').hidden = quick;
+  byId('nav-quick').toggleAttribute('aria-current', quick);
+  if (quick) byId('nav-quick').setAttribute('aria-current', 'page');
+  for (const button of document.querySelectorAll('[data-status]')) {
+    if (!quick && button.dataset.status === status) button.setAttribute('aria-current', 'page');
+    else button.removeAttribute('aria-current');
+  }
+  if (!quick) {
+    byId('status-filter').value = status;
+    byId('view-title').textContent = status || '全部送修';
+  }
+}
+
+function renderRecord(record) {
+  const row = element('button', 'issue-row');
+  row.type = 'button';
+  row.classList.toggle('selected', selectedRecord?.id === record.id);
+  const main = element('span', 'issue-main');
+  const symbol = {'已送修':'↗', '取回驗證':'◎', '結案（PASS）':'✓', '結案（FAIL）':'×'}[record.current_status] || '○';
+  const copy = element('span', 'item-copy');
+  copy.append(element('strong', 'item-title', record.description),
+    element('span', 'item-sub', `${record.serial_no} · 開單 ${record.is_opened ? 'O' : 'X'}`));
+  main.append(element('span', 'state-symbol', symbol), copy);
+  const tags = element('span', 'record-tags');
+  tags.append(element('span', 'failure-tag', record.failure_tag), element('span', 'repair-tag', record.repair_type));
+  row.append(main, statusPill(record.current_status), tags, element('span', 'dbn-pending', '尚未移植'),
+    element('span', 'machine-cell', record.machine_code), element('span', 'date-cell', record.occurred_on));
+  row.addEventListener('click', () => openDetail(record.id));
+  return row;
+}
+
+function detailSection(title, fields) {
+  const section = element('section', 'detail-section');
+  section.append(element('h3', '', title));
+  const grid = element('div', 'detail-grid');
+  for (const [label, value] of fields) {
+    const field = element('div', 'detail-field');
+    field.append(element('label', '', label), element('span', '', value ?? '—'));
+    grid.append(field);
+  }
+  section.append(grid);
+  return section;
+}
+
+async function openDetail(id) {
+  const request = ++detailRequest;
+  byId('detail-message').textContent = '';
+  try {
+    const result = await api('/api/repairs/records/' + encodeURIComponent(id));
+    if (request !== detailRequest) return;
+    const record = result.data;
+    selectedRecord = record;
+    byId('detail-serial').textContent = record.serial_no;
+    byId('detail-title').textContent = record.description;
+    byId('edit-detail').disabled = !catalogs?.statuses.includes(record.current_status);
+    const body = byId('detail-content');
+    body.replaceChildren(statusPill(record.current_status));
+    body.append(detailSection('板件資訊', [['機台', record.machine_code], ['Model', record.model],
+      ['S/N', record.serial_no], ['Part Number', record.board_part_code], ['是否開單', record.is_opened ? 'O' : 'X']]));
+    body.append(detailSection('維修資訊', [['維修分類', record.repair_type], ['維修金額', record.repair_amount == null ? '未設定' : record.repair_amount.toLocaleString('zh-TW')],
+      ['損壞日期', record.occurred_on], ['送修日期', record.sent_on], ['回修日期', record.returned_on], ['異常類別', record.failure_tag]]));
+    const failure = element('section', 'detail-section');
+    failure.append(element('h3', '', '異常描述'), element('div', 'detail-text', record.failure_description));
+    body.append(failure, element('p', 'detail-note', '附件、結案／再次送修及跨案件連續送修歷史尚未移植。本筆新增／修改紀錄可從「編輯／異動」查看。'));
+    if (!detail.open) detail.showModal();
+  } catch (error) {
+    if (request !== detailRequest) return;
+    byId('message').textContent = byId('quick-message').textContent = error.message;
+  }
+}
+
+byId('close-detail').addEventListener('click', () => {detailRequest++; detail.close();});
+byId('edit-detail').addEventListener('click', async () => {
+  if (!selectedRecord) return;
+  const button = byId('edit-detail');
+  button.disabled = true;
+  try {
+    const result = await api('/api/repairs/records/' + encodeURIComponent(selectedRecord.id));
+    detail.close();
+    await openEditor(result.data);
+  } catch (error) {byId('detail-message').textContent = error.message;}
+  finally {button.disabled = false;}
+});
+
+async function searchSerial() {
+  if (!catalogs) return;
+  const request = ++quickRequest;
+  let serial = byId('quick-query').value.trim().toUpperCase();
+  if (/^[0-9]{1,8}$/.test(serial)) serial = serial.padStart(9, '0');
+  if (!serial) return;
+  byId('quick-query').value = serial;
+  byId('quick-message').textContent = '正在查詢…';
+  byId('quick-results').replaceChildren();
+  try {
+    const query = new URLSearchParams({serial});
+    const [records, master] = await Promise.all([api('/api/repairs/records?' + query),
+      api('/api/repairs/serial-mapping?' + query)]);
+    if (request !== quickRequest) return;
+    quickSerial = serial;
+    updateCounts(records.status_counts);
+    const summary = element('section', 'quick-summary');
+    summary.append(element('h2', '', master.data?.board_name || records.data[0]?.description || '尚無板件主檔'),
+      element('p', 'serial-text', serial), element('p', '', `共 ${records.total} 筆送修紀錄 · Part Number：${master.data?.board_part_code || '未記錄'}`));
+    byId('quick-results').append(summary);
+    for (const record of records.data) {
+      const card = element('button', 'quick-card');
+      card.type = 'button';
+      card.append(element('strong', '', `${record.description} · ${record.current_status}`),
+        element('span', '', `${record.machine_code} · ${record.occurred_on} · ${record.failure_tag}`),
+        element('span', '', record.failure_description));
+      card.addEventListener('click', () => openDetail(record.id));
+      byId('quick-results').append(card);
+    }
+    if (records.total > 20) {
+      const all = element('button', 'quick-card', '目前顯示前 20 筆，前往送修清單查看全部');
+      all.type = 'button';
+      all.addEventListener('click', () => {serialFilter = serial; byId('query').value = ''; setView(false); page = 1; loadRecords();});
+      byId('quick-results').append(all);
+    }
+    byId('quick-message').textContent = records.total ? '點選紀錄查看詳細資料。' : '此 S/N 尚無本機送修紀錄。';
+  } catch (error) {if (request === quickRequest) byId('quick-message').textContent = error.message;}
+}
+
+byId('quick-form').addEventListener('submit', event => {event.preventDefault(); searchSerial();});
+byId('quick-query').addEventListener('input', () => {
+  quickRequest++; quickSerial = ''; byId('quick-results').replaceChildren();
+  byId('quick-message').textContent = '輸入 S/N 後按 Search 查詢。';
+});
+byId('nav-quick').addEventListener('click', () => {setView(true); byId('quick-query').focus();});
+for (const button of document.querySelectorAll('[data-status]')) button.addEventListener('click', () => {
+  serialFilter = ''; byId('query').value = ''; setView(false, button.dataset.status); page = 1; loadRecords();
+});
 
 function updateBoards(preferred = byId('board').value) {
   const machine = catalogs.machines.find(row => row.machine_code === byId('machine').value);
@@ -115,6 +275,7 @@ byId('record-form').addEventListener('submit', async event => {
     editor.close();
     page = 1;
     await loadRecords();
+    if (quickSerial) await searchSerial();
   } catch (error) {
     byId('form-message').textContent = error.message + '\n輸入內容已保留。若為連線中斷，請先查詢確認是否已儲存，避免重複新增。';
   } finally {
@@ -131,28 +292,14 @@ async function loadRecords() {
   byId('previous').disabled = byId('next').disabled = true;
   try {
     const query = new URLSearchParams({q:byId('query').value, status:byId('status-filter').value, page});
+    if (serialFilter) query.set('serial', serialFilter);
     const result = await api('/api/repairs/records?' + query);
     if (request !== listingRequest) return;
     page = result.page;
     total = result.total;
+    updateCounts(result.status_counts);
     byId('records').replaceChildren();
-    for (const record of result.data) {
-      const tr = document.createElement('tr');
-      const texts = [`${record.serial_no}－${record.description}`, `${record.machine_code}／${record.model}`, record.current_status,
-        record.failure_tag, `${record.repair_type}／${record.repair_amount == null ? '未設定' : record.repair_amount.toLocaleString('zh-TW')}`, record.occurred_on];
-      for (const text of texts) {const td = document.createElement('td'); td.textContent = text; tr.append(td);}
-      const info = document.createElement('small'); info.textContent = record.failure_description; tr.firstChild.append(info);
-      const action = document.createElement('td'), button = document.createElement('button');
-      button.textContent = '編輯／異動'; button.type = 'button';
-      button.disabled = !catalogs.statuses.includes(record.current_status);
-      button.addEventListener('click', async () => {
-        button.disabled = true;
-        try {const result = await api('/api/repairs/records/' + encodeURIComponent(record.id)); await openEditor(result.data);}
-        catch (error) {byId('message').textContent = error.message;}
-        finally {button.disabled = false;}
-      });
-      action.append(button); tr.append(action); byId('records').append(tr);
-    }
+    for (const record of result.data) byId('records').append(renderRecord(record));
     const first = total ? (page - 1) * 20 + 1 : 0;
     byId('message').textContent = `共${total}筆資料 顯示${first}-${Math.min(page * 20, total)}`;
     byId('page').textContent = `第 ${page} / ${Math.max(1, Math.ceil(total / 20))} 頁`;
@@ -165,7 +312,7 @@ async function loadRecords() {
   }
 }
 
-byId('search-form').addEventListener('submit', event => {event.preventDefault(); page = 1; loadRecords();});
+byId('search-form').addEventListener('submit', event => {event.preventDefault(); serialFilter = ''; setView(false, byId('status-filter').value); page = 1; loadRecords();});
 byId('previous').addEventListener('click', () => {page--; loadRecords();});
 byId('next').addEventListener('click', () => {page++; loadRecords();});
 

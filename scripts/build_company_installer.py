@@ -4,7 +4,7 @@ import pprint
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "2026-11-02-local-repairs-basic"
+VERSION = "2026-11-02-original-ui-stage1"
 FILES = (
     "README.md", "server.py", "database.py", "errors.py", "test_server.py", "test_repairs.py",
     "modules/__init__.py", "modules/repairs/__init__.py", "modules/repairs/catalog.json",

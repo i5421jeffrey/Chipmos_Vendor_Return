@@ -24,6 +24,10 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：分段�
                                             '## 目前範圍\n'
                                             '\n'
                                             '- `/`：環境檢查；`/repairs/`：備品管理的送修新增／查詢／編輯、每筆異動紀錄。\n'
+                                            '- 介面第一段還原：沿用原版左側導覽、狀態清單、S/N '
+                                            '快速搜尋、六欄送修列表、右側詳細資料及編輯視窗結構與配色。這不是完整原版的像素／功能一致性驗收；未移植功能停用並標示，不顯示假資料。\n'
+                                            '- 快速搜尋以正規化後的完整 S/N 精確查詢，不混入「包含相同字串」的其他序號；狀態導覽筆數由 SQLite '
+                                            '實際紀錄取得。\n'
                                             '- S/N 主檔只存 S/N、板名與 PN，命中後鎖定板名／PN；衝突阻止寫入，不自動同步其他歷史。\n'
                                             '- 機型由機台對應取得，維修金額由板件與維修分類決定；未設定為 NULL，零元仍為 0。\n'
                                             '- 修改必須提供讀取時的版本；過期版本回傳 409，不覆蓋他人修改。\n'
@@ -118,6 +122,10 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：分段�
                                             '6. 編輯該筆並儲存，再開啟檢查異動紀錄；點視窗背景或按 Esc 不會關閉表單。\n'
                                             '7. 在兩個瀏覽器分頁先後開啟同一筆編輯表單；第一頁儲存後，第二頁儲存應顯示衝突且保留輸入，不可覆蓋第一頁。\n'
                                             '8. 重啟後測試紀錄仍存在。此階段不要輸入正式資料，完整移植及備份流程尚未驗收。\n'
+                                            '9. 新版開啟後預設為 S/N 快速搜尋；查詢測試 '
+                                            'S/N，點結果應開啟右側詳細資料。點「編輯／異動」進入編輯視窗，既有鎖定與衝突保護維持不變。\n'
+                                            '10. 左側「全部送修」「待送修」等狀態可切換、搜尋及分頁；DBN 等未移植功能停用。請截圖對照原版，Windows '
+                                            '的顯示縮放及實際視窗操作仍需實機驗收。\n'
                                             '\n'
                                             '資料庫自動建立在 `company\\data\\spms.sqlite3`；不要刪除或放在網路磁碟、OneDrive。\n'
                                             '原第一階段的核心結構版本維持 1；送修模組版本另存於 `spms_module_migrations`。\n'
@@ -135,8 +143,9 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：分段�
                                             'python -m unittest discover -s company -p "test_*.py" -v\n'
                                             '```\n'
                                             '\n'
-                                            'Mac 開發機可額外執行 `swift scripts/test_company_ui.swift` 檢查 JS '
-                                            '語法；這不取代 Windows 瀏覽器互動驗收。\n'
+                                            'Mac 開發機可額外執行 `swift scripts/test_company_ui.swift` 檢查 JS 語法及 '
+                                            'mock DOM 流程（導覽、精確 S/N 查詢、詳細資料／編輯、衝突保留輸入）；這不取代 Windows 瀏覽器與 CSS '
+                                            '視覺驗收。\n'
                                             '要重建離線基礎對應（只讀 Git 檔案、不連雲端），執行 `python '
                                             'scripts/build_company_catalog.py`；\n'
                                             '這只產生封裝檔，不會更新已安裝 SQLite 的主檔，正式主檔變更須另行審閱遷移。\n'
@@ -145,7 +154,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：分段�
                                             '產生；公司版程式更新後必須重新產生。\n'
                                             '安裝測試：`python -m unittest discover -s scripts -p '
                                             '"test_company_installer.py" -v`。\n',
-                                 'sha256': '896f2f5463c65b670278fc428b5d0de1b6b6e0236bf4d239855ce9c79ce1ac73'},
+                                 'sha256': '0b8f4fe03e1072bcac9678580b8c74623b2ad09d1d5e1e9556c5d4c99d71f6b1'},
            'company/database.py': {'content': '"""Shared SQLite connections and additive, backed-up module '
                                               'migrations."""\n'
                                               'import json\n'
@@ -1416,6 +1425,12 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：分段�
                                                              '    if not 1 <= page <= 1000000:\n'
                                                              '        raise APIError("頁碼超過可接受範圍")\n'
                                                              '    where, arguments = [], []\n'
+                                                             '    serial = query.get("serial", '
+                                                             '[""])[0].strip()\n'
+                                                             '    if serial:\n'
+                                                             '        where.append("serial_no=?")\n'
+                                                             '        '
+                                                             'arguments.append(normalize_serial(serial))\n'
                                                              '    if text:\n'
                                                              '        text = "%" + text.replace("\\\\", '
                                                              '"\\\\\\\\").replace("%", "\\\\%").replace("_", '
@@ -1440,6 +1455,11 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：分段�
                                                              '        total = connection.execute("SELECT '
                                                              'count(*) FROM repair_records" + condition, '
                                                              'arguments).fetchone()[0]\n'
+                                                             '        counts = {row["current_status"]: '
+                                                             'row["count"] for row in connection.execute(\n'
+                                                             '            "SELECT current_status, count(*) '
+                                                             'AS count FROM repair_records GROUP BY '
+                                                             'current_status")}\n'
                                                              '        page = min(page, max(1, (total + 19) '
                                                              '// 20))\n'
                                                              '        rows = connection.execute("SELECT * '
@@ -1450,7 +1470,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：分段�
                                                              '(page - 1) * 20]).fetchall()\n'
                                                              '        return {"data": [public_record(row) '
                                                              'for row in rows], "total": total, "page": '
-                                                             'page, "page_size": 20}\n'
+                                                             'page, "page_size": 20,\n'
+                                                             '                "status_counts": counts}\n'
                                                              '\n'
                                                              '\n'
                                                              'def record_detail(path, record_id):\n'
@@ -1656,7 +1677,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：分段�
                                                              'json.loads(entry["changes"])\n'
                                                              '            result.append(entry)\n'
                                                              '        return {"data": result}\n',
-                                                  'sha256': '536cd988fae45b2a8c567b468d03b949dcc6df562a2f876e6ee0186c74f239ce'},
+                                                  'sha256': '86c9eb2c72f3445c297f5225e1e8ddc36fda499df7cc0723f1e3c4996a0a0801'},
            'company/server.py': {'content': '"""Local SPMS service. Python standard library only; no cloud '
                                             'connections."""\n'
                                             '\n'
@@ -2018,6 +2039,26 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：分段�
                                                   'self.assertEqual(len(service.list_history(self.path, '
                                                   'record["id"])["data"]), 2)\n'
                                                   '\n'
+                                                  '    def '
+                                                  'test_exact_serial_search_and_global_status_counts(self):\n'
+                                                  '        service.save_record(self.path, example())\n'
+                                                  '        other = service.save_record(self.path, '
+                                                  'example(serial_no="PREFIX-002850948"))["data"]\n'
+                                                  '        service.save_record(self.path, '
+                                                  'example(serial_no=other["serial_no"], '
+                                                  'expected_version=1,\n'
+                                                  '                           current_status="已送修", '
+                                                  'sent_on="2026-11-02"), other["id"])\n'
+                                                  '        result = service.list_records(self.path, '
+                                                  '{"serial": ["2850948"]})\n'
+                                                  '        self.assertEqual(result["total"], 1)\n'
+                                                  '        self.assertEqual(result["data"][0]["serial_no"], '
+                                                  '"002850948")\n'
+                                                  '        self.assertEqual(result["status_counts"], {"待送修": '
+                                                  '1, "已送修": 1})\n'
+                                                  '        self.assertEqual(service.list_records(self.path, '
+                                                  '{"serial": ["missing"]})["total"], 0)\n'
+                                                  '\n'
                                                   '    def test_concurrent_update_has_one_winner(self):\n'
                                                   '        record = service.save_record(self.path, '
                                                   'example())["data"]\n'
@@ -2256,7 +2297,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：分段�
                                                   '\n'
                                                   'if __name__ == "__main__":\n'
                                                   '    unittest.main()\n',
-                                       'sha256': '0861312e0057f214e34cc0174bae59ef160cc62373c2e69430df0aed1e577677'},
+                                       'sha256': 'a473c25f9510d26909ca374481ab4d3549dfefcf0bf288fdeb405dd801ade285'},
            'company/test_server.py': {'content': 'import concurrent.futures\n'
                                                  'import json\n'
                                                  'import sqlite3\n'
@@ -2494,8 +2535,130 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：分段�
                                                   '0;line-height:1.8;white-space:pre-wrap;overflow-wrap:anywhere}\n'
                                                   '@media(max-width:700px){header{display:block;padding:15px}nav{margin-top:15px;gap:12px;font-size:12px}main{padding:18px '
                                                   '12px}.toolbar{flex-wrap:wrap}.toolbar '
-                                                  'input{flex-basis:100%}.fields{grid-template-columns:1fr}.wide{grid-column:auto}.title-row{align-items:flex-start}dialog{padding:16px}}\n',
-                                       'sha256': '18c4afa8dd0bf36e23ed6d9321fb888f2a02deb6ed467660e290a46a04fd436c'},
+                                                  'input{flex-basis:100%}.fields{grid-template-columns:1fr}.wide{grid-column:auto}.title-row{align-items:flex-start}dialog{padding:16px}}\n'
+                                                  '\n'
+                                                  '/* Original SPMS shell/list proportions; local-only '
+                                                  'implementation. */\n'
+                                                  ':root{--bg:#101113;--side:#151618;--line:#292a2d;--muted:#88898d;--accent:#8b8df8;font:13px/1.5 '
+                                                  '-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}\n'
+                                                  '[hidden]{display:none!important}.app{min-height:100vh;display:grid;grid-template-columns:218px '
+                                                  'minmax(0,1fr)}\n'
+                                                  '.sidebar{position:sticky;top:0;height:100vh;overflow:auto;display:flex;flex-direction:column;gap:6px;background:var(--side);border:0;border-right:1px '
+                                                  'solid var(--line);border-radius:0;margin:0;padding:17px '
+                                                  '11px;color:#aaaab0;font-size:12px}\n'
+                                                  '.brand{display:flex;align-items:center;gap:10px;padding:2px '
+                                                  '8px 12px}.brand '
+                                                  'strong{display:block;font-size:25px;letter-spacing:-.055em;line-height:1.1;color:#f0f0f2}.brand '
+                                                  'small{display:block;font-size:8px;color:#77787e;white-space:nowrap;margin-top:4px}.brand-mark{display:grid;place-items:center;flex:none;width:36px;height:36px;border:1px '
+                                                  'solid '
+                                                  '#45457b;border-radius:50%;color:#e7e7e8;font-size:24px;font-weight:700}.system-label{padding:0 '
+                                                  '9px '
+                                                  '14px;color:#85868c;font-size:10px}.nav-label{padding:17px '
+                                                  '9px '
+                                                  '4px;font-size:10px;letter-spacing:.08em;color:#707176}.sidebar '
+                                                  'nav{display:grid;gap:2px;margin:0}.nav-item{display:flex;align-items:center;gap:9px;width:100%;padding:7px '
+                                                  '9px;border:0;background:transparent;border-radius:5px;color:#aaaab0;text-align:left;font-size:12px;white-space:nowrap}.nav-item:hover{background:#202124;color:#eee}.nav-item[aria-current="page"]{background:#28292c;color:#f2f2f3}.nav-item:disabled{opacity:.45}.nav-item>span:first-child:not(.count){width:15px;text-align:center;color:#85868c}.count{margin-left:auto;font:11px '
+                                                  'ui-monospace,SFMono-Regular,Menlo,monospace;color:#77787e}.environment-link{margin-top:auto;padding:20px '
+                                                  '9px 5px;color:#929398;font-size:11px}\n'
+                                                  '.content{min-width:0;width:100%;max-width:1180px;margin:0 '
+                                                  'auto;padding:24px 25px 60px}.local-badge{margin:0 0 '
+                                                  '12px;color:#929398;font-size:11px;text-align:right}.notice{padding:9px '
+                                                  '11px;margin-bottom:22px;border:1px solid '
+                                                  '#3d3828;background:#1b1913;border-radius:5px;color:#c8b989;font-size:11px;line-height:1.7}.title-row '
+                                                  'h1{font-size:20px;font-weight:600;letter-spacing:-.02em}.title-row '
+                                                  'p{font-size:12px;color:var(--muted);margin:4px 0 '
+                                                  '0}.title-row{margin-bottom:20px}button,input,select,textarea{font:inherit}button{padding:6px '
+                                                  '9px}#create,#save{background:#353569;border-color:#45457b;color:#e5e5ff;font-size:12px}.toolbar{align-items:center;gap:8px;margin:0 '
+                                                  '0 12px}.toolbar '
+                                                  'input{max-width:360px;height:32px;font-size:12px}.toolbar '
+                                                  'select,.toolbar '
+                                                  'button{height:32px;font-size:11px;padding:0 '
+                                                  '9px}.list-count{color:var(--muted);font-size:11px;margin:0 '
+                                                  '0 8px;text-align:right}\n'
+                                                  '.list-heading,.issue-row{display:grid;grid-template-columns:minmax(0,3fr) '
+                                                  'minmax(0,2fr) minmax(0,2fr) minmax(0,1fr) minmax(0,1fr) '
+                                                  'minmax(0,1fr);gap:12px;text-align:left;align-items:center}.list-heading{padding:12px '
+                                                  '16px;border-bottom:1px solid '
+                                                  'var(--line);color:#81838b;font-size:11px}.issue-row{width:100%;min-height:76px;padding:15px '
+                                                  '16px;border:0;border-bottom:1px solid '
+                                                  '#25272b;border-radius:0;background:transparent;color:#dedee0;cursor:pointer}.issue-row:hover{background:#151719}.issue-row.selected{background:#17191c}.issue-row>span{min-width:0}.issue-main{display:flex;align-items:center;gap:13px}.state-symbol{width:22px;flex:none;text-align:center;font-size:19px;color:#a4a6ad}.item-copy{display:block;min-width:0}.item-title{display:block;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px;font-weight:550}.item-sub{display:block;margin-top:3px;font:10px '
+                                                  'ui-monospace,SFMono-Regular,Menlo,monospace;color:#858891;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.status-pill{display:inline-flex;align-items:center;gap:8px;font-size:12px}.status-pill::before{content:"";width:8px;height:8px;border-radius:50%;background:#85868c;flex:none}.tone-sent{color:#dc9999}.tone-sent::before{background:#dc9999}.tone-verify{color:#dfc36f}.tone-verify::before{background:#dfc36f}.tone-pass{color:#79c78b}.tone-pass::before{background:#79c78b}.tone-fail{color:#ef7777}.tone-fail::before{background:#ef7777}.record-tags{display:grid;justify-items:start;gap:4px}.failure-tag{font-size:12px;color:#c7c9d1;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.repair-tag{font-size:9px;border:1px '
+                                                  'solid #555078;padding:0 '
+                                                  '5px;border-radius:4px;color:#c7bfff}.dbn-pending{font-size:10px;color:#777982}.machine-cell{font-size:12px;overflow:hidden;text-overflow:ellipsis}.date-cell{font-size:11px;color:#a0a2aa;text-align:right;white-space:nowrap}.list-heading>:last-child{text-align:right}.pager{font-size:11px;margin:18px '
+                                                  '0}.pager button{font-size:11px}\n'
+                                                  '.quick-search-view{max-width:820px;margin:clamp(24px,8vh,86px) '
+                                                  'auto 0}.quick-search-view '
+                                                  'h1{font-size:27px;font-weight:650;letter-spacing:-.03em}.quick-intro{color:var(--muted);font-size:13px;margin:9px '
+                                                  '0 30px}#quick-form '
+                                                  'label{font-size:12px;color:#bcbcc2;margin-bottom:8px}.quick-controls{display:flex;gap:9px}.quick-controls '
+                                                  'input{flex:1;min-width:0;height:54px;padding:0 '
+                                                  '15px;font-size:17px;letter-spacing:.025em}.quick-controls '
+                                                  'button{min-width:104px;background:#353569;border-color:#45457b;color:#e5e5ff;font-size:13px}#quick-message{color:#929398;font-size:11px;margin:12px '
+                                                  '0}.quick-summary{border:1px solid '
+                                                  'var(--line);border-radius:8px;background:#151618;padding:17px;margin-top:20px}.quick-summary '
+                                                  'h2{margin:0 0 5px;font-size:17px}.quick-summary '
+                                                  'p{color:#999ba6;font-size:12px}.quick-card{width:100%;display:block;text-align:left;border:1px '
+                                                  'solid '
+                                                  'var(--line);background:#151618;border-radius:6px;margin-top:10px;padding:14px;color:#ddd}.quick-card '
+                                                  'strong{display:block;font-size:13px}.quick-card '
+                                                  'span{display:block;margin-top:5px;color:#a5a6ad;font-size:12px;overflow-wrap:anywhere}\n'
+                                                  'dialog:not(.record-detail){width:min(720px,94vw);background:#17181a;border-color:#393a3f;padding:0;box-shadow:0 '
+                                                  '24px 80px '
+                                                  '#0009}.dialog-head{position:sticky;top:0;z-index:1;background:#17181aee;backdrop-filter:blur(8px);border-bottom:1px '
+                                                  'solid var(--line);padding:13px 18px}.dialog-head '
+                                                  'h2{font-size:15px;margin:0;font-weight:600}#record-form{padding:0 '
+                                                  '18px 18px}.fields{gap:13px 14px}.fields '
+                                                  'label{font-size:11px;color:#a1a2a6}.fields input,.fields '
+                                                  'select,.fields textarea{background:#101113;border:1px '
+                                                  'solid #343539;padding:8px '
+                                                  '9px;font-size:12px;line-height:1.45}.fields '
+                                                  'textarea{min-height:84px}.fields '
+                                                  '.hint{font-size:10px}.fields .check '
+                                                  'input{width:auto}.actions{margin-top:12px}#form-message{font-size:11px}#history-section{margin:0;padding:15px '
+                                                  '18px;border-color:var(--line);font-size:11px}\n'
+                                                  '.record-detail{position:fixed;inset:0 0 0 '
+                                                  'auto;margin:0;width:min(430px,100vw);height:100vh;max-height:100vh;border:0;border-left:1px '
+                                                  'solid '
+                                                  '#333438;border-radius:0;background:#151618;color:#d2d2d4;padding:0;box-shadow:-12px '
+                                                  '0 40px '
+                                                  '#0005}.record-detail::backdrop{background:#0008}.record-detail '
+                                                  '.dialog-head{background:#151618ee;font-size:11px;color:var(--muted)}.detail-body{padding:20px '
+                                                  '20px 36px}.serial-text{font:11px '
+                                                  'ui-monospace,SFMono-Regular,Menlo,monospace;color:#8a8b91;margin:0 '
+                                                  '0 8px}.detail-body '
+                                                  'h2{font-size:18px;line-height:1.35;margin:0 0 '
+                                                  '12px;overflow-wrap:anywhere}.detail-actions{display:flex;justify-content:flex-end;margin-bottom:13px}.detail-section{border-top:1px '
+                                                  'solid var(--line);padding:15px 0}.detail-section '
+                                                  'h3{font-size:10px;color:#85868c;letter-spacing:.07em;margin:0 '
+                                                  '0 '
+                                                  '11px;font-weight:600}.detail-grid{display:grid;grid-template-columns:1fr '
+                                                  '1fr;gap:13px 10px}.detail-field '
+                                                  'label{display:block;font-size:10px;color:#77787e;margin-bottom:3px}.detail-field '
+                                                  'span{font-size:12px;overflow-wrap:anywhere}.detail-text{white-space:pre-wrap;overflow-wrap:anywhere;font-size:12px;line-height:1.7}.detail-note{color:#85868c;font-size:11px}\n'
+                                                  '@media(max-width:960px){.list-heading{display:none}.issue-row{grid-template-columns:minmax(0,1fr) '
+                                                  'auto;gap:8px;padding:14px '
+                                                  '12px}.issue-main{grid-column:1/-1}.status-pill{grid-column:1}.record-tags{grid-column:2;grid-row:2;justify-items:end}.dbn-pending{grid-column:1;grid-row:3}.machine-cell{grid-column:2;grid-row:3;text-align:right}.date-cell{grid-column:1/-1;grid-row:4}.toolbar{flex-wrap:wrap}.toolbar '
+                                                  'input{max-width:none;flex-basis:100%}}\n'
+                                                  '@media(min-width:601px) and '
+                                                  '(max-width:800px){.app{grid-template-columns:178px '
+                                                  'minmax(0,1fr)}.sidebar{padding-left:8px;padding-right:8px}.brand{gap:6px;padding-left:3px}.brand '
+                                                  'strong{font-size:22px}.brand '
+                                                  'small{font-size:6.5px}.brand-mark{width:30px;height:30px;font-size:20px}.content{padding:23px '
+                                                  '15px 45px}}\n'
+                                                  '@media(max-width:600px){.app{display:block}.sidebar{position:static;height:auto;padding:12px}.brand{padding-bottom:8px}.brand '
+                                                  'strong{font-size:22px}.system-label{padding-bottom:8px}.sidebar '
+                                                  'nav{display:flex;overflow-x:auto}.sidebar '
+                                                  '#status-nav{margin-top:5px}.nav-item{width:auto;flex:none}.count{margin-left:4px}.sidebar '
+                                                  '.nav-label,.pending-nav,.environment-link{display:none!important}.content{padding:16px '
+                                                  '12px '
+                                                  '40px}.notice{font-size:10px}.local-badge{margin-bottom:8px}.title-row '
+                                                  'h1{font-size:18px}.quick-search-view{margin:18px auto '
+                                                  '0}.quick-search-view h1{font-size:23px}.quick-controls '
+                                                  'input{height:50px;font-size:16px}.quick-controls '
+                                                  'button{min-width:78px}.fields{grid-template-columns:1fr}dialog:not(.record-detail){width:96vw}.dialog-head{padding:13px '
+                                                  '14px}#record-form{padding:0 14px '
+                                                  '14px}.title-row{align-items:flex-start}}\n',
+                                       'sha256': 'bb73013fa9aed02f28d28eedfd0fc06453ce44219b87cc6c5c0f174f2ae60ba0'},
            'company/web/repairs.html': {'content': '<!doctype html>\n'
                                                    '<html lang="zh-Hant">\n'
                                                    '<head>\n'
@@ -2507,31 +2670,100 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：分段�
                                                    '  <script src="/repairs/app.js" defer></script>\n'
                                                    '</head>\n'
                                                    '<body>\n'
-                                                   '<header><strong>SPMS 公司版</strong><nav><a '
-                                                   'href="/">環境檢查</a><a href="/repairs/" '
-                                                   'aria-current="page">備品管理</a><span>機台管理（尚未移植）</span></nav></header>\n'
-                                                   '<main>\n'
-                                                   '  <div class="title-row"><div><h1>備品管理</h1><p>SQLite '
-                                                   '本機移植驗證版 · 送修基本流程</p></div><button id="create" '
-                                                   'type="button" disabled>＋ 新增送修</button></div>\n'
-                                                   '  '
-                                                   '<aside>目前只開放本機驗證。DBN／Socket、附件、結案／再次送修、完整主檔維護與統計尚未移植；舊資料尚未匯入。機台／板件／價格為 '
-                                                   'Git 儲存庫內的基礎對應，正式使用前需核對。</aside>\n'
-                                                   '  <form id="search-form" class="toolbar"><input '
-                                                   'id="query" type="search" placeholder="搜尋 '
-                                                   'S/N、板件名稱、機台或異常描述" aria-label="搜尋"><select '
-                                                   'id="status-filter" aria-label="狀態"><option '
+                                                   '<div class="app">\n'
+                                                   '  <aside class="sidebar">\n'
+                                                   '    <div class="brand"><span class="brand-mark" '
+                                                   'aria-hidden="true">S</span><div><strong>SPMS</strong><small>Spare '
+                                                   'Parts Management System</small></div></div>\n'
+                                                   '    <div class="system-label">備品管理系統 · 公司 SQLite '
+                                                   '版</div>\n'
+                                                   '    <nav aria-label="快速搜尋"><button class="nav-item" '
+                                                   'id="nav-quick" type="button" aria-current="page"><span '
+                                                   'aria-hidden="true">⌕</span>快速搜尋</button></nav>\n'
+                                                   '    <div class="nav-label">紀錄項目</div>\n'
+                                                   '    <nav id="status-nav" aria-label="送修狀態">\n'
+                                                   '      <button class="nav-item" data-status="" '
+                                                   'type="button"><span aria-hidden="true">☷</span>全部送修<span '
+                                                   'class="count" data-count="all">0</span></button>\n'
+                                                   '      <button class="nav-item" data-status="待送修" '
+                                                   'type="button"><span aria-hidden="true">○</span>待送修<span '
+                                                   'class="count" data-count="待送修">0</span></button>\n'
+                                                   '      <button class="nav-item" data-status="已送修" '
+                                                   'type="button"><span aria-hidden="true">↗</span>已送修<span '
+                                                   'class="count" data-count="已送修">0</span></button>\n'
+                                                   '      <button class="nav-item" data-status="取回驗證" '
+                                                   'type="button"><span aria-hidden="true">◎</span>取回驗證<span '
+                                                   'class="count" data-count="取回驗證">0</span></button>\n'
+                                                   '      <button class="nav-item" data-status="結案（PASS）" '
+                                                   'type="button"><span aria-hidden="true">✓</span>PASS<span '
+                                                   'class="count" data-count="結案（PASS）">0</span></button>\n'
+                                                   '      <button class="nav-item" data-status="結案（FAIL）" '
+                                                   'type="button"><span aria-hidden="true">×</span>FAIL<span '
+                                                   'class="count" data-count="結案（FAIL）">0</span></button>\n'
+                                                   '    </nav>\n'
+                                                   '    <div class="nav-label">尚未移植</div>\n'
+                                                   '    <nav class="pending-nav" '
+                                                   'aria-label="尚未移植的功能"><button class="nav-item" '
+                                                   'disabled>DBN 紀錄</button><button class="nav-item" '
+                                                   'disabled>S/N 主檔維護</button><button class="nav-item" '
+                                                   'disabled>統計資料</button><button class="nav-item" '
+                                                   'disabled>全站異動紀錄</button><button class="nav-item" '
+                                                   'disabled>機台管理</button></nav>\n'
+                                                   '    <a class="environment-link" href="/">SQLite '
+                                                   '環境檢查</a>\n'
+                                                   '  </aside>\n'
+                                                   '  <main class="content">\n'
+                                                   '    <p class="local-badge">本機驗證版 · 不連接 Supabase</p>\n'
+                                                   '    <div '
+                                                   'class="notice">介面分段還原中：DBN／Socket、附件、結案／再次送修、完整主檔維護與統計尚未移植；舊資料未匯入，內附基礎對應仍須核對。本版只限本機驗收，尚未開放內網。</div>\n'
+                                                   '    <section id="quick-view" class="quick-search-view">\n'
+                                                   '      <h1>SPMS</h1><p class="quick-intro">Enter a board '
+                                                   'S/N to quickly view related repair records.</p>\n'
+                                                   '      <form id="quick-form"><label for="quick-query">板件 '
+                                                   'S/N</label><div class="quick-controls"><input '
+                                                   'id="quick-query" type="search" placeholder="001234567" '
+                                                   'maxlength="64" required autocomplete="off"><button '
+                                                   'type="submit">Search</button></div></form>\n'
+                                                   '      <p id="quick-message" role="status" '
+                                                   'aria-live="polite">輸入 S/N 查詢本機送修紀錄；DBN 查詢尚未移植。</p>\n'
+                                                   '      <div id="quick-results"></div>\n'
+                                                   '    </section>\n'
+                                                   '    <section id="records-view" hidden>\n'
+                                                   '      <div class="title-row"><div><h1 '
+                                                   'id="view-title">全部送修</h1><p>追蹤送修狀態、開單資訊及異常描述</p></div><button '
+                                                   'id="create" type="button" disabled>＋ '
+                                                   '新增送修</button></div>\n'
+                                                   '      <form id="search-form" class="toolbar"><input '
+                                                   'id="query" type="search" placeholder="搜尋板件、S/N、機台或異常描述…" '
+                                                   'aria-label="搜尋"><select id="status-filter" '
+                                                   'aria-label="狀態"><option '
                                                    'value="">所有狀態</option><option>待送修</option><option>已送修</option><option>取回驗證</option><option>結案（PASS）</option><option>結案（FAIL）</option></select><button '
                                                    'type="submit">查詢</button></form>\n'
-                                                   '  <p id="message" role="status" '
+                                                   '      <p id="message" class="list-count" role="status" '
                                                    'aria-live="polite">正在載入…</p>\n'
-                                                   '  <div '
-                                                   'class="table-wrap"><table><thead><tr><th>S/N－板件名稱</th><th>機台／機型</th><th>狀態</th><th>異常類別</th><th>維修分類／金額</th><th>損壞日期</th><th>操作</th></tr></thead><tbody '
-                                                   'id="records"></tbody></table></div>\n'
-                                                   '  <div class="pager"><button id="previous" type="button" '
-                                                   'disabled>上一頁</button><span id="page"></span><button '
-                                                   'id="next" type="button" disabled>下一頁</button></div>\n'
-                                                   '</main>\n'
+                                                   '      <div '
+                                                   'class="list-heading"><span>項目</span><span>目前狀態</span><span>標籤</span><span>DBN</span><span>機台</span><span>損壞日期</span></div>\n'
+                                                   '      <div id="records" class="rows" '
+                                                   'aria-label="送修清單"></div>\n'
+                                                   '      <div class="pager"><button id="previous" '
+                                                   'type="button" disabled>上一頁</button><span '
+                                                   'id="page"></span><button id="next" type="button" '
+                                                   'disabled>下一頁</button></div>\n'
+                                                   '    </section>\n'
+                                                   '  </main>\n'
+                                                   '</div>\n'
+                                                   '<dialog id="record-detail" class="record-detail" '
+                                                   'aria-labelledby="detail-title">\n'
+                                                   '  <div class="dialog-head"><span>送修詳細資料</span><button '
+                                                   'id="close-detail" type="button" '
+                                                   'aria-label="關閉詳細資料">×</button></div>\n'
+                                                   '  <div class="detail-body"><p id="detail-serial" '
+                                                   'class="serial-text"></p><h2 id="detail-title"></h2><div '
+                                                   'class="detail-actions"><button id="edit-detail" '
+                                                   'type="button">編輯／異動</button></div><div '
+                                                   'id="detail-content"></div><p id="detail-message" '
+                                                   'role="status"></p></div>\n'
+                                                   '</dialog>\n'
                                                    '<dialog id="editor" aria-labelledby="editor-title">\n'
                                                    '  <div class="dialog-head"><h2 '
                                                    'id="editor-title">新增送修</h2><button id="close" '
@@ -2580,12 +2812,16 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：分段�
                                                    '</dialog>\n'
                                                    '</body>\n'
                                                    '</html>\n',
-                                        'sha256': '92118283dac2de4363e69f8c8d63dff879ba5114a5c9fe3dd79caf76f080ce29'},
+                                        'sha256': 'e308d20b0040dcb4c5c38c7bb8a40aafa5ddf48f9fa206a6e4d950d602c20dc4'},
            'company/web/repairs.js': {'content': 'const byId = id => document.getElementById(id);\n'
                                                  'let catalogs, current = null, mapping = null, '
                                                  'mappingRequest = 0, saving = false;\n'
                                                  'let page = 1, total = 0, listingRequest = 0;\n'
+                                                 'let quickRequest = 0, detailRequest = 0, selectedRecord = '
+                                                 "null, serialFilter = '';\n"
+                                                 "let quickSerial = '';\n"
                                                  "const editor = byId('editor');\n"
+                                                 "const detail = byId('record-detail');\n"
                                                  "const fieldLabels = {serial_no:'S/N', machine_code:'機台', "
                                                  "model:'機型', description:'板件名稱', board_part_code:'Part "
                                                  "Number', failure_tag:'異常類別', failure_description:'異常描述', "
@@ -2615,6 +2851,225 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：分段�
                                                  '  for (const value of values) select.add(new Option(value, '
                                                  'value));\n'
                                                  '}\n'
+                                                 '\n'
+                                                 'function element(tag, className, text) {\n'
+                                                 '  const node = document.createElement(tag);\n'
+                                                 '  if (className) node.className = className;\n'
+                                                 '  if (text !== undefined) node.textContent = text;\n'
+                                                 '  return node;\n'
+                                                 '}\n'
+                                                 '\n'
+                                                 'function statusTone(status) {\n'
+                                                 "  return {'已送修':'sent', '取回驗證':'verify', "
+                                                 "'結案（PASS）':'pass', '結案（FAIL）':'fail'}[status] || "
+                                                 "'pending';\n"
+                                                 '}\n'
+                                                 '\n'
+                                                 'function statusPill(status) {\n'
+                                                 "  return element('span', 'status-pill tone-' + "
+                                                 'statusTone(status), status);\n'
+                                                 '}\n'
+                                                 '\n'
+                                                 'function updateCounts(counts) {\n'
+                                                 '  for (const node of '
+                                                 "document.querySelectorAll('[data-count]')) {\n"
+                                                 "    node.textContent = node.dataset.count === 'all'\n"
+                                                 '      ? Object.values(counts).reduce((sum, number) => sum '
+                                                 '+ number, 0) : counts[node.dataset.count] || 0;\n'
+                                                 '  }\n'
+                                                 '}\n'
+                                                 '\n'
+                                                 "function setView(quick, status = '') {\n"
+                                                 "  byId('quick-view').hidden = !quick;\n"
+                                                 "  byId('records-view').hidden = quick;\n"
+                                                 "  byId('nav-quick').toggleAttribute('aria-current', "
+                                                 'quick);\n'
+                                                 '  if (quick) '
+                                                 "byId('nav-quick').setAttribute('aria-current', 'page');\n"
+                                                 '  for (const button of '
+                                                 "document.querySelectorAll('[data-status]')) {\n"
+                                                 '    if (!quick && button.dataset.status === status) '
+                                                 "button.setAttribute('aria-current', 'page');\n"
+                                                 "    else button.removeAttribute('aria-current');\n"
+                                                 '  }\n'
+                                                 '  if (!quick) {\n'
+                                                 "    byId('status-filter').value = status;\n"
+                                                 "    byId('view-title').textContent = status || '全部送修';\n"
+                                                 '  }\n'
+                                                 '}\n'
+                                                 '\n'
+                                                 'function renderRecord(record) {\n'
+                                                 "  const row = element('button', 'issue-row');\n"
+                                                 "  row.type = 'button';\n"
+                                                 "  row.classList.toggle('selected', selectedRecord?.id === "
+                                                 'record.id);\n'
+                                                 "  const main = element('span', 'issue-main');\n"
+                                                 "  const symbol = {'已送修':'↗', '取回驗證':'◎', '結案（PASS）':'✓', "
+                                                 "'結案（FAIL）':'×'}[record.current_status] || '○';\n"
+                                                 "  const copy = element('span', 'item-copy');\n"
+                                                 "  copy.append(element('strong', 'item-title', "
+                                                 'record.description),\n'
+                                                 "    element('span', 'item-sub', `${record.serial_no} · 開單 "
+                                                 "${record.is_opened ? 'O' : 'X'}`));\n"
+                                                 "  main.append(element('span', 'state-symbol', symbol), "
+                                                 'copy);\n'
+                                                 "  const tags = element('span', 'record-tags');\n"
+                                                 "  tags.append(element('span', 'failure-tag', "
+                                                 "record.failure_tag), element('span', 'repair-tag', "
+                                                 'record.repair_type));\n'
+                                                 '  row.append(main, statusPill(record.current_status), '
+                                                 "tags, element('span', 'dbn-pending', '尚未移植'),\n"
+                                                 "    element('span', 'machine-cell', record.machine_code), "
+                                                 "element('span', 'date-cell', record.occurred_on));\n"
+                                                 "  row.addEventListener('click', () => "
+                                                 'openDetail(record.id));\n'
+                                                 '  return row;\n'
+                                                 '}\n'
+                                                 '\n'
+                                                 'function detailSection(title, fields) {\n'
+                                                 "  const section = element('section', 'detail-section');\n"
+                                                 "  section.append(element('h3', '', title));\n"
+                                                 "  const grid = element('div', 'detail-grid');\n"
+                                                 '  for (const [label, value] of fields) {\n'
+                                                 "    const field = element('div', 'detail-field');\n"
+                                                 "    field.append(element('label', '', label), "
+                                                 "element('span', '', value ?? '—'));\n"
+                                                 '    grid.append(field);\n'
+                                                 '  }\n'
+                                                 '  section.append(grid);\n'
+                                                 '  return section;\n'
+                                                 '}\n'
+                                                 '\n'
+                                                 'async function openDetail(id) {\n'
+                                                 '  const request = ++detailRequest;\n'
+                                                 "  byId('detail-message').textContent = '';\n"
+                                                 '  try {\n'
+                                                 "    const result = await api('/api/repairs/records/' + "
+                                                 'encodeURIComponent(id));\n'
+                                                 '    if (request !== detailRequest) return;\n'
+                                                 '    const record = result.data;\n'
+                                                 '    selectedRecord = record;\n'
+                                                 "    byId('detail-serial').textContent = record.serial_no;\n"
+                                                 "    byId('detail-title').textContent = "
+                                                 'record.description;\n'
+                                                 "    byId('edit-detail').disabled = "
+                                                 '!catalogs?.statuses.includes(record.current_status);\n'
+                                                 "    const body = byId('detail-content');\n"
+                                                 '    '
+                                                 'body.replaceChildren(statusPill(record.current_status));\n'
+                                                 "    body.append(detailSection('板件資訊', [['機台', "
+                                                 "record.machine_code], ['Model', record.model],\n"
+                                                 "      ['S/N', record.serial_no], ['Part Number', "
+                                                 "record.board_part_code], ['是否開單', record.is_opened ? 'O' : "
+                                                 "'X']]));\n"
+                                                 "    body.append(detailSection('維修資訊', [['維修分類', "
+                                                 "record.repair_type], ['維修金額', record.repair_amount == null "
+                                                 "? '未設定' : record.repair_amount.toLocaleString('zh-TW')],\n"
+                                                 "      ['損壞日期', record.occurred_on], ['送修日期', "
+                                                 "record.sent_on], ['回修日期', record.returned_on], ['異常類別', "
+                                                 'record.failure_tag]]));\n'
+                                                 "    const failure = element('section', 'detail-section');\n"
+                                                 "    failure.append(element('h3', '', '異常描述'), "
+                                                 "element('div', 'detail-text', "
+                                                 'record.failure_description));\n'
+                                                 "    body.append(failure, element('p', 'detail-note', "
+                                                 "'附件、結案／再次送修及跨案件連續送修歷史尚未移植。本筆新增／修改紀錄可從「編輯／異動」查看。'));\n"
+                                                 '    if (!detail.open) detail.showModal();\n'
+                                                 '  } catch (error) {\n'
+                                                 '    if (request !== detailRequest) return;\n'
+                                                 "    byId('message').textContent = "
+                                                 "byId('quick-message').textContent = error.message;\n"
+                                                 '  }\n'
+                                                 '}\n'
+                                                 '\n'
+                                                 "byId('close-detail').addEventListener('click', () => "
+                                                 '{detailRequest++; detail.close();});\n'
+                                                 "byId('edit-detail').addEventListener('click', async () => "
+                                                 '{\n'
+                                                 '  if (!selectedRecord) return;\n'
+                                                 "  const button = byId('edit-detail');\n"
+                                                 '  button.disabled = true;\n'
+                                                 '  try {\n'
+                                                 "    const result = await api('/api/repairs/records/' + "
+                                                 'encodeURIComponent(selectedRecord.id));\n'
+                                                 '    detail.close();\n'
+                                                 '    await openEditor(result.data);\n'
+                                                 "  } catch (error) {byId('detail-message').textContent = "
+                                                 'error.message;}\n'
+                                                 '  finally {button.disabled = false;}\n'
+                                                 '});\n'
+                                                 '\n'
+                                                 'async function searchSerial() {\n'
+                                                 '  if (!catalogs) return;\n'
+                                                 '  const request = ++quickRequest;\n'
+                                                 '  let serial = '
+                                                 "byId('quick-query').value.trim().toUpperCase();\n"
+                                                 '  if (/^[0-9]{1,8}$/.test(serial)) serial = '
+                                                 "serial.padStart(9, '0');\n"
+                                                 '  if (!serial) return;\n'
+                                                 "  byId('quick-query').value = serial;\n"
+                                                 "  byId('quick-message').textContent = '正在查詢…';\n"
+                                                 "  byId('quick-results').replaceChildren();\n"
+                                                 '  try {\n'
+                                                 '    const query = new URLSearchParams({serial});\n'
+                                                 '    const [records, master] = await '
+                                                 "Promise.all([api('/api/repairs/records?' + query),\n"
+                                                 "      api('/api/repairs/serial-mapping?' + query)]);\n"
+                                                 '    if (request !== quickRequest) return;\n'
+                                                 '    quickSerial = serial;\n'
+                                                 '    updateCounts(records.status_counts);\n'
+                                                 "    const summary = element('section', 'quick-summary');\n"
+                                                 "    summary.append(element('h2', '', "
+                                                 'master.data?.board_name || records.data[0]?.description || '
+                                                 "'尚無板件主檔'),\n"
+                                                 "      element('p', 'serial-text', serial), element('p', "
+                                                 "'', `共 ${records.total} 筆送修紀錄 · Part "
+                                                 "Number：${master.data?.board_part_code || '未記錄'}`));\n"
+                                                 "    byId('quick-results').append(summary);\n"
+                                                 '    for (const record of records.data) {\n'
+                                                 "      const card = element('button', 'quick-card');\n"
+                                                 "      card.type = 'button';\n"
+                                                 "      card.append(element('strong', '', "
+                                                 '`${record.description} · ${record.current_status}`),\n'
+                                                 "        element('span', '', `${record.machine_code} · "
+                                                 '${record.occurred_on} · ${record.failure_tag}`),\n'
+                                                 "        element('span', '', record.failure_description));\n"
+                                                 "      card.addEventListener('click', () => "
+                                                 'openDetail(record.id));\n'
+                                                 "      byId('quick-results').append(card);\n"
+                                                 '    }\n'
+                                                 '    if (records.total > 20) {\n'
+                                                 "      const all = element('button', 'quick-card', '目前顯示前 "
+                                                 "20 筆，前往送修清單查看全部');\n"
+                                                 "      all.type = 'button';\n"
+                                                 "      all.addEventListener('click', () => {serialFilter = "
+                                                 "serial; byId('query').value = ''; setView(false); page = "
+                                                 '1; loadRecords();});\n'
+                                                 "      byId('quick-results').append(all);\n"
+                                                 '    }\n'
+                                                 "    byId('quick-message').textContent = records.total ? "
+                                                 "'點選紀錄查看詳細資料。' : '此 S/N 尚無本機送修紀錄。';\n"
+                                                 '  } catch (error) {if (request === quickRequest) '
+                                                 "byId('quick-message').textContent = error.message;}\n"
+                                                 '}\n'
+                                                 '\n'
+                                                 "byId('quick-form').addEventListener('submit', event => "
+                                                 '{event.preventDefault(); searchSerial();});\n'
+                                                 "byId('quick-query').addEventListener('input', () => {\n"
+                                                 "  quickRequest++; quickSerial = ''; "
+                                                 "byId('quick-results').replaceChildren();\n"
+                                                 "  byId('quick-message').textContent = '輸入 S/N 後按 Search "
+                                                 "查詢。';\n"
+                                                 '});\n'
+                                                 "byId('nav-quick').addEventListener('click', () => "
+                                                 "{setView(true); byId('quick-query').focus();});\n"
+                                                 'for (const button of '
+                                                 "document.querySelectorAll('[data-status]')) "
+                                                 "button.addEventListener('click', () => {\n"
+                                                 "  serialFilter = ''; byId('query').value = ''; "
+                                                 'setView(false, button.dataset.status); page = 1; '
+                                                 'loadRecords();\n'
+                                                 '});\n'
                                                  '\n'
                                                  "function updateBoards(preferred = byId('board').value) {\n"
                                                  '  const machine = catalogs.machines.find(row => '
@@ -2756,6 +3211,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：分段�
                                                  '    editor.close();\n'
                                                  '    page = 1;\n'
                                                  '    await loadRecords();\n'
+                                                 '    if (quickSerial) await searchSerial();\n'
                                                  '  } catch (error) {\n'
                                                  "    byId('form-message').textContent = error.message + "
                                                  "'\\n輸入內容已保留。若為連線中斷，請先查詢確認是否已儲存，避免重複新增。';\n"
@@ -2778,47 +3234,16 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：分段�
                                                  '    const query = new '
                                                  "URLSearchParams({q:byId('query').value, "
                                                  "status:byId('status-filter').value, page});\n"
+                                                 "    if (serialFilter) query.set('serial', serialFilter);\n"
                                                  "    const result = await api('/api/repairs/records?' + "
                                                  'query);\n'
                                                  '    if (request !== listingRequest) return;\n'
                                                  '    page = result.page;\n'
                                                  '    total = result.total;\n'
+                                                 '    updateCounts(result.status_counts);\n'
                                                  "    byId('records').replaceChildren();\n"
-                                                 '    for (const record of result.data) {\n'
-                                                 "      const tr = document.createElement('tr');\n"
-                                                 '      const texts = '
-                                                 '[`${record.serial_no}－${record.description}`, '
-                                                 '`${record.machine_code}／${record.model}`, '
-                                                 'record.current_status,\n'
-                                                 '        record.failure_tag, '
-                                                 '`${record.repair_type}／${record.repair_amount == null ? '
-                                                 "'未設定' : record.repair_amount.toLocaleString('zh-TW')}`, "
-                                                 'record.occurred_on];\n'
-                                                 '      for (const text of texts) {const td = '
-                                                 "document.createElement('td'); td.textContent = text; "
-                                                 'tr.append(td);}\n'
-                                                 "      const info = document.createElement('small'); "
-                                                 'info.textContent = record.failure_description; '
-                                                 'tr.firstChild.append(info);\n'
-                                                 "      const action = document.createElement('td'), button "
-                                                 "= document.createElement('button');\n"
-                                                 "      button.textContent = '編輯／異動'; button.type = "
-                                                 "'button';\n"
-                                                 '      button.disabled = '
-                                                 '!catalogs.statuses.includes(record.current_status);\n'
-                                                 "      button.addEventListener('click', async () => {\n"
-                                                 '        button.disabled = true;\n'
-                                                 '        try {const result = await '
-                                                 "api('/api/repairs/records/' + "
-                                                 'encodeURIComponent(record.id)); await '
-                                                 'openEditor(result.data);}\n'
-                                                 "        catch (error) {byId('message').textContent = "
-                                                 'error.message;}\n'
-                                                 '        finally {button.disabled = false;}\n'
-                                                 '      });\n'
-                                                 '      action.append(button); tr.append(action); '
-                                                 "byId('records').append(tr);\n"
-                                                 '    }\n'
+                                                 '    for (const record of result.data) '
+                                                 "byId('records').append(renderRecord(record));\n"
                                                  '    const first = total ? (page - 1) * 20 + 1 : 0;\n'
                                                  "    byId('message').textContent = `共${total}筆資料 "
                                                  '顯示${first}-${Math.min(page * 20, total)}`;\n'
@@ -2835,7 +3260,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：分段�
                                                  '}\n'
                                                  '\n'
                                                  "byId('search-form').addEventListener('submit', event => "
-                                                 '{event.preventDefault(); page = 1; loadRecords();});\n'
+                                                 "{event.preventDefault(); serialFilter = ''; setView(false, "
+                                                 "byId('status-filter').value); page = 1; loadRecords();});\n"
                                                  "byId('previous').addEventListener('click', () => {page--; "
                                                  'loadRecords();});\n'
                                                  "byId('next').addEventListener('click', () => {page++; "
@@ -2855,7 +3281,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：分段�
                                                  "  } catch (error) {byId('message').textContent = "
                                                  "error.message; byId('message').dataset.error = 'true';}\n"
                                                  '})();\n',
-                                      'sha256': 'fd5ab15b1867dc7818456b3b8e4874cc1a3dd19b702b961061ee3fa695ed2751'},
+                                      'sha256': 'da3013ddf2b67d81cc478b4d3fac828036f57600e5a23aa7f8063985f3ab4969'},
            'company/web/style.css': {'content': ':root{color-scheme:dark;font-family:"Segoe '
                                                 'UI",sans-serif;background:#101113;color:#e7e7e8}\n'
                                                 '*{box-sizing:border-box}body{margin:0}main{max-width:850px;margin:60px '
@@ -2876,7 +3302,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：分段�
                                                 '@media(max-width:600px){main{margin:25px auto;padding:0 '
                                                 '16px}h1{font-size:22px}section{padding:18px}dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:10px}}\n',
                                      'sha256': '064406c8758be5620dfe7440f59d59ec1de5f6307e74f5bad85dd03e018c0769'}},
- 'version': '2026-11-02-local-repairs-basic'}
+ 'version': '2026-11-02-original-ui-stage1'}
 
 
 def check_local_path(path):

@@ -59,6 +59,17 @@ class RepairTests(unittest.TestCase):
         self.assertEqual(service.record_detail(self.path, record["id"])["data"]["failure_description"], "補充描述")
         self.assertEqual(len(service.list_history(self.path, record["id"])["data"]), 2)
 
+    def test_exact_serial_search_and_global_status_counts(self):
+        service.save_record(self.path, example())
+        other = service.save_record(self.path, example(serial_no="PREFIX-002850948"))["data"]
+        service.save_record(self.path, example(serial_no=other["serial_no"], expected_version=1,
+                           current_status="已送修", sent_on="2026-11-02"), other["id"])
+        result = service.list_records(self.path, {"serial": ["2850948"]})
+        self.assertEqual(result["total"], 1)
+        self.assertEqual(result["data"][0]["serial_no"], "002850948")
+        self.assertEqual(result["status_counts"], {"待送修": 1, "已送修": 1})
+        self.assertEqual(service.list_records(self.path, {"serial": ["missing"]})["total"], 0)
+
     def test_concurrent_update_has_one_winner(self):
         record = service.save_record(self.path, example())["data"]
         def edit(number):

@@ -8,15 +8,47 @@
   <script src="/repairs/app.js" defer></script>
 </head>
 <body>
-<header><strong>SPMS 公司版</strong><nav><a href="/">環境檢查</a><a href="/repairs/" aria-current="page">備品管理</a><span>機台管理（尚未移植）</span></nav></header>
-<main>
-  <div class="title-row"><div><h1>備品管理</h1><p>SQLite 本機移植驗證版 · 送修基本流程</p></div><button id="create" type="button" disabled>＋ 新增送修</button></div>
-  <aside>目前只開放本機驗證。DBN／Socket、附件、結案／再次送修、完整主檔維護與統計尚未移植；舊資料尚未匯入。機台／板件／價格為 Git 儲存庫內的基礎對應，正式使用前需核對。</aside>
-  <form id="search-form" class="toolbar"><input id="query" type="search" placeholder="搜尋 S/N、板件名稱、機台或異常描述" aria-label="搜尋"><select id="status-filter" aria-label="狀態"><option value="">所有狀態</option><option>待送修</option><option>已送修</option><option>取回驗證</option><option>結案（PASS）</option><option>結案（FAIL）</option></select><button type="submit">查詢</button></form>
-  <p id="message" role="status" aria-live="polite">正在載入…</p>
-  <div class="table-wrap"><table><thead><tr><th>S/N－板件名稱</th><th>機台／機型</th><th>狀態</th><th>異常類別</th><th>維修分類／金額</th><th>損壞日期</th><th>操作</th></tr></thead><tbody id="records"></tbody></table></div>
-  <div class="pager"><button id="previous" type="button" disabled>上一頁</button><span id="page"></span><button id="next" type="button" disabled>下一頁</button></div>
-</main>
+<div class="app">
+  <aside class="sidebar">
+    <div class="brand"><span class="brand-mark" aria-hidden="true">S</span><div><strong>SPMS</strong><small>Spare Parts Management System</small></div></div>
+    <div class="system-label">備品管理系統 · 公司 SQLite 版</div>
+    <nav aria-label="快速搜尋"><button class="nav-item" id="nav-quick" type="button" aria-current="page"><span aria-hidden="true">⌕</span>快速搜尋</button></nav>
+    <div class="nav-label">紀錄項目</div>
+    <nav id="status-nav" aria-label="送修狀態">
+      <button class="nav-item" data-status="" type="button"><span aria-hidden="true">☷</span>全部送修<span class="count" data-count="all">0</span></button>
+      <button class="nav-item" data-status="待送修" type="button"><span aria-hidden="true">○</span>待送修<span class="count" data-count="待送修">0</span></button>
+      <button class="nav-item" data-status="已送修" type="button"><span aria-hidden="true">↗</span>已送修<span class="count" data-count="已送修">0</span></button>
+      <button class="nav-item" data-status="取回驗證" type="button"><span aria-hidden="true">◎</span>取回驗證<span class="count" data-count="取回驗證">0</span></button>
+      <button class="nav-item" data-status="結案（PASS）" type="button"><span aria-hidden="true">✓</span>PASS<span class="count" data-count="結案（PASS）">0</span></button>
+      <button class="nav-item" data-status="結案（FAIL）" type="button"><span aria-hidden="true">×</span>FAIL<span class="count" data-count="結案（FAIL）">0</span></button>
+    </nav>
+    <div class="nav-label">尚未移植</div>
+    <nav class="pending-nav" aria-label="尚未移植的功能"><button class="nav-item" disabled>DBN 紀錄</button><button class="nav-item" disabled>S/N 主檔維護</button><button class="nav-item" disabled>統計資料</button><button class="nav-item" disabled>全站異動紀錄</button><button class="nav-item" disabled>機台管理</button></nav>
+    <a class="environment-link" href="/">SQLite 環境檢查</a>
+  </aside>
+  <main class="content">
+    <p class="local-badge">本機驗證版 · 不連接 Supabase</p>
+    <div class="notice">介面分段還原中：DBN／Socket、附件、結案／再次送修、完整主檔維護與統計尚未移植；舊資料未匯入，內附基礎對應仍須核對。本版只限本機驗收，尚未開放內網。</div>
+    <section id="quick-view" class="quick-search-view">
+      <h1>SPMS</h1><p class="quick-intro">Enter a board S/N to quickly view related repair records.</p>
+      <form id="quick-form"><label for="quick-query">板件 S/N</label><div class="quick-controls"><input id="quick-query" type="search" placeholder="001234567" maxlength="64" required autocomplete="off"><button type="submit">Search</button></div></form>
+      <p id="quick-message" role="status" aria-live="polite">輸入 S/N 查詢本機送修紀錄；DBN 查詢尚未移植。</p>
+      <div id="quick-results"></div>
+    </section>
+    <section id="records-view" hidden>
+      <div class="title-row"><div><h1 id="view-title">全部送修</h1><p>追蹤送修狀態、開單資訊及異常描述</p></div><button id="create" type="button" disabled>＋ 新增送修</button></div>
+      <form id="search-form" class="toolbar"><input id="query" type="search" placeholder="搜尋板件、S/N、機台或異常描述…" aria-label="搜尋"><select id="status-filter" aria-label="狀態"><option value="">所有狀態</option><option>待送修</option><option>已送修</option><option>取回驗證</option><option>結案（PASS）</option><option>結案（FAIL）</option></select><button type="submit">查詢</button></form>
+      <p id="message" class="list-count" role="status" aria-live="polite">正在載入…</p>
+      <div class="list-heading"><span>項目</span><span>目前狀態</span><span>標籤</span><span>DBN</span><span>機台</span><span>損壞日期</span></div>
+      <div id="records" class="rows" aria-label="送修清單"></div>
+      <div class="pager"><button id="previous" type="button" disabled>上一頁</button><span id="page"></span><button id="next" type="button" disabled>下一頁</button></div>
+    </section>
+  </main>
+</div>
+<dialog id="record-detail" class="record-detail" aria-labelledby="detail-title">
+  <div class="dialog-head"><span>送修詳細資料</span><button id="close-detail" type="button" aria-label="關閉詳細資料">×</button></div>
+  <div class="detail-body"><p id="detail-serial" class="serial-text"></p><h2 id="detail-title"></h2><div class="detail-actions"><button id="edit-detail" type="button">編輯／異動</button></div><div id="detail-content"></div><p id="detail-message" role="status"></p></div>
+</dialog>
 <dialog id="editor" aria-labelledby="editor-title">
   <div class="dialog-head"><h2 id="editor-title">新增送修</h2><button id="close" type="button" aria-label="關閉">×</button></div>
   <form id="record-form">
