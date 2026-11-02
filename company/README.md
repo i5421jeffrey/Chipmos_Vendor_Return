@@ -19,6 +19,39 @@
 
 ## 從第一階段更新（保留資料）
 
+### 單檔安裝（須先符合公司 IT 政策）
+
+若公司允許下載及執行此類 Python 安裝程式，可從 GitHub 儲存庫根目錄取得
+`install_spms.py`，放到 `D:\Python\SPMS\install_spms.py`。不要更改副檔名來繞過安全限制；
+若被封鎖，請聯絡 IT 核准交付方式。
+
+此檔內含 17 個純文字程式檔與個別 SHA256 校驗碼，不是需要額外下載內容的啟動器，
+也不會執行封裝的服務、開啟／遷移資料庫、變更系統政策或防火牆。
+校驗碼只供偵測損壞，不是數位簽章；請由可信任的儲存庫取得並依公司規定審核。
+
+先停止服務，在 PowerShell 執行唯讀預覽：
+
+```powershell
+cd D:\Python\SPMS
+.\.venv\Scripts\python.exe .\install_spms.py --check
+```
+
+顯示 `CHECK OK` 後才執行安裝：
+
+```powershell
+.\.venv\Scripts\python.exe .\install_spms.py
+```
+
+確認服務已停止且更新範圍正確後輸入 `INSTALL`。
+安裝前把會被覆寫的舊程式備份至 `D:\Python\SPMS\spms-code-backups\<時間-唯一碼>`。
+只替換清單中的程式，保留 `company\data`、`.venv` 與其他檔案；它不備份資料庫，
+資料庫備份及模組升級仍在下一次啟動服務時處理。
+程式檔逐一替換，發生一般寫入錯誤會嘗試回復已替換程式；斷電、強制終止或回復失敗不保證自動還原，請保持服務停止並保留備份供維護人員處理。
+出現 `.spms-install.lock` 錯誤表示另有安裝執行中或上次中斷，不要直接刪鎖或資料庫重試。
+此安裝方式尚需 Windows 實機驗收。
+
+### 手動複製程式
+
 1. 在舊版 PowerShell 按 Ctrl+C 停止，關閉其他使用這個資料庫的服務。
 2. 停止後先複製整個 `company\data` 資料夾到另一個安全的本機位置保存。
 3. 下載新版，將 `company` 中的程式檔與資料夾合併複製到既有位置；不要刪除舊資料夾後重放，也不要覆蓋或刪除 `company\data`、上層 `.venv`。
@@ -79,3 +112,6 @@ python -m unittest discover -s company -p "test_*.py" -v
 Mac 開發機可額外執行 `swift scripts/test_company_ui.swift` 檢查 JS 語法；這不取代 Windows 瀏覽器互動驗收。
 要重建離線基礎對應（只讀 Git 檔案、不連雲端），執行 `python scripts/build_company_catalog.py`；
 這只產生封裝檔，不會更新已安裝 SQLite 的主檔，正式主檔變更須另行審閱遷移。
+
+單檔安裝程式由 `python scripts/build_company_installer.py` 產生；公司版程式更新後必須重新產生。
+安裝測試：`python -m unittest discover -s scripts -p "test_company_installer.py" -v`。
