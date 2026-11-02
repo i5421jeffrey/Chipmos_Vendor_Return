@@ -30,6 +30,9 @@ class ImportTests(unittest.TestCase):
         self.assertEqual(row['repair_amount'], 123.45)
         self.assertEqual(row['created_at'], '2020-01-01T00:00:00+08:00')
         self.assertTrue(ops.attachment_metadata(self.path, row['id'])['data'])
+        history = ops.history(self.path, {'source':['repair_records'], 'operation':['IMPORT']})
+        self.assertEqual(history['total'], 1)
+        self.assertEqual(history['data'][0]['record_id'], 'source-id')
         with self.assertRaises(sqlite3.IntegrityError):
             import_data.apply(self.path, data)
         self.assertEqual(service.list_records(self.path, {})['total'], 1)

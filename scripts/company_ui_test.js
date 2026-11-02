@@ -77,11 +77,17 @@ const document = {
 const testRecord = {id:'record-1', serial_no:'002850948', machine_code:'F45', model:'T5377S', description:'HVDR PE', board_part_code:'BPR-030837', failure_tag:'RTE', failure_description:'<script>not markup</script>', repair_type:'板修', repair_amount:0, current_status:'待送修', is_opened:false, occurred_on:'2026-11-02', sent_on:null, returned_on:null, version:1};
 const testDbn = {id:'dbn-1',serial_no:'002850948',machine_code:'F45',model:'T5377S',board_name:'HVDR PE',board_part_code:'BPR-030837',customer_code:'AB',product_code:'JAA118',station_code:'CP1',issue_type:'Group',dut:'1-2',dut_pin_snapshot:{'1':['COMMON','ONE'], '2':['COMMON','TWO']},socket_file_id:'socket-1',created_at:'2026-11-02T00:00:00Z',version:1};
 const requests = [];
+const faultPrefixes = new Map(), gatePrefixes = new Map();
 let featureChain = null;
 let recordWritesSucceed = false, recordReadFails = false, liveRecord = {...testRecord};
 let recordReadGate = null;
 async function fetch(path, options = {}) {
   requests.push({path:String(path), options});
+  for (const [prefix, gate] of gatePrefixes) if (String(path).startsWith(prefix)) await gate;
+  for (const [prefix, failure] of faultPrefixes) if (String(path).startsWith(prefix)) {
+    if (failure === 'INVALID_JSON') return {ok:true,json:async()=>{throw Error('invalid JSON');}};
+    throw Error(failure);
+  }
   let data;
   if (options.method === 'PUT') {
     if (recordWritesSucceed && String(path).startsWith('/api/repairs/records/')) {
@@ -240,6 +246,9 @@ function assert(ok, message) {if (!ok) throw Error(message);}
   renderHistory([{source_table:'dbn_records',operation:'UPDATE',changed_at:'2026-11-02T00:00:00Z',changes:{is_opened:{old:false,new:true},repair_amount:{old:null,new:0},dut_pin_snapshot:{old:null,new:{'1':null}},issue_description:{old:'',new:'<script>text</script>'}}}], auditContainer);
   assert(auditContainer.textContent.includes('未開單') && auditContainer.textContent.includes('已開單'), 'History formats booleans');
   assert(auditContainer.textContent.includes('尚無對應') && auditContainer.textContent.includes('<script>text</script>'), 'History safely renders missing PINs and untrusted text');
+  const importContainer = new TestNode();
+  renderHistory([{source_table:'repair_records',operation:'IMPORT',changed_at:'2026-11-02T00:00:00Z',changes:{repair_amount:{old:null,new:0}}}], importContainer);
+  assert(importContainer.textContent.includes('送修／離線匯入'), 'Imported audit events are clearly distinguished from original source history');
   await openWorkspace('statistics');
   assert(nodes['history-filters'].hidden, 'Other workspaces hide history filters');
   assert(nodes['workspace-content'].textContent.includes('F45'), 'Statistics chart/table/ranking render');

@@ -4,6 +4,7 @@ let page = 1, total = 0, listingRequest = 0;
 let quickRequest = 0, detailRequest = 0, selectedRecord = null, serialFilter = '';
 let quickSerial = '';
 let editorSession = 0, editorReloading = false;
+let catalogsLoading = false;
 const editor = byId('editor');
 const detail = byId('record-detail');
 const fieldLabels = {serial_no:'S/N', machine_code:'機台', model:'機型', description:'板件名稱', board_part_code:'Part Number', failure_tag:'異常類別', failure_description:'異常描述', repair_type:'維修分類', repair_amount:'維修金額', current_status:'狀態', is_opened:'已開單', occurred_on:'損壞日期', sent_on:'送修日期', returned_on:'回修日期', attachment:'Fail Log', closed_on:'結案日期', retry_of_record_id:'前次案件'};
@@ -12,9 +13,12 @@ async function api(path, method = 'GET', body) {
   const options = {method, cache:'no-store', headers:{'X-SPMS-Request':'1'}};
   if (body !== undefined) {options.headers['Content-Type'] = 'application/json'; options.body = JSON.stringify(body);}
   // Writes are not automatically retried: a lost response must be checked first.
-  const response = await fetch(path, options);
-  const data = await response.json();
-  if (!response.ok) throw new Error(data.error || '操作失敗');
+  let response, data;
+  try {response = await fetch(path, options);}
+  catch (error) {throw new Error('本機服務連線失敗，請確認 Python 服務仍在執行：' + error.message);}
+  try {data = await response.json();}
+  catch {throw new Error('本機服務回應不是有效 JSON；請保留錯誤並確認服務版本。寫入結果未知時勿直接重送。');}
+  if (!response.ok) {const error = new Error(data.error || '操作失敗'); error.status = response.status; throw error;}
   return data;
 }
 
@@ -47,6 +51,7 @@ function updateCounts(counts) {
 }
 
 function setView(quick, status = '') {
+  if (typeof invalidateFeatureRequests === 'function') invalidateFeatureRequests();
   byId('workspace-view').hidden = true;
   for (const button of document.querySelectorAll('[data-workspace]')) button.removeAttribute('aria-current');
   byId('quick-view').hidden = !quick;
@@ -126,12 +131,13 @@ async function openDetail(id) {
     const failure = element('section', 'detail-section');
     failure.append(element('h3', '', '異常描述'), element('div', 'detail-text', record.failure_description));
     body.append(failure);
+    if (!detail.open) detail.showModal();
     if (typeof renderDetailFeatures === 'function') await renderDetailFeatures(record, body, () => request === detailRequest);
     if (request !== detailRequest) return;
     if (!detail.open) detail.showModal();
   } catch (error) {
     if (request !== detailRequest) return;
-    byId('message').textContent = byId('quick-message').textContent = error.message;
+    byId('detail-message').textContent = byId('message').textContent = byId('quick-message').textContent = error.message;
   }
 }
 
@@ -140,12 +146,15 @@ detail.addEventListener('cancel', () => {detailRequest++;});
 byId('edit-detail').addEventListener('click', async () => {
   if (!selectedRecord) return;
   const button = byId('edit-detail');
+  const id = selectedRecord.id, request = detailRequest;
   button.disabled = true;
   try {
-    const result = await api('/api/repairs/records/' + encodeURIComponent(selectedRecord.id));
+    const result = await api('/api/repairs/records/' + encodeURIComponent(id));
+    if (request !== detailRequest || !detail.open || selectedRecord?.id !== id) return;
+    detailRequest++;
     detail.close();
     await openEditor(result.data);
-  } catch (error) {byId('detail-message').textContent = error.message;}
+  } catch (error) {if (request === detailRequest) byId('detail-message').textContent = error.message;}
   finally {button.disabled = false;}
 });
 
@@ -160,11 +169,19 @@ async function searchSerial() {
   byId('quick-results').replaceChildren();
   try {
     const query = new URLSearchParams({serial});
-    const [records, summary, dbn] = await Promise.all([api('/api/repairs/records?' + query),
+    const outcomes = await Promise.allSettled([api('/api/repairs/records?' + query),
       api('/api/repairs/serial-summary?' + query), api('/api/repairs/dbn?' + query)]);
     if (request !== quickRequest) return;
+    const read = (index, fallback) => outcomes[index].status === 'fulfilled' ? outcomes[index].value : {...fallback, error:outcomes[index].reason.message};
+    const records = read(0, {data:[],total:0}), dbn = read(2, {data:[],total:0});
+    const summary = read(1, {serial_no:serial,mapping:null,models:[],machines:[]});
+    if (summary.error) {
+      const known = [...records.data,...dbn.data];
+      summary.models = [...new Set(known.map(row => row.model).filter(Boolean))];
+      summary.machines = [...new Set(known.map(row => row.machine_code).filter(Boolean))];
+    }
     quickSerial = serial;
-    updateCounts(records.status_counts);
+    if (!records.error) updateCounts(records.status_counts);
     renderQuickResults(summary, records, dbn, byId('quick-results'));
     if (records.total > 20) {
       const all = element('button', 'quick-card', '目前顯示前 20 筆，前往送修清單查看全部');
@@ -176,7 +193,7 @@ async function searchSerial() {
       const allDbn = element('button', 'quick-card', '前往 DBN 清單查看全部'); allDbn.type = 'button';
       allDbn.addEventListener('click', () => openWorkspace('dbn', serial)); byId('quick-results').append(allDbn);
     }
-    byId('quick-message').textContent = records.total || dbn.total ? '點選送修紀錄查看詳細資料。' : '此 S/N 尚無本機送修或 DBN 紀錄。';
+    byId('quick-message').textContent = outcomes.some(row => row.status === 'rejected') ? '部分查詢失敗，以下只顯示已成功讀取的資料；不可當成完整歷史或零筆。可再按 Search 重新查詢。' : records.total || dbn.total ? '點選送修紀錄查看詳細資料。' : '此 S/N 尚無本機送修或 DBN 紀錄。';
   } catch (error) {if (request === quickRequest) byId('quick-message').textContent = error.message;}
 }
 
@@ -353,7 +370,11 @@ byId('record-form').addEventListener('submit', async event => {
   byId('form-message').textContent = '正在儲存…';
   let frozen = [];
   try {
+    frozen = [...byId('record-form').elements].map(input => [input, input.disabled]);
+    frozen.forEach(([input]) => {input.disabled = true;});
     if (!await lookupMapping()) throw new Error('S/N 查詢已變更，請再檢查後儲存');
+    frozen.forEach(([input, disabled]) => {input.disabled = disabled;});
+    byId('board').disabled = Boolean(mapping);
     const datesValid = updateEditorDates();
     if (!byId('record-form').reportValidity()) throw new Error('請填妥必填欄位');
     if (!datesValid) throw new Error(byId('date-hint').textContent);
@@ -365,10 +386,9 @@ byId('record-form').addEventListener('submit', async event => {
     if (current && payload.reprice && !window.confirm('確認重新套用目前價目？這會更新此案金額，已結案案件也會影響歷史統計。')) {
       byId('form-message').textContent = '已取消重新計價，尚未儲存；輸入內容已保留。'; return;
     }
+    frozen.forEach(([input]) => {input.disabled = true;});
     if (!current && byId('create-attachment').files?.[0]) payload.attachment = await encodeFile(byId('create-attachment').files[0]);
     if (current) payload.expected_version = current.version;
-    frozen = [...byId('record-form').elements].map(input => [input, input.disabled]);
-    for (const [input] of frozen) input.disabled = true;
     const url = '/api/repairs/records' + (current ? '/' + encodeURIComponent(current.id) : '');
     const result = await api(url, current ? 'PUT' : 'POST', payload);
     const savedId = result.data.id;
@@ -382,6 +402,7 @@ byId('record-form').addEventListener('submit', async event => {
     byId('form-message').textContent = error.message + '\n輸入內容已保留。若為連線中斷，請先查詢確認是否已儲存，避免重複新增。';
   } finally {
     for (const [input, disabled] of frozen) input.disabled = disabled;
+    byId('board').disabled = Boolean(mapping);
     saving = false;
     for (const id of ['save', 'cancel', 'close', 'reload-record']) byId(id).disabled = false;
   }
@@ -427,7 +448,10 @@ byId('query').addEventListener('input', () => {
   searchTimer = window.setTimeout(() => {serialFilter = ''; page = 1; loadRecords();}, 220);
 });
 
-(async () => {
+async function initializeApp() {
+  if (catalogsLoading) return;
+  catalogsLoading = true; byId('create').disabled = byId('reload-catalogs').disabled = true;
+  byId('startup-error').hidden = true;
   try {
     catalogs = await api('/api/repairs/catalog');
     fillSelect(byId('machine'), catalogs.machines.map(row => row.machine_code), '請選擇機台');
@@ -437,5 +461,10 @@ byId('query').addEventListener('input', () => {
     fillSelect(byId('type-filter'), catalogs.repair_types, '所有維修分類');
     byId('create').disabled = false;
     await loadRecords();
-  } catch (error) {byId('message').textContent = error.message; byId('message').dataset.error = 'true';}
-})();
+  } catch (error) {
+    byId('startup-error').hidden = false; byId('startup-message').textContent = '無法載入本機對應表：' + error.message;
+    byId('message').textContent = error.message; byId('message').dataset.error = 'true';
+  } finally {catalogsLoading = false; byId('reload-catalogs').disabled = false;}
+}
+byId('reload-catalogs').addEventListener('click', initializeApp);
+initializeApp();

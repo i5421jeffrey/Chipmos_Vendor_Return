@@ -16,10 +16,124 @@ from pathlib import Path, PurePosixPath
 from uuid import uuid4
 
 
-BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 離線功能驗收\n'
+BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管理：本機功能整批對照與交付界線\n'
+                                                           '\n'
+                                                           '本文件記錄目前**開發交付範圍**，不是公司驗收簽核，也不代表已完成真實舊資料移轉或正式上線。\n'
+                                                           '依使用者要求，先集中完成開發與自動測試，再統一安排公司端驗收；略過的檢查仍是未驗收。\n'
+                                                           '\n'
+                                                           '## 已實作的原版操作對照\n'
+                                                           '\n'
+                                                           '原版依據為儲存庫的 '
+                                                           '`docs/repairs/index.html`、`history.html`、`dbn-socket.js`、`repair-pricing.js`；\n'
+                                                           '沒有讀取 Supabase '
+                                                           '線上資料。下表表示功能已有本機實作與開發測試，不表示畫面逐像素一致。\n'
+                                                           '\n'
+                                                           '| 功能 | 原版參考 | 本機實作／測試依據 |\n'
+                                                           '| --- | --- | --- |\n'
+                                                           '| 狀態導覽、查詢、標籤／分類篩選 | `renderNav`、`render` | '
+                                                           '`web/repairs.js`、`service.list_records`；版本、搜尋與 '
+                                                           'HTTP 測試 |\n'
+                                                           '| S/N 快速搜尋、送修／DBN 分區及摘要 | '
+                                                           '`renderQuickSearch`、`searchQuickSerial` | '
+                                                           '`serial_summary`、`renderQuickResults`；精確 '
+                                                           'S/N、跨分頁摘要及部分失敗測試 |\n'
+                                                           '| 新增／編輯、日期、開單、計價 | '
+                                                           '`createRecord`、`saveRecordEdits` | '
+                                                           '`service.save_record`；日期／版本衝突、原金額快照、重新計價測試 |\n'
+                                                           '| 詳細資料、時程、連續維修歷史 | '
+                                                           '`renderDetail`、`historyMarkup`、`repairTimeline` '
+                                                           '| '
+                                                           '`operations.chain`、`renderRepairChain`；逐輪內容／附件及切換測試 '
+                                                           '|\n'
+                                                           '| PASS／FAIL 及再次送修 | '
+                                                           '`finishVerification`、`createRetry` | '
+                                                           '`operations.resolve`；單一交易、重複結案衝突及失敗回復測試 |\n'
+                                                           '| Fail Log 上傳、預覽、下載、刪除 | '
+                                                           '`loadAttachment`、`uploadAttachment` | SQLite '
+                                                           'BLOB、SHA256；格式／容量、交易、HTTP 位元組與備份測試 |\n'
+                                                           '| DBN 客戶／產品／站點、DUT／PIN | '
+                                                           '`renderDbnList`、`openDbnModal`、`dbn-socket.js` | '
+                                                           '`operations.save_dbn`；級聯、範圍、歷史 PIN 快照及共用 PIN 測試 '
+                                                           '|\n'
+                                                           '| S/N 主檔、影響預覽、明確歷史同步 | `saveSerialMapping` | '
+                                                           '`preview_mapping`、`save_mapping`；token、改 '
+                                                           'S/N、相容性及整批回復測試 |\n'
+                                                           '| 全站／單案異動 | `history.html` | '
+                                                           '舊值／新值、類型／操作／台北日期篩選；本機 IMPORT 可獨立查詢 |\n'
+                                                           '| 年／月損壞頻率、分類金額、機台排行 | `renderStatistics` | '
+                                                           '`operations.statistics`；首輪計次、各輪結案金額、NULL／0 與排序測試 '
+                                                           '|\n'
+                                                           '| **機台／板件／價格對應（指定保留）** | 公司版擴充，不因原版還原移除 | '
+                                                           '搜尋、中文清單、元單位、逐列編輯、主檔 token 及不改寫歷史測試 |\n'
+                                                           '| 離線安裝、遷移、備份與匯入工具 | 公司 Windows／SQLite 需求 | '
+                                                           '`database.py`、`maintenance.py`、`import_data.py`；暫存資料庫及獨立安裝後測試 '
+                                                           '|\n'
+                                                           '\n'
+                                                           '## 本輪集中修補的例外流程\n'
+                                                           '\n'
+                                                           '- '
+                                                           '快速搜尋的送修、DBN、板件摘要分開處理失敗；已讀取的資料仍顯示，失敗不當成零筆或完整歷史。\n'
+                                                           '- '
+                                                           '基本案件先顯示；附件或送修鏈失敗不遮蔽基本資料。未知附件狀態不提供空附件上傳；未知送修鏈停用結案／刪除，提供重新讀取。\n'
+                                                           '- 初始對應表載入失敗在預設頁顯示原因及重讀按鈕，不要求重裝或刪資料。\n'
+                                                           '- 送修／DBN '
+                                                           '等表單在非同步前置查詢時鎖定輸入；失敗保留內容並恢復原先欄位鎖定。取消導覽後的舊回應不會重新彈出表單。\n'
+                                                           '- 非 JSON 回應／斷線有明確訊息，不自動重送寫入。\n'
+                                                           '- DBN 搜尋補齊原版 DUT／類型及本機 PN／Model／站點；送修可搜尋 '
+                                                           'PN；萬用字元當成文字。\n'
+                                                           '- 不同時區格式的來源時間保留原字串，但清單以時間點排序，不以字串誤判先後。\n'
+                                                           '- 新增對應表單不把上一組價格默默帶入新 PN，也不覆蓋明確手改的 '
+                                                           'PN；保固及金額範圍在前後端檢查。\n'
+                                                           '\n'
+                                                           '## 刻意保留的差異與未完成事項\n'
+                                                           '\n'
+                                                           '1. **操作實作不等於像素還原**：編輯使用本機 dialog，清單採伺服器每頁 20 '
+                                                           '筆；快速搜尋提供轉往完整清單。異動每頁為 20 個事件，單一事件欄位一併顯示，與原版每頁 10 '
+                                                           '個欄位不同。\n'
+                                                           '2. 原版 CSS／Logo '
+                                                           '已離線封裝；本輪桌面瀏覽器未連線，沒有執行真實瀏覽器、CSS、Windows '
+                                                           '縮放及視覺驗收。mock DOM 不取代這些檢查。\n'
+                                                           '3. 原版 UI-only '
+                                                           '硬編碼密碼沒有搬成「登入」。**真正登入、角色、具名稽核仍未實作**，須先決定公司帳號來源與權限規則。\n'
+                                                           '4. **真實舊資料仍未移轉**：缺核准匯出檔及實體附件。現有工具只接受 README 的審核 '
+                                                           'JSON；原始 SQL／CSV、來源異動、舊欄位如 '
+                                                           '`repair_month`／`item`／`area`／`tester_id`／`failure_data`／`order_status` '
+                                                           '沒有通用轉換器。未知欄位拒絕，不默默丟棄。需原樣保留來源檔，取得真實資料後再決定轉換及核對。\n'
+                                                           '5. **正式內網、服務啟動管理、排程／異地備份仍未部署**。只監聽 '
+                                                           'localhost；不可自行改綁定位址或開防火牆作正式服務。需 IT 核准與主機設定。\n'
+                                                           '6. 機台保養模組仍僅預留，不在目前備品優先範圍。\n'
+                                                           '7. 第二輪 '
+                                                           'PASS、統計、主檔同步、人工復原及本輪畫面仍未通過公司驗收；使用者要求最後統一驗收，不將開發自動測試當作代替。\n'
+                                                           '\n'
+                                                           '## 自動檢查與交付\n'
+                                                           '\n'
+                                                           '命令及 Windows 安裝／保留資料步驟見 '
+                                                           '`README.md`。所有開發測試使用暫存資料，不改動公司正式資料。\n'
+                                                           '\n'
+                                                           '- 後端／HTTP／升級／備份／離線匯入：`python -m unittest '
+                                                           'discover -s company -p "test_*.py" -v`\n'
+                                                           '- UI 正常／故障恢復兩個隔離的 mock-DOM 套件：`swift '
+                                                           'scripts/test_company_ui.swift`\n'
+                                                           '- 原版資源重現、離線頁面資源、保留對應維護入口：`python -m unittest '
+                                                           'discover -s scripts -p '
+                                                           '"test_company_ui_assets.py" -v`\n'
+                                                           '- 重建：`python '
+                                                           'scripts/build_company_installer.py`\n'
+                                                           '- 安裝器、回復、資料／venv 保護及脫離原始碼安裝後後端測試：`python -m '
+                                                           'unittest discover -s scripts -p '
+                                                           '"test_company_installer.py" -v`\n'
+                                                           '\n'
+                                                           '安裝檔不封裝／覆寫 `company/data` 或 '
+                                                           '`.venv`，也不自動啟動服務、匯入真實舊資料或開放內網。\n',
+                                                'sha256': 'e20e4406aff2acd4a008f0170282362e462247d8d42eb55f3b9447a867bd7409'},
+           'company/README.md': {'content': '# SPMS 公司版：SQLite 離線功能驗收\n'
                                             '\n'
                                             '只使用本機 Python 與 SQLite，不連接或更新 Supabase。尚未開放內網或匯入舊資料。\n'
                                             '不需安裝第三方套件。目標環境：Windows 11、Python 3.13、現代瀏覽器。\n'
+                                            '\n'
+                                            '本輪原版功能對照、集中修補與未完成界線見 '
+                                            '[IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)。\n'
+                                            '公司端驗收集中在整批開發後進行；不以自動測試通過宣稱已正式上線。\n'
                                             '\n'
                                             '## 目前範圍\n'
                                             '\n'
@@ -70,6 +184,10 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             '- 異動紀錄提供資料類型、操作、開始／結束日期篩選及舊值／新值六欄表格；日期依台北時區、包含結束日，搜尋包含異動內容並將 '
                                             '`%`／`_` 視為文字。以每頁 20 個事件分頁，同一事件的變更欄位一併顯示（不同於原版每頁 10 '
                                             '個欄位）；新增／刪除也保留各欄細節，不隱藏來源紀錄。尚非具名人員稽核。\n'
+                                            '- '
+                                            '集中故障處理：快速搜尋分區顯示失敗，不把失敗當零筆；附件／送修鏈失敗仍保留基本詳情，未知狀態停用相關危險操作並提供重讀。對應表初始化失敗可重試；送出前的非同步查詢也鎖定輸入。DBN '
+                                            '補齊 DUT／類型／站點／PN／Model 搜尋，送修支援 PN；匯入異動可用 IMPORT '
+                                            '篩選。來源時間原字串保留、按實際時間點排序。\n'
                                             '- 詳細資料的連續送修歷史逐輪顯示日期、狀態、維修分類、金額、異常類別、描述與該輪附件；標示目前案件，可點選切換，不將同 '
                                             'S/N 的其他獨立送修混入本鏈。只有單筆未結案時顯示「尚無連續送修紀錄」。S/N 主檔表單提供獨立唯讀 PN '
                                             '預覽。此輪畫面仍未經 Windows／視覺驗收。\n'
@@ -289,6 +407,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             'Mac 開發機可額外執行 `swift scripts/test_company_ui.swift` 檢查 JS 語法及 '
                                             'mock DOM 流程（導覽、精確 S/N 查詢、詳細資料／編輯、衝突保留輸入）；這不取代 Windows 瀏覽器與 CSS '
                                             '視覺驗收。\n'
+                                            '該命令另執行隔離的 '
+                                            '`scripts/company_ui_resilience_test.js`，涵蓋部分讀取失敗、起始載入恢復、取消後遲到回應、前置查詢鎖定、錯誤回應及對應維護表單保護。\n'
                                             '要重建離線基礎對應（只讀 Git 檔案、不連雲端），執行 `python '
                                             'scripts/build_company_catalog.py`；\n'
                                             '這只產生封裝檔，不會更新已安裝 SQLite 的主檔，正式主檔變更須另行審閱遷移。\n'
@@ -303,7 +423,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                             '產生；公司版程式更新後必須重新產生。\n'
                                             '安裝測試：`python -m unittest discover -s scripts -p '
                                             '"test_company_installer.py" -v`。\n',
-                                 'sha256': '4fc5e1509227f8862f6eb0979244e8c8a4b11388c8f7a6d372663bf0c65b19c6'},
+                                 'sha256': '612864292ab0f31eec9f159d7ca3b95a13f85d26e3a51fefefe97cebf3c984fb'},
            'company/database.py': {'content': '"""Shared SQLite connections and additive, backed-up module '
                                               'migrations."""\n'
                                               'import json\n'
@@ -2120,9 +2240,11 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                                 "        connection.execute('BEGIN')\n"
                                                                 '        return paginate(connection, '
                                                                 "'dbn_records', query, ('serial_no', "
-                                                                "'board_name', 'machine_code', "
-                                                                "'customer_code', 'product_code', "
-                                                                "'issue_description'), 'created_at DESC,id', "
+                                                                "'board_name', 'board_part_code', "
+                                                                "'machine_code', 'model', 'customer_code', "
+                                                                "'product_code', 'station_code', "
+                                                                "'issue_type', 'dut', 'issue_description'), "
+                                                                "'julianday(created_at) DESC,id', "
                                                                 'public_dbn)\n'
                                                                 '\n'
                                                                 '\n'
@@ -2720,7 +2842,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                                 "'repair_board_prices', "
                                                                 "'repair_attachments')),\n"
                                                                 "        ('operation', 'operation', "
-                                                                "('INSERT', 'UPDATE', 'DELETE')),\n"
+                                                                "('INSERT', 'UPDATE', 'DELETE', 'IMPORT')),\n"
                                                                 '    ):\n'
                                                                 "        value = query.get(key, [''])[0]\n"
                                                                 '        if value:\n'
@@ -2953,7 +3075,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                                 "identity, 'UPDATE' if old else 'INSERT', "
                                                                 'dict(old) if old else None, after)\n'
                                                                 "        return {'data': after}\n",
-                                                     'sha256': '3a7a1e23e5ff6bc7f40c6419501b27fad8285a3f5e2f7d52848efa76780ec8c6'},
+                                                     'sha256': 'a6a3498a201f2a15b49010b951682f8f5e147708e32e5933a27c358c0b6b4197'},
            'company/modules/repairs/schema.sql': {'content': 'CREATE TABLE repair_machine_models (\n'
                                                              '    machine_code TEXT PRIMARY KEY,\n'
                                                              '    model TEXT NOT NULL\n'
@@ -3215,7 +3337,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                              '"\\\\\\\\").replace("%", "\\\\%").replace("_", '
                                                              '"\\\\_") + "%"\n'
                                                              "        fields = ('serial_no', 'description', "
-                                                             "'machine_code', 'model', "
+                                                             "'board_part_code', 'machine_code', 'model', "
                                                              "'failure_description', 'failure_tag', "
                                                              "'repair_type')\n"
                                                              "        where.append('(' + ' OR '.join(field + "
@@ -3256,8 +3378,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                              '// 20))\n'
                                                              '        rows = connection.execute("SELECT * '
                                                              'FROM repair_records" + condition + " ORDER BY '
-                                                             'occurred_on DESC, created_at DESC, id LIMIT 20 '
-                                                             'OFFSET ?",\n'
+                                                             'occurred_on DESC, julianday(created_at) DESC, '
+                                                             'id LIMIT 20 OFFSET ?",\n'
                                                              '                                  [*arguments, '
                                                              '(page - 1) * 20]).fetchall()\n'
                                                              '        data = []\n'
@@ -3524,7 +3646,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                              'json.loads(entry["changes"])\n'
                                                              '            result.append(entry)\n'
                                                              '        return {"data": result}\n',
-                                                  'sha256': 'e56fe3ff52cebd2036861453cefd15fa91c11b003ffb6abef15bfe21fb412233'},
+                                                  'sha256': '588df60ee090d3a8b19cce80a077ef884d13cea3b05d0bc90d0e56749d4a65f7'},
            'company/server.py': {'content': '"""Local SPMS service. Python standard library only; no cloud '
                                             'connections."""\n'
                                             '\n'
@@ -3989,6 +4111,44 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    "{'q':['RTE']})['total'], 21)\n"
                                                    '        self.assertEqual(service.list_records(self.path, '
                                                    "{'q':['板修']})['total'], 21)\n"
+                                                   '        self.assertEqual(service.list_records(self.path, '
+                                                   "{'q':['BPR-030837']})['total'], 21)\n"
+                                                   '\n'
+                                                   '    def '
+                                                   'test_dbn_search_covers_original_issue_dut_and_local_identity_fields(self):\n'
+                                                   '        ops.save_dbn(self.path, dbn())\n'
+                                                   "        for term in ('Group', '1-4', 'CP1', "
+                                                   "'BPR-030837', 'T5377S', 'F45', 'jaa118'):\n"
+                                                   '            with self.subTest(term=term):\n'
+                                                   '                self.assertEqual(ops.list_dbn(self.path, '
+                                                   "{'q':[term]})['total'], 1)\n"
+                                                   '        self.assertEqual(ops.list_dbn(self.path, '
+                                                   "{'q':['%_']})['total'], 0)\n"
+                                                   '\n'
+                                                   '    def '
+                                                   'test_imported_timestamps_sort_by_instant_not_timezone_text(self):\n'
+                                                   '        first = service.save_record(self.path, '
+                                                   "example())['data']\n"
+                                                   '        second = service.save_record(self.path, '
+                                                   "example())['data']\n"
+                                                   '        dbn_first = ops.save_dbn(self.path, '
+                                                   "dbn())['data']\n"
+                                                   '        dbn_second = ops.save_dbn(self.path, '
+                                                   "dbn())['data']\n"
+                                                   '        with connect(self.path) as connection:\n'
+                                                   "            for table, ids in (('repair_records', "
+                                                   "[first['id'], second['id']]), ('dbn_records', "
+                                                   "[dbn_first['id'], dbn_second['id']])):\n"
+                                                   "                connection.execute(f'UPDATE {table} SET "
+                                                   "created_at=? WHERE id=?', ('2026-11-02T10:00:00+08:00', "
+                                                   'ids[0]))\n'
+                                                   "                connection.execute(f'UPDATE {table} SET "
+                                                   "created_at=? WHERE id=?', ('2026-11-02T03:00:00Z', "
+                                                   'ids[1]))\n'
+                                                   '        self.assertEqual(service.list_records(self.path, '
+                                                   "{})['data'][0]['id'], second['id'])\n"
+                                                   '        self.assertEqual(ops.list_dbn(self.path, '
+                                                   "{})['data'][0]['id'], dbn_second['id'])\n"
                                                    '\n'
                                                    '    def '
                                                    'test_history_filters_taipei_boundaries_and_change_search(self):\n'
@@ -4669,7 +4829,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    '\n'
                                                    "if __name__ == '__main__':\n"
                                                    '    unittest.main()\n',
-                                        'sha256': 'bb731b1652c369da53cb3cf793d0305f4b57962ca5c94a0b6c3a309697f27ce5'},
+                                        'sha256': 'b38280d7b1a3b6132cc280c48b407a284ce61447e4b447ef713a2daf9c01b887'},
            'company/test_import_data.py': {'content': 'import json\n'
                                                       'import sqlite3\n'
                                                       'import unittest\n'
@@ -4721,6 +4881,13 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                       '        '
                                                       'self.assertTrue(ops.attachment_metadata(self.path, '
                                                       "row['id'])['data'])\n"
+                                                      '        history = ops.history(self.path, '
+                                                      "{'source':['repair_records'], "
+                                                      "'operation':['IMPORT']})\n"
+                                                      "        self.assertEqual(history['total'], 1)\n"
+                                                      '        '
+                                                      "self.assertEqual(history['data'][0]['record_id'], "
+                                                      "'source-id')\n"
                                                       '        with '
                                                       'self.assertRaises(sqlite3.IntegrityError):\n'
                                                       '            import_data.apply(self.path, data)\n'
@@ -4826,7 +4993,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                       '\n'
                                                       "if __name__ == '__main__':\n"
                                                       '    unittest.main()\n',
-                                           'sha256': 'f9a40578c21d14ac6d8c5b210f37751204216e3d2d0027961829fa2abc511fc3'},
+                                           'sha256': '8eb001c16c15aa65463a04b789a0f6171abe9b73d858c75d559ceaee60718553'},
            'company/test_repairs.py': {'content': 'import concurrent.futures\n'
                                                   'import json\n'
                                                   'import sqlite3\n'
@@ -5354,6 +5521,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   "'', workspaceRequest = 0;\n"
                                                   'let operationsSaving = false, operationsSubmit = null, '
                                                   'masterData = null;\n'
+                                                  'let operationRequest = 0, operationsSession = 0;\n'
                                                   "let statisticsMode = 'year', statisticsYear = String(new "
                                                   'Date().getFullYear()), statisticsMonth = String(new '
                                                   "Date().getMonth() + 1).padStart(2, '0');\n"
@@ -5368,6 +5536,9 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   "history:'本機異動紀錄；尚未登入，這不是具名操作人員稽核。', "
                                                   "statistics:'首輪損壞頻率與機台排行；依結案日期加總各輪已知金額。', "
                                                   "masters:'修改只影響後續選擇與儲存，不自動改寫既有案件、S/N 或價格快照。'};\n"
+                                                  '\n'
+                                                  'function invalidateFeatureRequests() {workspaceRequest++; '
+                                                  'operationRequest++;}\n'
                                                   '\n'
                                                   "function action(label, handler, className = 'button') {\n"
                                                   "  const button = element('button', className, label); "
@@ -5426,6 +5597,9 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   "byId('create-attachment-field'));\n"
                                                   '\n'
                                                   'function openOperations(title, submit) {\n'
+                                                  '  if (operationsSaving) throw new '
+                                                  "Error('正在處理上一筆操作，請稍候');\n"
+                                                  '  operationsSession++;\n'
                                                   "  byId('operations-title').textContent = title;\n"
                                                   "  byId('operations-fields').replaceChildren(); "
                                                   "byId('operations-message').textContent = '';\n"
@@ -5459,7 +5633,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '}\n'
                                                   '\n'
                                                   'function closeOperations() {if (!operationsSaving) '
-                                                  'operationsDialog.close();}\n'
+                                                  '{operationsSession++; operationRequest++; '
+                                                  'operationsSubmit = null; operationsDialog.close();}}\n'
                                                   "byId('operations-close').addEventListener('click', "
                                                   'closeOperations);\n'
                                                   "byId('operations-cancel').addEventListener('click', "
@@ -5480,6 +5655,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '{input.disabled = true;});\n'
                                                   '  try {\n'
                                                   "    byId('operations-message').textContent = '正在處理…';\n"
+                                                  '    freeze();\n'
                                                   '    await operationsSubmit(freeze);\n'
                                                   '  } catch (error) {\n'
                                                   "    byId('operations-message').textContent = "
@@ -5653,7 +5829,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   "{repair_records:'送修',dbn_records:'DBN',serial_board_mappings:'S/N "
                                                   "對應',repair_machine_models:'機台對應',repair_model_boards:'板件對應',repair_board_prices:'價格',repair_attachments:'附件'};\n"
                                                   '  const operations = '
-                                                  "{INSERT:'新增',UPDATE:'修改',DELETE:'刪除'};\n"
+                                                  "{INSERT:'新增',UPDATE:'修改',DELETE:'刪除',IMPORT:'離線匯入'};\n"
                                                   '  const labels = '
                                                   "{...fieldLabels,board_name:'板件名稱',customer_code:'客戶',product_code:'產品',station_code:'站點',issue_type:'DBN "
                                                   "類型',issue_description:'異常描述',dut:'DUT',socket_file_id:'Socket "
@@ -5807,14 +5983,19 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   "|| '—'), element('div', 'quick-summary-serial', 'S/N ' + "
                                                   'summary.serial_no));\n'
                                                   "  heading.append(title, element('div', "
-                                                  "'quick-summary-count', `${records.total} 筆送修 · "
-                                                  '${dbn.total} 筆 DBN`)); board.append(heading);\n'
+                                                  "'quick-summary-count', `${records.error ? '送修讀取失敗' : "
+                                                  "records.total + ' 筆送修'} · ${dbn.error ? 'DBN 讀取失敗' : "
+                                                  "dbn.total + ' 筆 DBN'}`)); board.append(heading);\n"
+                                                  "  if (summary.error) board.append(element('p', 'notice', "
+                                                  "'板件摘要讀取失敗：' + summary.error + '；機台／Model "
+                                                  "僅整理已載入結果，可能不完整。'));\n"
                                                   "  const grid = element('div', 'quick-summary-grid');\n"
                                                   "  for (const [label, value] of [['Part "
                                                   "Number',summary.mapping?.board_part_code || '—'], "
                                                   "['Model',summary.models.join('、') || '—'], "
                                                   "['機台',summary.machines.join('、') || '—'], "
-                                                  "['板件資料',summary.mapping ? '已關聯' : '—']]) {\n"
+                                                  "['板件資料',summary.error ? '讀取失敗' : summary.mapping ? '已關聯' "
+                                                  ": '—']]) {\n"
                                                   "    const field = element('div', 'quick-summary-field'); "
                                                   "field.append(element('label', '', label), element('div', "
                                                   "'', value)); grid.append(field);\n"
@@ -5826,9 +6007,12 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   "'quick-section-heading'), list = element('div', "
                                                   "'quick-result-list');\n"
                                                   "    head.append(element('h2', '', title), element('span', "
-                                                  "'quick-section-count', `${result.total} 筆${result.total > "
-                                                  "20 ? '（目前顯示前 20 筆）' : ''}`));\n"
-                                                  "    if (!result.total) list.append(element('p', "
+                                                  "'quick-section-count', result.error ? '讀取失敗' : "
+                                                  "`${result.total} 筆${result.total > 20 ? '（目前顯示前 20 筆）' : "
+                                                  "''}`));\n"
+                                                  "    if (result.error) list.append(element('p', 'notice', "
+                                                  'result.error));\n'
+                                                  "    else if (!result.total) list.append(element('p', "
                                                   "'quick-empty', `沒有此 S/N 的${title}。`));\n"
                                                   '    section.append(head, list); '
                                                   'container.append(section); return list;\n'
@@ -5885,8 +6069,10 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '}\n'
                                                   '\n'
                                                   'async function editDbn(record = null) {\n'
+                                                  '  const request = ++operationRequest;\n'
                                                   '  const dbnCatalog = await '
                                                   "api('/api/repairs/dbn/catalog');\n"
+                                                  '  if (request !== operationRequest) return;\n'
                                                   "  if (!catalogs) throw new Error('機台對應尚未載入');\n"
                                                   '  let inputs, localMapping = null, lookupRequest = 0;\n'
                                                   "  openOperations(record ? '編輯 DBN 紀錄' : '新增 DBN 紀錄', "
@@ -5915,6 +6101,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   ": 'POST', payload);\n"
                                                   '    operationsDialog.close(); await refreshFeatures();\n'
                                                   '  });\n'
+                                                  '  const session = operationsSession;\n'
                                                   '  inputs = {\n'
                                                   "    serial:formField('S/N', 'text', record?.serial_no), "
                                                   "machine:formField('機台', 'select', record?.machine_code, "
@@ -5995,6 +6182,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   "'Other'].includes(inputs.kind.value);\n"
                                                   '    inputs.dut.required = usesDut; inputs.dut.disabled = '
                                                   '!usesDut;\n'
+                                                  "    inputs.dut.setCustomValidity('');\n"
                                                   '    inputs.description.required = usesDescription; '
                                                   'inputs.description.disabled = !usesDescription;\n'
                                                   '    fieldContainers.get(inputs.dut).hidden = !usesDut;\n'
@@ -6005,23 +6193,23 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '    if (!usesDut || !inputs.dut.value) return;\n'
                                                   '    const match = '
                                                   '/^(\\d{1,4})(?:\\s*-\\s*(\\d{1,4}))?$/.exec(inputs.dut.value.trim());\n'
-                                                  "    if (!match) {preview.textContent = 'DUT 格式錯誤'; "
-                                                  'return;}\n'
+                                                  '    const invalidDut = message => {preview.textContent = '
+                                                  'message; inputs.dut.setCustomValidity(message);};\n'
+                                                  "    if (!match) {invalidDut('DUT 格式錯誤'); return;}\n"
                                                   '    const first = Number(match[1]), last = '
                                                   'Number(match[2] || match[1]);\n'
                                                   '    const socket = dbnCatalog.sockets.find(row => '
                                                   'row.product_code === inputs.product.value);\n'
                                                   '    if (first < 1 || last < first || last > 2048 || last '
                                                   "- first > 7 || (inputs.kind.value === 'Single Dut' && "
-                                                  "match[2])) {preview.textContent = 'Single Dut 限單一編號；Group "
-                                                  "限連續 1–8 個 DUT'; return;}\n"
+                                                  "match[2])) {invalidDut('Single Dut 限單一編號；Group 限連續 1–8 個 "
+                                                  "DUT'); return;}\n"
                                                   '    const canonical = first === last ? String(first) : '
                                                   '`${first}-${last}`;\n'
                                                   '    const same = record && record.product_code === '
                                                   'inputs.product.value && record.dut === canonical;\n'
                                                   '    if (!same && socket && last > socket.dut_count) '
-                                                  "{preview.textContent = 'DUT 超出此 Socket File 範圍'; "
-                                                  'return;}\n'
+                                                  "{invalidDut('DUT 超出此 Socket File 範圍'); return;}\n"
                                                   '    const snapshot = same ? record.dut_pin_snapshot : '
                                                   'Object.fromEntries(Array.from({length:last-first+1}, (_, '
                                                   'index) => [String(first+index), '
@@ -6046,13 +6234,16 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '    const result = await '
                                                   "api('/api/repairs/serial-mapping?serial=' + "
                                                   'encodeURIComponent(number));\n'
-                                                  '    if (request !== lookupRequest) return;\n'
+                                                  '    if (request !== lookupRequest || session !== '
+                                                  'operationsSession || !operationsDialog.open || '
+                                                  'operationsSaving) return;\n'
                                                   '    localMapping = result.data; if (localMapping) '
                                                   'inputs.serial.value = localMapping.serial_no; boards();\n'
                                                   '  }\n'
                                                   "  inputs.serial.addEventListener('blur', () => "
-                                                  'lookup().catch(error => '
-                                                  "{byId('operations-message').textContent = "
+                                                  'lookup().catch(error => {if (session === '
+                                                  'operationsSession && operationsDialog.open) '
+                                                  "byId('operations-message').textContent = "
                                                   'error.message;}));\n'
                                                   '  boards(record?.board_name); products(); '
                                                   "inputs.product.value = record?.product_code || ''; "
@@ -6175,7 +6366,9 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '}\n'
                                                   '\n'
                                                   'async function editMaster(kind, record = null) {\n'
+                                                  '  const request = ++operationRequest;\n'
                                                   "  const original = await api('/api/repairs/masters');\n"
+                                                  '  if (request !== operationRequest) return;\n'
                                                   '  if (record && original.token !== masterData?.token) '
                                                   "throw new Error('主檔已變更，請重新查詢清單再修改');\n"
                                                   '  const fields = {};\n'
@@ -6195,6 +6388,12 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   "      const [units, cents = ''] = entered.split('.'); "
                                                   'value[key] = entered ? Number(units) * 100 + '
                                                   "Number(cents.padEnd(2, '0')) : null;\n"
+                                                  '      if (value[key] !== null && '
+                                                  '(!Number.isSafeInteger(value[key]) || value[key] > 10 ** '
+                                                  "12)) throw new Error('金額超出允許範圍（最多 10,000,000,000 元）');\n"
+                                                  "      if (key === 'warranty_repair_cents' && value[key] "
+                                                  '!== null && value[key] !== 0) throw new '
+                                                  "Error('保固金額只能是零或未設定');\n"
                                                   '    }\n'
                                                   "    if (!window.confirm('確認儲存對應？不會自動更新其他主檔／歷史案件或金額。')) "
                                                   "{byId('operations-message').textContent = '已取消，未寫入。'; "
@@ -6223,25 +6422,25 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '  function autofill() {\n'
                                                   "    if (kind === 'machine') {\n"
                                                   '      const row = original.machines.find(row => '
-                                                  'row.machine_code === fields.machine_code.value); if (row) '
-                                                  'fields.model.value = row.model;\n'
+                                                  'row.machine_code === fields.machine_code.value); '
+                                                  "fields.model.value = row?.model || '';\n"
                                                   '    } else {\n'
                                                   "      const row = (kind === 'price' ? original.prices : "
                                                   'original.boards).find(row => row.model === '
                                                   'fields.model.value && row.board_name === '
                                                   "fields.board_name.value && (kind !== 'price' || "
                                                   'row.board_part_code === fields.board_part_code.value));\n'
-                                                  '      if (!row) return;\n'
-                                                  '      fields.board_part_code.value = '
-                                                  'row.board_part_code;\n'
+                                                  "      if (kind === 'board') fields.board_part_code.value "
+                                                  "= row?.board_part_code || '';\n"
                                                   "      if (kind === 'price') for (const key of "
                                                   "['board_repair_cents','external_repair_cents','contract_repair_cents','warranty_repair_cents']) "
-                                                  "fields[key].value = row[key] == null ? '' : (row[key] / "
+                                                  "fields[key].value = row?.[key] == null ? '' : (row[key] / "
                                                   '100).toFixed(2);\n'
                                                   '    }\n'
                                                   '  }\n'
-                                                  "  if (!record) for (const key of ['machine_code', "
-                                                  "'model', 'board_name', 'board_part_code']) "
+                                                  "  if (!record) for (const key of kind === 'price' ? "
+                                                  "['model','board_name','board_part_code'] : "
+                                                  "['machine_code','model','board_name']) "
                                                   "fields[key]?.addEventListener('change', autofill);\n"
                                                   '  for (const [key, input] of Object.entries(fields)) {\n'
                                                   '    input.dataset.field = key;\n'
@@ -6261,10 +6460,15 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '\n'
                                                   'async function renderDetailFeatures(record, container, '
                                                   'stillCurrent) {\n'
-                                                  '  const [meta, chainResult] = await '
-                                                  'Promise.all([api(`/api/repairs/records/${encodeURIComponent(record.id)}/attachment`), '
+                                                  '  const outcomes = await '
+                                                  'Promise.allSettled([api(`/api/repairs/records/${encodeURIComponent(record.id)}/attachment`), '
                                                   'api(`/api/repairs/records/${encodeURIComponent(record.id)}/chain`)]);\n'
                                                   '  if (!stillCurrent()) return;\n'
+                                                  "  const meta = outcomes[0].status === 'fulfilled' ? "
+                                                  'outcomes[0].value : {error:outcomes[0].reason.message};\n'
+                                                  "  const chainResult = outcomes[1].status === 'fulfilled' "
+                                                  '? outcomes[1].value : '
+                                                  '{data:[],error:outcomes[1].reason.message};\n'
                                                   '  const previousAttempt = chainResult.data.find(row => '
                                                   'row.id === record.retry_of_record_id);\n'
                                                   "  if (previousAttempt?.current_status === '結案（FAIL）' && "
@@ -6276,7 +6480,10 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   "  const fileSection = element('section', "
                                                   "'detail-section'); fileSection.append(element('h3', '', "
                                                   "'Fail Log'));\n"
-                                                  '  if (meta.data) {\n'
+                                                  '  if (meta.error) {\n'
+                                                  "    fileSection.append(element('p', 'notice', '附件狀態讀取失敗：' "
+                                                  "+ meta.error + '；不能當成沒有附件。'));\n"
+                                                  '  } else if (meta.data) {\n'
                                                   "    fileSection.append(element('p', '', "
                                                   '`${meta.data.filename} · ${meta.data.file_size} '
                                                   'bytes`));\n'
@@ -6319,8 +6526,15 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '    }));\n'
                                                   '  }\n'
                                                   '  container.append(fileSection);\n'
-                                                  '  container.append(renderRepairChain(record, '
-                                                  "chainResult.data), action('查看此 S/N 的 DBN', () => "
+                                                  "  if (chainResult.error) container.append(element('p', "
+                                                  "'notice', '送修鏈讀取失敗：' + chainResult.error + "
+                                                  "'；不能確認是否可刪除或結案。'));\n"
+                                                  '  else container.append(renderRepairChain(record, '
+                                                  'chainResult.data));\n'
+                                                  '  if (meta.error || chainResult.error) '
+                                                  "container.append(action('重新讀取詳細資料', () => "
+                                                  'openDetail(record.id)));\n'
+                                                  "  container.append(action('查看此 S/N 的 DBN', () => "
                                                   "{detail.close(); return openWorkspace('dbn', "
                                                   'record.serial_no);}));\n'
                                                   "  if (record.current_status === '取回驗證') {\n"
@@ -6337,7 +6551,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   "    const failButton = action('FAIL・建立下一筆維修', () => "
                                                   "retryRepair(record), 'button danger');\n"
                                                   '    passButton.disabled = failButton.disabled = '
-                                                  'record.repair_amount == null;\n'
+                                                  'record.repair_amount == null || '
+                                                  'Boolean(chainResult.error);\n'
                                                   '    resolve.append(passButton, failButton);\n'
                                                   '    if (record.repair_amount == null) '
                                                   "resolve.append(element('p', 'hint', "
@@ -6353,9 +6568,10 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '    detail.close(); selectedRecord = null; await '
                                                   'refreshFeatures();\n'
                                                   "  }, 'button danger');\n"
-                                                  '  deleteButton.disabled = chainResult.data.length > 1;\n'
+                                                  '  deleteButton.disabled = chainResult.data.length > 1 || '
+                                                  'Boolean(chainResult.error) || Boolean(meta.error);\n'
                                                   '  container.append(deleteButton);\n'
-                                                  '  if (deleteButton.disabled) '
+                                                  '  if (chainResult.data.length > 1) '
                                                   "container.append(element('p', 'hint', "
                                                   "'此案屬於連續送修鏈，不能單獨刪除，以保留各輪追溯關係。'));\n"
                                                   '}\n'
@@ -6573,9 +6789,12 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   'amountCard.append(amountsTable);\n'
                                                   '  grid.append(frequencyCard, amountCard); '
                                                   'container.append(grid);\n'
-                                                  "  const ranking = byId('ranking-sort').value === 'asc' ? "
-                                                  '[...result.ranking].sort((a,b) => a.count - b.count || '
-                                                  'a.machine.localeCompare(b.machine)) : result.ranking;\n'
+                                                  "  const direction = byId('ranking-sort').value === 'asc' "
+                                                  '? 1 : -1;\n'
+                                                  '  const ranking = [...result.ranking].sort((a,b) => '
+                                                  'direction * (a.count - b.count) || '
+                                                  "a.machine.localeCompare(b.machine, 'en', "
+                                                  '{numeric:true}));\n'
                                                   '  let rank = 0, last = null;\n'
                                                   "  const rankingCard = card('機台損壞次數排名', "
                                                   "'依損壞日期；同一段連續維修只計一次', `共 ${ranking.length} 台機台`);\n"
@@ -6585,7 +6804,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                   '= index + 1; last = row.count; return [rank, row.machine, '
                                                   'row.count];}))); container.append(rankingCard);\n'
                                                   '}\n',
-                                       'sha256': '340d54f1f22b1de76e6383d262227fbd668fc7a8917f99bdf406cb7bb0195fae'},
+                                       'sha256': '4a5fda75298c05542dc9823ad7f1710e4a14023ed2d3033c2e4a847926a3db3c'},
            'company/web/index.html': {'content': '<!doctype html>\n'
                                                  '<html lang="zh-Hant">\n'
                                                  '<head>\n'
@@ -7389,6 +7608,10 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    '環境檢查</a>\n'
                                                    '  </aside>\n'
                                                    '  <main class="content">\n'
+                                                   '    <div id="startup-error" class="notice" role="alert" '
+                                                   'hidden><p id="startup-message"></p><button '
+                                                   'id="reload-catalogs" '
+                                                   'type="button">重新讀取對應表</button></div>\n'
                                                    '    <details class="local-information"><summary>SQLite '
                                                    '本機移植版 · 不連接 Supabase</summary><p '
                                                    'class="notice">公司端略過的驗證仍標為未驗收。舊資料尚未匯入；尚未完成畫面一致性及正式上線驗收。僅限本機，登入權限及公司內網部署待 '
@@ -7469,7 +7692,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    'value="">全部</option><option '
                                                    'value="INSERT">新增</option><option '
                                                    'value="UPDATE">修改</option><option '
-                                                   'value="DELETE">刪除</option></select></label>\n'
+                                                   'value="DELETE">刪除</option><option '
+                                                   'value="IMPORT">離線匯入</option></select></label>\n'
                                                    '        <label>開始日期<input id="history-start" type="date" '
                                                    'form="workspace-search"></label>\n'
                                                    '        <label>結束日期<input id="history-end" type="date" '
@@ -7586,7 +7810,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                    'type="submit">儲存</button></div></form></dialog>\n'
                                                    '</body>\n'
                                                    '</html>\n',
-                                        'sha256': 'c44d15aeb62868dd1c6768666e72265180a17ed7ec1f791496f1a4a7a8d32bb8'},
+                                        'sha256': '008b055846c3404846bbeaf7a091f52a57303b8dbab4676bf4438de5a018eca6'},
            'company/web/repairs.js': {'content': 'const byId = id => document.getElementById(id);\n'
                                                  'let catalogs, current = null, mapping = null, '
                                                  'mappingRequest = 0, saving = false;\n'
@@ -7595,6 +7819,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  "null, serialFilter = '';\n"
                                                  "let quickSerial = '';\n"
                                                  'let editorSession = 0, editorReloading = false;\n'
+                                                 'let catalogsLoading = false;\n'
                                                  "const editor = byId('editor');\n"
                                                  "const detail = byId('record-detail');\n"
                                                  "const fieldLabels = {serial_no:'S/N', machine_code:'機台', "
@@ -7613,10 +7838,15 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  'JSON.stringify(body);}\n'
                                                  '  // Writes are not automatically retried: a lost response '
                                                  'must be checked first.\n'
-                                                 '  const response = await fetch(path, options);\n'
-                                                 '  const data = await response.json();\n'
-                                                 '  if (!response.ok) throw new Error(data.error || '
-                                                 "'操作失敗');\n"
+                                                 '  let response, data;\n'
+                                                 '  try {response = await fetch(path, options);}\n'
+                                                 "  catch (error) {throw new Error('本機服務連線失敗，請確認 Python "
+                                                 "服務仍在執行：' + error.message);}\n"
+                                                 '  try {data = await response.json();}\n'
+                                                 "  catch {throw new Error('本機服務回應不是有效 "
+                                                 "JSON；請保留錯誤並確認服務版本。寫入結果未知時勿直接重送。');}\n"
+                                                 '  if (!response.ok) {const error = new Error(data.error || '
+                                                 "'操作失敗'); error.status = response.status; throw error;}\n"
                                                  '  return data;\n'
                                                  '}\n'
                                                  '\n'
@@ -7656,6 +7886,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  '}\n'
                                                  '\n'
                                                  "function setView(quick, status = '') {\n"
+                                                 "  if (typeof invalidateFeatureRequests === 'function') "
+                                                 'invalidateFeatureRequests();\n'
                                                  "  byId('workspace-view').hidden = true;\n"
                                                  '  for (const button of '
                                                  "document.querySelectorAll('[data-workspace]')) "
@@ -7774,6 +8006,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  "element('div', 'detail-text', "
                                                  'record.failure_description));\n'
                                                  '    body.append(failure);\n'
+                                                 '    if (!detail.open) detail.showModal();\n'
                                                  "    if (typeof renderDetailFeatures === 'function') await "
                                                  'renderDetailFeatures(record, body, () => request === '
                                                  'detailRequest);\n'
@@ -7781,7 +8014,8 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  '    if (!detail.open) detail.showModal();\n'
                                                  '  } catch (error) {\n'
                                                  '    if (request !== detailRequest) return;\n'
-                                                 "    byId('message').textContent = "
+                                                 "    byId('detail-message').textContent = "
+                                                 "byId('message').textContent = "
                                                  "byId('quick-message').textContent = error.message;\n"
                                                  '  }\n'
                                                  '}\n'
@@ -7794,14 +8028,18 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  '{\n'
                                                  '  if (!selectedRecord) return;\n'
                                                  "  const button = byId('edit-detail');\n"
+                                                 '  const id = selectedRecord.id, request = detailRequest;\n'
                                                  '  button.disabled = true;\n'
                                                  '  try {\n'
                                                  "    const result = await api('/api/repairs/records/' + "
-                                                 'encodeURIComponent(selectedRecord.id));\n'
+                                                 'encodeURIComponent(id));\n'
+                                                 '    if (request !== detailRequest || !detail.open || '
+                                                 'selectedRecord?.id !== id) return;\n'
+                                                 '    detailRequest++;\n'
                                                  '    detail.close();\n'
                                                  '    await openEditor(result.data);\n'
-                                                 "  } catch (error) {byId('detail-message').textContent = "
-                                                 'error.message;}\n'
+                                                 '  } catch (error) {if (request === detailRequest) '
+                                                 "byId('detail-message').textContent = error.message;}\n"
                                                  '  finally {button.disabled = false;}\n'
                                                  '});\n'
                                                  '\n'
@@ -7818,13 +8056,29 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  "  byId('quick-results').replaceChildren();\n"
                                                  '  try {\n'
                                                  '    const query = new URLSearchParams({serial});\n'
-                                                 '    const [records, summary, dbn] = await '
-                                                 "Promise.all([api('/api/repairs/records?' + query),\n"
+                                                 '    const outcomes = await '
+                                                 "Promise.allSettled([api('/api/repairs/records?' + query),\n"
                                                  "      api('/api/repairs/serial-summary?' + query), "
                                                  "api('/api/repairs/dbn?' + query)]);\n"
                                                  '    if (request !== quickRequest) return;\n'
+                                                 '    const read = (index, fallback) => '
+                                                 "outcomes[index].status === 'fulfilled' ? "
+                                                 'outcomes[index].value : {...fallback, '
+                                                 'error:outcomes[index].reason.message};\n'
+                                                 '    const records = read(0, {data:[],total:0}), dbn = '
+                                                 'read(2, {data:[],total:0});\n'
+                                                 '    const summary = read(1, '
+                                                 '{serial_no:serial,mapping:null,models:[],machines:[]});\n'
+                                                 '    if (summary.error) {\n'
+                                                 '      const known = [...records.data,...dbn.data];\n'
+                                                 '      summary.models = [...new Set(known.map(row => '
+                                                 'row.model).filter(Boolean))];\n'
+                                                 '      summary.machines = [...new Set(known.map(row => '
+                                                 'row.machine_code).filter(Boolean))];\n'
+                                                 '    }\n'
                                                  '    quickSerial = serial;\n'
-                                                 '    updateCounts(records.status_counts);\n'
+                                                 '    if (!records.error) '
+                                                 'updateCounts(records.status_counts);\n'
                                                  '    renderQuickResults(summary, records, dbn, '
                                                  "byId('quick-results'));\n"
                                                  '    if (records.total > 20) {\n'
@@ -7843,8 +8097,11 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  "openWorkspace('dbn', serial)); "
                                                  "byId('quick-results').append(allDbn);\n"
                                                  '    }\n'
-                                                 "    byId('quick-message').textContent = records.total || "
-                                                 "dbn.total ? '點選送修紀錄查看詳細資料。' : '此 S/N 尚無本機送修或 DBN 紀錄。';\n"
+                                                 "    byId('quick-message').textContent = outcomes.some(row "
+                                                 "=> row.status === 'rejected') ? "
+                                                 "'部分查詢失敗，以下只顯示已成功讀取的資料；不可當成完整歷史或零筆。可再按 Search 重新查詢。' : "
+                                                 "records.total || dbn.total ? '點選送修紀錄查看詳細資料。' : '此 S/N "
+                                                 "尚無本機送修或 DBN 紀錄。';\n"
                                                  '  } catch (error) {if (request === quickRequest) '
                                                  "byId('quick-message').textContent = error.message;}\n"
                                                  '}\n'
@@ -8129,8 +8386,15 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  "  byId('form-message').textContent = '正在儲存…';\n"
                                                  '  let frozen = [];\n'
                                                  '  try {\n'
+                                                 "    frozen = [...byId('record-form').elements].map(input "
+                                                 '=> [input, input.disabled]);\n'
+                                                 '    frozen.forEach(([input]) => {input.disabled = '
+                                                 'true;});\n'
                                                  "    if (!await lookupMapping()) throw new Error('S/N "
                                                  "查詢已變更，請再檢查後儲存');\n"
+                                                 '    frozen.forEach(([input, disabled]) => {input.disabled '
+                                                 '= disabled;});\n'
+                                                 "    byId('board').disabled = Boolean(mapping);\n"
                                                  '    const datesValid = updateEditorDates();\n'
                                                  "    if (!byId('record-form').reportValidity()) throw new "
                                                  "Error('請填妥必填欄位');\n"
@@ -8149,14 +8413,13 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  "      byId('form-message').textContent = "
                                                  "'已取消重新計價，尚未儲存；輸入內容已保留。'; return;\n"
                                                  '    }\n'
+                                                 '    frozen.forEach(([input]) => {input.disabled = '
+                                                 'true;});\n'
                                                  "    if (!current && byId('create-attachment').files?.[0]) "
                                                  'payload.attachment = await '
                                                  "encodeFile(byId('create-attachment').files[0]);\n"
                                                  '    if (current) payload.expected_version = '
                                                  'current.version;\n'
-                                                 "    frozen = [...byId('record-form').elements].map(input "
-                                                 '=> [input, input.disabled]);\n'
-                                                 '    for (const [input] of frozen) input.disabled = true;\n'
                                                  "    const url = '/api/repairs/records' + (current ? '/' + "
                                                  "encodeURIComponent(current.id) : '');\n"
                                                  "    const result = await api(url, current ? 'PUT' : "
@@ -8174,6 +8437,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  '  } finally {\n'
                                                  '    for (const [input, disabled] of frozen) input.disabled '
                                                  '= disabled;\n'
+                                                 "    byId('board').disabled = Boolean(mapping);\n"
                                                  '    saving = false;\n'
                                                  "    for (const id of ['save', 'cancel', 'close', "
                                                  "'reload-record']) byId(id).disabled = false;\n"
@@ -8239,7 +8503,11 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  "''; page = 1; loadRecords();}, 220);\n"
                                                  '});\n'
                                                  '\n'
-                                                 '(async () => {\n'
+                                                 'async function initializeApp() {\n'
+                                                 '  if (catalogsLoading) return;\n'
+                                                 "  catalogsLoading = true; byId('create').disabled = "
+                                                 "byId('reload-catalogs').disabled = true;\n"
+                                                 "  byId('startup-error').hidden = true;\n"
                                                  '  try {\n'
                                                  "    catalogs = await api('/api/repairs/catalog');\n"
                                                  "    fillSelect(byId('machine'), catalogs.machines.map(row "
@@ -8254,10 +8522,19 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                  "'所有維修分類');\n"
                                                  "    byId('create').disabled = false;\n"
                                                  '    await loadRecords();\n'
-                                                 "  } catch (error) {byId('message').textContent = "
-                                                 "error.message; byId('message').dataset.error = 'true';}\n"
-                                                 '})();\n',
-                                      'sha256': '421cd3132b16f42500e404b970507430a93fbe278cf143dedf5b044cfea0b959'},
+                                                 '  } catch (error) {\n'
+                                                 "    byId('startup-error').hidden = false; "
+                                                 "byId('startup-message').textContent = '無法載入本機對應表：' + "
+                                                 'error.message;\n'
+                                                 "    byId('message').textContent = error.message; "
+                                                 "byId('message').dataset.error = 'true';\n"
+                                                 '  } finally {catalogsLoading = false; '
+                                                 "byId('reload-catalogs').disabled = false;}\n"
+                                                 '}\n'
+                                                 "byId('reload-catalogs').addEventListener('click', "
+                                                 'initializeApp);\n'
+                                                 'initializeApp();\n',
+                                      'sha256': 'f2d90373623e377a2884b50bc7a258c783fa229eab452179dee66787b6872cf5'},
            'company/web/style.css': {'content': ':root{color-scheme:dark;font-family:"Segoe '
                                                 'UI",sans-serif;background:#101113;color:#e7e7e8}\n'
                                                 '*{box-sizing:border-box}body{margin:0}main{max-width:850px;margin:60px '
@@ -8278,7 +8555,7 @@ BUNDLE = {'files': {'company/README.md': {'content': '# SPMS 公司版：SQLite 
                                                 '@media(max-width:600px){main{margin:25px auto;padding:0 '
                                                 '16px}h1{font-size:22px}section{padding:18px}dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:10px}}\n',
                                      'sha256': '064406c8758be5620dfe7440f59d59ec1de5f6307e74f5bad85dd03e018c0769'}},
- 'version': '2026-11-02-status-dates'}
+ 'version': '2026-11-02-local-batch-review'}
 
 
 def check_local_path(path):

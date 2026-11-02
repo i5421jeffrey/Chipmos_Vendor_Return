@@ -1,7 +1,7 @@
 import Foundation
 import JavaScriptCore
 
-// Syntax smoke test only; actual browser/Windows acceptance is still required.
+// Syntax plus isolated mock-DOM suites; real browser/Windows acceptance is separate.
 for file in ["company/web/app.js", "company/web/repairs.js", "company/web/features.js"] {
     let script = try String(contentsOfFile: file, encoding: .utf8)
     let context = JSContext()!
@@ -19,17 +19,20 @@ func values(_ pattern: String) throws -> [String] {
 }
 let ids = try values("\\bid=\"([^\"]+)\"")
 if Set(ids).count != ids.count { print("Duplicate company HTML IDs");exit(1) }
-let context = JSContext()!
-for (name, array) in [("pageIds", ids), ("pageStatuses", try values("data-status=\"([^\"]*)\"")), ("pageCounters", try values("data-count=\"([^\"]+)\"")), ("pageWorkspaces", try values("data-workspace=\"([^\"]+)\""))] {
-    let json = String(data: try JSONSerialization.data(withJSONObject: array), encoding: .utf8)!
-    context.evaluateScript("const \(name)=\(json);")
-}
 let tests = try String(contentsOfFile: "scripts/company_ui_test.js", encoding: .utf8).components(separatedBy: "// TESTS")
-context.evaluateScript(tests[0])
-context.evaluateScript(try String(contentsOfFile: "company/web/repairs.js", encoding: .utf8))
-context.evaluateScript(try String(contentsOfFile: "company/web/features.js", encoding: .utf8))
-context.evaluateScript(tests[1])
-if let error = context.exception { print(error);exit(1) }
-if let error = context.objectForKeyedSubscript("companyUiFailure"), !error.isUndefined { print(error);exit(1) }
-if context.objectForKeyedSubscript("companyUiDone")?.toBool() != true { print("Company mock UI tests did not complete");exit(1) }
+for suite in ["normal", "resilience"] {
+    let context = JSContext()!
+    for (name, array) in [("pageIds", ids), ("pageStatuses", try values("data-status=\"([^\"]*)\"")), ("pageCounters", try values("data-count=\"([^\"]+)\"")), ("pageWorkspaces", try values("data-workspace=\"([^\"]+)\""))] {
+        let json = String(data: try JSONSerialization.data(withJSONObject: array), encoding: .utf8)!
+        context.evaluateScript("const \(name)=\(json);")
+    }
+    context.evaluateScript(tests[0])
+    context.evaluateScript(try String(contentsOfFile: "company/web/repairs.js", encoding: .utf8))
+    context.evaluateScript(try String(contentsOfFile: "company/web/features.js", encoding: .utf8))
+    context.evaluateScript(suite == "normal" ? tests[1] : try String(contentsOfFile: "scripts/company_ui_resilience_test.js", encoding: .utf8))
+    if let error = context.exception { print(error);exit(1) }
+    if let error = context.objectForKeyedSubscript("companyUiFailure"), !error.isUndefined { print(error);exit(1) }
+    if context.objectForKeyedSubscript("companyUiDone")?.toBool() != true { print("Company mock UI tests did not complete: \(suite)");exit(1) }
+    print("Company UI mock-DOM \(suite) suite: OK")
+}
 print("Company UI mock-DOM flows: navigation, S/N, detail/edit, conflicts, DBN create, mapping preview/sync, masters, history, statistics: OK")

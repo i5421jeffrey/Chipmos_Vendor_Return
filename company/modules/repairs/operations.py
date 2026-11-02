@@ -104,7 +104,7 @@ def public_dbn(row):
 def list_dbn(path, query):
     with connect(path) as connection:
         connection.execute('BEGIN')
-        return paginate(connection, 'dbn_records', query, ('serial_no', 'board_name', 'machine_code', 'customer_code', 'product_code', 'issue_description'), 'created_at DESC,id', public_dbn)
+        return paginate(connection, 'dbn_records', query, ('serial_no', 'board_name', 'board_part_code', 'machine_code', 'model', 'customer_code', 'product_code', 'station_code', 'issue_type', 'dut', 'issue_description'), 'julianday(created_at) DESC,id', public_dbn)
 
 
 def serial_summary(path, number):
@@ -371,7 +371,7 @@ def history(path, query):
     where, args = [], []
     for key, column, allowed in (
         ('source', 'source_table', ('repair_records', 'dbn_records', 'serial_board_mappings', 'repair_machine_models', 'repair_model_boards', 'repair_board_prices', 'repair_attachments')),
-        ('operation', 'operation', ('INSERT', 'UPDATE', 'DELETE')),
+        ('operation', 'operation', ('INSERT', 'UPDATE', 'DELETE', 'IMPORT')),
     ):
         value = query.get(key, [''])[0]
         if value:

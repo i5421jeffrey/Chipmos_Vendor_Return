@@ -1,12 +1,15 @@
 /* Local-only feature workspaces. Untrusted values are always text, never HTML. */
 let workspace = '', workspacePage = 1, workspaceSerial = '', workspaceRequest = 0;
 let operationsSaving = false, operationsSubmit = null, masterData = null;
+let operationRequest = 0, operationsSession = 0;
 let statisticsMode = 'year', statisticsYear = String(new Date().getFullYear()), statisticsMonth = String(new Date().getMonth() + 1).padStart(2, '0');
 const fieldContainers = new WeakMap();
 const filePickerUpdates = new WeakMap();
 const workspaceTitles = {dbn:'DBN 紀錄', mappings:'S/N 主檔維護', history:'全站異動紀錄', statistics:'統計資料', masters:'機台／板件／價格對應'};
 const operationsDialog = byId('operations-modal');
 const descriptions = {dbn:'DBN 紀錄獨立於送修案件；DUT／PIN 保存當時快照。', mappings:'主檔只保存 S/N、板名與 PN；歷史同步須先預覽及確認，不重算金額。', history:'本機異動紀錄；尚未登入，這不是具名操作人員稽核。', statistics:'首輪損壞頻率與機台排行；依結案日期加總各輪已知金額。', masters:'修改只影響後續選擇與儲存，不自動改寫既有案件、S/N 或價格快照。'};
+
+function invalidateFeatureRequests() {workspaceRequest++; operationRequest++;}
 
 function action(label, handler, className = 'button') {
   const button = element('button', className, label); button.type = 'button';
@@ -48,6 +51,8 @@ function mountFilePicker(input, container) {
 mountFilePicker(byId('create-attachment'), byId('create-attachment-field'));
 
 function openOperations(title, submit) {
+  if (operationsSaving) throw new Error('正在處理上一筆操作，請稍候');
+  operationsSession++;
   byId('operations-title').textContent = title;
   byId('operations-fields').replaceChildren(); byId('operations-message').textContent = '';
   operationsSubmit = submit;
@@ -69,7 +74,7 @@ function formField(label, kind = 'text', value = '', choices = null) {
   return input;
 }
 
-function closeOperations() {if (!operationsSaving) operationsDialog.close();}
+function closeOperations() {if (!operationsSaving) {operationsSession++; operationRequest++; operationsSubmit = null; operationsDialog.close();}}
 byId('operations-close').addEventListener('click', closeOperations);
 byId('operations-cancel').addEventListener('click', closeOperations);
 operationsDialog.addEventListener('cancel', event => event.preventDefault());
@@ -83,6 +88,7 @@ byId('operations-form').addEventListener('submit', async event => {
   let freeze = () => inputs.forEach(input => {input.disabled = true;});
   try {
     byId('operations-message').textContent = '正在處理…';
+    freeze();
     await operationsSubmit(freeze);
   } catch (error) {
     byId('operations-message').textContent = error.message + '\n輸入已保留；連線中斷時請先查詢是否成功，勿直接重複新增。';
@@ -178,7 +184,7 @@ async function loadWorkspace() {
 
 function renderHistory(events, container) {
   const sources = {repair_records:'送修',dbn_records:'DBN',serial_board_mappings:'S/N 對應',repair_machine_models:'機台對應',repair_model_boards:'板件對應',repair_board_prices:'價格',repair_attachments:'附件'};
-  const operations = {INSERT:'新增',UPDATE:'修改',DELETE:'刪除'};
+  const operations = {INSERT:'新增',UPDATE:'修改',DELETE:'刪除',IMPORT:'離線匯入'};
   const labels = {...fieldLabels,board_name:'板件名稱',customer_code:'客戶',product_code:'產品',station_code:'站點',issue_type:'DBN 類型',issue_description:'異常描述',dut:'DUT',socket_file_id:'Socket File 版本',dut_pin_snapshot:'PIN',board_repair_cents:'板修金額（分）',external_repair_cents:'外修金額（分）',contract_repair_cents:'合約金額（分）',warranty_repair_cents:'保固金額（分）'};
   function value(field, data) {
     if (data == null) return '—';
@@ -262,16 +268,18 @@ function repairTimeline(record) {
 function renderQuickResults(summary, records, dbn, container) {
   const board = element('section', 'quick-board-summary'), heading = element('div', 'quick-summary-heading'), title = element('div');
   title.append(element('h2', 'quick-summary-title', summary.mapping?.board_name || records.data[0]?.description || dbn.data[0]?.board_name || '—'), element('div', 'quick-summary-serial', 'S/N ' + summary.serial_no));
-  heading.append(title, element('div', 'quick-summary-count', `${records.total} 筆送修 · ${dbn.total} 筆 DBN`)); board.append(heading);
+  heading.append(title, element('div', 'quick-summary-count', `${records.error ? '送修讀取失敗' : records.total + ' 筆送修'} · ${dbn.error ? 'DBN 讀取失敗' : dbn.total + ' 筆 DBN'}`)); board.append(heading);
+  if (summary.error) board.append(element('p', 'notice', '板件摘要讀取失敗：' + summary.error + '；機台／Model 僅整理已載入結果，可能不完整。'));
   const grid = element('div', 'quick-summary-grid');
-  for (const [label, value] of [['Part Number',summary.mapping?.board_part_code || '—'], ['Model',summary.models.join('、') || '—'], ['機台',summary.machines.join('、') || '—'], ['板件資料',summary.mapping ? '已關聯' : '—']]) {
+  for (const [label, value] of [['Part Number',summary.mapping?.board_part_code || '—'], ['Model',summary.models.join('、') || '—'], ['機台',summary.machines.join('、') || '—'], ['板件資料',summary.error ? '讀取失敗' : summary.mapping ? '已關聯' : '—']]) {
     const field = element('div', 'quick-summary-field'); field.append(element('label', '', label), element('div', '', value)); grid.append(field);
   }
   board.append(grid); container.append(board);
   function group(title, result) {
     const section = element('section', 'quick-result-section'), head = element('div', 'quick-section-heading'), list = element('div', 'quick-result-list');
-    head.append(element('h2', '', title), element('span', 'quick-section-count', `${result.total} 筆${result.total > 20 ? '（目前顯示前 20 筆）' : ''}`));
-    if (!result.total) list.append(element('p', 'quick-empty', `沒有此 S/N 的${title}。`));
+    head.append(element('h2', '', title), element('span', 'quick-section-count', result.error ? '讀取失敗' : `${result.total} 筆${result.total > 20 ? '（目前顯示前 20 筆）' : ''}`));
+    if (result.error) list.append(element('p', 'notice', result.error));
+    else if (!result.total) list.append(element('p', 'quick-empty', `沒有此 S/N 的${title}。`));
     section.append(head, list); container.append(section); return list;
   }
   const repairList = group('送修紀錄', records);
@@ -300,7 +308,9 @@ async function refreshFeatures() {
 }
 
 async function editDbn(record = null) {
+  const request = ++operationRequest;
   const dbnCatalog = await api('/api/repairs/dbn/catalog');
+  if (request !== operationRequest) return;
   if (!catalogs) throw new Error('機台對應尚未載入');
   let inputs, localMapping = null, lookupRequest = 0;
   openOperations(record ? '編輯 DBN 紀錄' : '新增 DBN 紀錄', async freeze => {
@@ -314,6 +324,7 @@ async function editDbn(record = null) {
     freeze(); await api('/api/repairs/dbn' + (record ? '/' + encodeURIComponent(record.id) : ''), record ? 'PUT' : 'POST', payload);
     operationsDialog.close(); await refreshFeatures();
   });
+  const session = operationsSession;
   inputs = {
     serial:formField('S/N', 'text', record?.serial_no), machine:formField('機台', 'select', record?.machine_code, catalogs.machines.map(row => row.machine_code)),
     board:formField('板件名稱', 'select'), part:formField('Part Number'),
@@ -353,6 +364,7 @@ async function editDbn(record = null) {
     const usesDut = ['Group', 'Single Dut'].includes(inputs.kind.value);
     const usesDescription = ['RTE', 'Other'].includes(inputs.kind.value);
     inputs.dut.required = usesDut; inputs.dut.disabled = !usesDut;
+    inputs.dut.setCustomValidity('');
     inputs.description.required = usesDescription; inputs.description.disabled = !usesDescription;
     fieldContainers.get(inputs.dut).hidden = !usesDut;
     fieldContainers.get(inputs.description).hidden = !usesDescription;
@@ -360,13 +372,14 @@ async function editDbn(record = null) {
     preview.replaceChildren();
     if (!usesDut || !inputs.dut.value) return;
     const match = /^(\d{1,4})(?:\s*-\s*(\d{1,4}))?$/.exec(inputs.dut.value.trim());
-    if (!match) {preview.textContent = 'DUT 格式錯誤'; return;}
+    const invalidDut = message => {preview.textContent = message; inputs.dut.setCustomValidity(message);};
+    if (!match) {invalidDut('DUT 格式錯誤'); return;}
     const first = Number(match[1]), last = Number(match[2] || match[1]);
     const socket = dbnCatalog.sockets.find(row => row.product_code === inputs.product.value);
-    if (first < 1 || last < first || last > 2048 || last - first > 7 || (inputs.kind.value === 'Single Dut' && match[2])) {preview.textContent = 'Single Dut 限單一編號；Group 限連續 1–8 個 DUT'; return;}
+    if (first < 1 || last < first || last > 2048 || last - first > 7 || (inputs.kind.value === 'Single Dut' && match[2])) {invalidDut('Single Dut 限單一編號；Group 限連續 1–8 個 DUT'); return;}
     const canonical = first === last ? String(first) : `${first}-${last}`;
     const same = record && record.product_code === inputs.product.value && record.dut === canonical;
-    if (!same && socket && last > socket.dut_count) {preview.textContent = 'DUT 超出此 Socket File 範圍'; return;}
+    if (!same && socket && last > socket.dut_count) {invalidDut('DUT 超出此 Socket File 範圍'); return;}
     const snapshot = same ? record.dut_pin_snapshot : Object.fromEntries(Array.from({length:last-first+1}, (_, index) => [String(first+index), socket?.dut_pins[String(first+index)] || null]));
     preview.append(pinDetails({dut:canonical, socket_file_id:same ? record.socket_file_id : socket?.id, dut_pin_snapshot:snapshot}));
   }
@@ -377,10 +390,10 @@ async function editDbn(record = null) {
   async function lookup() {
     const request = ++lookupRequest, number = inputs.serial.value;
     const result = await api('/api/repairs/serial-mapping?serial=' + encodeURIComponent(number));
-    if (request !== lookupRequest) return;
+    if (request !== lookupRequest || session !== operationsSession || !operationsDialog.open || operationsSaving) return;
     localMapping = result.data; if (localMapping) inputs.serial.value = localMapping.serial_no; boards();
   }
-  inputs.serial.addEventListener('blur', () => lookup().catch(error => {byId('operations-message').textContent = error.message;}));
+  inputs.serial.addEventListener('blur', () => lookup().catch(error => {if (session === operationsSession && operationsDialog.open) byId('operations-message').textContent = error.message;}));
   boards(record?.board_name); products(); inputs.product.value = record?.product_code || ''; stations(); inputs.station.value = record?.station_code || ''; issue();
   if (record) await lookup();
 }
@@ -453,7 +466,9 @@ function renderMasters(result, container, query = '') {
 }
 
 async function editMaster(kind, record = null) {
+  const request = ++operationRequest;
   const original = await api('/api/repairs/masters');
+  if (request !== operationRequest) return;
   if (record && original.token !== masterData?.token) throw new Error('主檔已變更，請重新查詢清單再修改');
   const fields = {};
   openOperations((record ? '修改' : '新增／修改') + {machine:'機台對應', board:'板件對應', price:'價格'}[kind], async freeze => {
@@ -462,6 +477,8 @@ async function editMaster(kind, record = null) {
       const entered = value[key];
       if (entered && !/^\d+(?:\.\d{1,2})?$/.test(entered)) throw new Error('金額最多兩位小數，不可負數');
       const [units, cents = ''] = entered.split('.'); value[key] = entered ? Number(units) * 100 + Number(cents.padEnd(2, '0')) : null;
+      if (value[key] !== null && (!Number.isSafeInteger(value[key]) || value[key] > 10 ** 12)) throw new Error('金額超出允許範圍（最多 10,000,000,000 元）');
+      if (key === 'warranty_repair_cents' && value[key] !== null && value[key] !== 0) throw new Error('保固金額只能是零或未設定');
     }
     if (!window.confirm('確認儲存對應？不會自動更新其他主檔／歷史案件或金額。')) {byId('operations-message').textContent = '已取消，未寫入。'; return;}
     freeze(); await api('/api/repairs/masters', 'POST', {kind, value, expected_token:original.token});
@@ -477,15 +494,14 @@ async function editMaster(kind, record = null) {
   }
   function autofill() {
     if (kind === 'machine') {
-      const row = original.machines.find(row => row.machine_code === fields.machine_code.value); if (row) fields.model.value = row.model;
+      const row = original.machines.find(row => row.machine_code === fields.machine_code.value); fields.model.value = row?.model || '';
     } else {
       const row = (kind === 'price' ? original.prices : original.boards).find(row => row.model === fields.model.value && row.board_name === fields.board_name.value && (kind !== 'price' || row.board_part_code === fields.board_part_code.value));
-      if (!row) return;
-      fields.board_part_code.value = row.board_part_code;
-      if (kind === 'price') for (const key of ['board_repair_cents','external_repair_cents','contract_repair_cents','warranty_repair_cents']) fields[key].value = row[key] == null ? '' : (row[key] / 100).toFixed(2);
+      if (kind === 'board') fields.board_part_code.value = row?.board_part_code || '';
+      if (kind === 'price') for (const key of ['board_repair_cents','external_repair_cents','contract_repair_cents','warranty_repair_cents']) fields[key].value = row?.[key] == null ? '' : (row[key] / 100).toFixed(2);
     }
   }
-  if (!record) for (const key of ['machine_code', 'model', 'board_name', 'board_part_code']) fields[key]?.addEventListener('change', autofill);
+  if (!record) for (const key of kind === 'price' ? ['model','board_name','board_part_code'] : ['machine_code','model','board_name']) fields[key]?.addEventListener('change', autofill);
   for (const [key, input] of Object.entries(fields)) {
     input.dataset.field = key;
     if (record) input.value = key.endsWith('_cents') ? (record[key] == null ? '' : (record[key] / 100).toFixed(2)) : record[key] ?? '';
@@ -497,14 +513,18 @@ async function editMaster(kind, record = null) {
 }
 
 async function renderDetailFeatures(record, container, stillCurrent) {
-  const [meta, chainResult] = await Promise.all([api(`/api/repairs/records/${encodeURIComponent(record.id)}/attachment`), api(`/api/repairs/records/${encodeURIComponent(record.id)}/chain`)]);
+  const outcomes = await Promise.allSettled([api(`/api/repairs/records/${encodeURIComponent(record.id)}/attachment`), api(`/api/repairs/records/${encodeURIComponent(record.id)}/chain`)]);
   if (!stillCurrent()) return;
+  const meta = outcomes[0].status === 'fulfilled' ? outcomes[0].value : {error:outcomes[0].reason.message};
+  const chainResult = outcomes[1].status === 'fulfilled' ? outcomes[1].value : {data:[],error:outcomes[1].reason.message};
   const previousAttempt = chainResult.data.find(row => row.id === record.retry_of_record_id);
   if (previousAttempt?.current_status === '結案（FAIL）' && !['結案（PASS）','結案（FAIL）'].includes(record.current_status)) {
     container.append(element('p', 'notice retry-warning', '上次維修未完成（前一輪結案結果為 FAIL）；本輪仍待處理。'));
   }
   const fileSection = element('section', 'detail-section'); fileSection.append(element('h3', '', 'Fail Log'));
-  if (meta.data) {
+  if (meta.error) {
+    fileSection.append(element('p', 'notice', '附件狀態讀取失敗：' + meta.error + '；不能當成沒有附件。'));
+  } else if (meta.data) {
     fileSection.append(element('p', '', `${meta.data.filename} · ${meta.data.file_size} bytes`));
     const link = element('a', '', '下載'); link.href = '/api/repairs/attachments/' + encodeURIComponent(meta.data.id) + '?download=1';
     const preview = element('pre', 'file-preview'); preview.hidden = true;
@@ -529,7 +549,10 @@ async function renderDetailFeatures(record, container, stillCurrent) {
     }));
   }
   container.append(fileSection);
-  container.append(renderRepairChain(record, chainResult.data), action('查看此 S/N 的 DBN', () => {detail.close(); return openWorkspace('dbn', record.serial_no);}));
+  if (chainResult.error) container.append(element('p', 'notice', '送修鏈讀取失敗：' + chainResult.error + '；不能確認是否可刪除或結案。'));
+  else container.append(renderRepairChain(record, chainResult.data));
+  if (meta.error || chainResult.error) container.append(action('重新讀取詳細資料', () => openDetail(record.id)));
+  container.append(action('查看此 S/N 的 DBN', () => {detail.close(); return openWorkspace('dbn', record.serial_no);}));
   if (record.current_status === '取回驗證') {
     const resolve = element('section', 'detail-section'); resolve.append(element('h3', '', '驗證結果'));
     const passButton = action('PASS・成功維修', async () => {
@@ -538,7 +561,7 @@ async function renderDetailFeatures(record, container, stillCurrent) {
       await refreshFeatures(); await openDetail(record.id);
     });
     const failButton = action('FAIL・建立下一筆維修', () => retryRepair(record), 'button danger');
-    passButton.disabled = failButton.disabled = record.repair_amount == null;
+    passButton.disabled = failButton.disabled = record.repair_amount == null || Boolean(chainResult.error);
     resolve.append(passButton, failButton);
     if (record.repair_amount == null) resolve.append(element('p', 'hint', '金額未設定，請先補齊價格，在編輯案件時勾選「重新套用目前價目」並儲存，再結案。'));
     container.append(resolve);
@@ -548,9 +571,9 @@ async function renderDetailFeatures(record, container, stillCurrent) {
     await api('/api/repairs/records/' + encodeURIComponent(record.id), 'DELETE', {expected_version:record.version});
     detail.close(); selectedRecord = null; await refreshFeatures();
   }, 'button danger');
-  deleteButton.disabled = chainResult.data.length > 1;
+  deleteButton.disabled = chainResult.data.length > 1 || Boolean(chainResult.error) || Boolean(meta.error);
   container.append(deleteButton);
-  if (deleteButton.disabled) container.append(element('p', 'hint', '此案屬於連續送修鏈，不能單獨刪除，以保留各輪追溯關係。'));
+  if (chainResult.data.length > 1) container.append(element('p', 'hint', '此案屬於連續送修鏈，不能單獨刪除，以保留各輪追溯關係。'));
 }
 
 function renderRepairChain(record, rows) {
@@ -664,7 +687,8 @@ function renderStatistics(result, container) {
   amountCard.append(legend);
   const amountsTable = element('details', 'stats-data'); amountsTable.append(element('summary', '', '查看金額明細'), table(['期間', ...labels], Object.entries(result.amounts_cents).map(([period, amounts]) => [period, ...labels.map(label => (amounts[label] / 100).toLocaleString('zh-TW'))]))); amountCard.append(amountsTable);
   grid.append(frequencyCard, amountCard); container.append(grid);
-  const ranking = byId('ranking-sort').value === 'asc' ? [...result.ranking].sort((a,b) => a.count - b.count || a.machine.localeCompare(b.machine)) : result.ranking;
+  const direction = byId('ranking-sort').value === 'asc' ? 1 : -1;
+  const ranking = [...result.ranking].sort((a,b) => direction * (a.count - b.count) || a.machine.localeCompare(b.machine, 'en', {numeric:true}));
   let rank = 0, last = null;
   const rankingCard = card('機台損壞次數排名', '依損壞日期；同一段連續維修只計一次', `共 ${ranking.length} 台機台`);
   rankingCard.className = 'stats-card machine-ranking';

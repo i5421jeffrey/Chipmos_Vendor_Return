@@ -61,6 +61,26 @@ class FeatureTests(unittest.TestCase):
         self.assertEqual(service.list_records(self.path, {'q':['T5377S']})['total'], 21)
         self.assertEqual(service.list_records(self.path, {'q':['RTE']})['total'], 21)
         self.assertEqual(service.list_records(self.path, {'q':['板修']})['total'], 21)
+        self.assertEqual(service.list_records(self.path, {'q':['BPR-030837']})['total'], 21)
+
+    def test_dbn_search_covers_original_issue_dut_and_local_identity_fields(self):
+        ops.save_dbn(self.path, dbn())
+        for term in ('Group', '1-4', 'CP1', 'BPR-030837', 'T5377S', 'F45', 'jaa118'):
+            with self.subTest(term=term):
+                self.assertEqual(ops.list_dbn(self.path, {'q':[term]})['total'], 1)
+        self.assertEqual(ops.list_dbn(self.path, {'q':['%_']})['total'], 0)
+
+    def test_imported_timestamps_sort_by_instant_not_timezone_text(self):
+        first = service.save_record(self.path, example())['data']
+        second = service.save_record(self.path, example())['data']
+        dbn_first = ops.save_dbn(self.path, dbn())['data']
+        dbn_second = ops.save_dbn(self.path, dbn())['data']
+        with connect(self.path) as connection:
+            for table, ids in (('repair_records', [first['id'], second['id']]), ('dbn_records', [dbn_first['id'], dbn_second['id']])):
+                connection.execute(f'UPDATE {table} SET created_at=? WHERE id=?', ('2026-11-02T10:00:00+08:00', ids[0]))
+                connection.execute(f'UPDATE {table} SET created_at=? WHERE id=?', ('2026-11-02T03:00:00Z', ids[1]))
+        self.assertEqual(service.list_records(self.path, {})['data'][0]['id'], second['id'])
+        self.assertEqual(ops.list_dbn(self.path, {})['data'][0]['id'], dbn_second['id'])
 
     def test_history_filters_taipei_boundaries_and_change_search(self):
         with connect(self.path) as connection:

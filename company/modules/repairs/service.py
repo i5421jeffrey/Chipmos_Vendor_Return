@@ -71,7 +71,7 @@ def list_records(path, query):
         arguments.append(normalize_serial(serial))
     if text:
         text = "%" + text.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%"
-        fields = ('serial_no', 'description', 'machine_code', 'model', 'failure_description', 'failure_tag', 'repair_type')
+        fields = ('serial_no', 'description', 'board_part_code', 'machine_code', 'model', 'failure_description', 'failure_tag', 'repair_type')
         where.append('(' + ' OR '.join(field + " LIKE ? ESCAPE '\\'" for field in fields) + ')')
         arguments.extend([text] * len(fields))
     if status:
@@ -94,7 +94,7 @@ def list_records(path, query):
         counts = {row["current_status"]: row["count"] for row in connection.execute(
             "SELECT current_status, count(*) AS count FROM repair_records GROUP BY current_status")}
         page = min(page, max(1, (total + 19) // 20))
-        rows = connection.execute("SELECT * FROM repair_records" + condition + " ORDER BY occurred_on DESC, created_at DESC, id LIMIT 20 OFFSET ?",
+        rows = connection.execute("SELECT * FROM repair_records" + condition + " ORDER BY occurred_on DESC, julianday(created_at) DESC, id LIMIT 20 OFFSET ?",
                                   [*arguments, (page - 1) * 20]).fetchall()
         data = []
         for row in rows:
