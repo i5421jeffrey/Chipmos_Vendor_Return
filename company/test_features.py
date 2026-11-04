@@ -229,8 +229,37 @@ class FeatureTests(unittest.TestCase):
         self.assertEqual(ops.attachment_metadata(self.path, child['id'])['data']['file_size'], 7)
         with self.assertRaises(APIError):
             ops.delete(self.path, 'records', row['id'], {'expected_version':3})
+        ops.delete(self.path, 'records', child['id'], {'expected_version':1})
+        self.assertEqual(service.record_detail(self.path, row['id'])['data']['current_status'], '結案（FAIL）')
+        with connect(self.path) as connection:
+            self.assertEqual(connection.execute('SELECT count(*) FROM repair_attachments WHERE repair_record_id=?', (child['id'],)).fetchone()[0], 0)
+        ops.delete(self.path, 'records', row['id'], {'expected_version':3})
+
+    def test_three_rounds_delete_tail_first_preserves_parent_and_audit(self):
+        first = self.ready()
+        second = ops.resolve(self.path, first['id'], dict(expected_version=2, passed=False, repair_type='保固', failure_description='second'))['retry']
+        today = datetime.now(timezone(timedelta(hours=8))).date().isoformat()
+        second = service.save_record(self.path, example(repair_type='保固', expected_version=1, occurred_on=today,
+            current_status='取回驗證', sent_on=today, returned_on=today), second['id'])['data']
+        third = ops.resolve(self.path, second['id'], dict(expected_version=2, passed=False, repair_type='保固', failure_description='third', attachment=upload()))['retry']
+        parent_before = service.record_detail(self.path, second['id'])['data']
+        for record in (first, parent_before):
+            with self.assertRaises(APIError) as caught:
+                ops.delete(self.path, 'records', record['id'], {'expected_version':3})
+            self.assertEqual(caught.exception.status, 409)
         with self.assertRaises(APIError):
-            ops.delete(self.path, 'records', child['id'], {'expected_version':1})
+            ops.delete(self.path, 'records', third['id'], {'expected_version':99})
+        ops.delete(self.path, 'records', third['id'], {'expected_version':1})
+        self.assertEqual(service.record_detail(self.path, second['id'])['data'], parent_before)
+        with connect(self.path) as connection:
+            self.assertEqual(connection.execute('SELECT count(*) FROM repair_attachments').fetchone()[0], 0)
+            self.assertEqual(connection.execute("SELECT count(*) FROM record_change_history WHERE operation='DELETE' AND source_table='repair_attachments'").fetchone()[0], 1)
+        ops.delete(self.path, 'records', second['id'], {'expected_version':3})
+        ops.delete(self.path, 'records', first['id'], {'expected_version':3})
+        self.assertEqual(service.list_records(self.path, {})['total'], 0)
+        with connect(self.path) as connection:
+            self.assertEqual(connection.execute("SELECT count(*) FROM record_change_history WHERE operation='DELETE' AND source_table='repair_records'").fetchone()[0], 3)
+            self.assertEqual(connection.execute('PRAGMA foreign_key_check').fetchall(), [])
 
     def test_retry_failure_rolls_back_both_records(self):
         row = self.ready()

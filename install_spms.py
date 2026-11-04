@@ -18,6 +18,13 @@ from uuid import uuid4
 
 BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管理：本機功能整批對照與交付界線\n'
                                                            '\n'
+                                                           '## 連續送修刪除規則（2026-11-04）\n'
+                                                           '\n'
+                                                           '只能從最後一輪逐筆往前刪除；有後續送修時，介面停用刪除，後端在寫入交易內重新檢查。刪除包含該筆附件並保留刪除異動，不變更前一輪的 '
+                                                           'FAIL '
+                                                           '狀態、日期、版本或金額。鏈／附件查詢失敗或無法確認目前案件時仍禁止刪除。新增三輪倒序刪除、版本衝突、附件及異動測試；不代表 '
+                                                           'Windows 操作驗收。\n'
+                                                           '\n'
                                                            '## SPMS 介面文字整理（2026-11-04）\n'
                                                            '\n'
                                                            '- 日常頁面統一使用 '
@@ -146,7 +153,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                            '`.venv`，也不自動啟動服務、匯入真實舊資料或開放內網。\n'
                                                            '真實來源包與預覽結果只保存在使用者核准的本機資料夾，不放入儲存庫或通用安裝檔；公司正式匯入仍需停止服務、預檢及 '
                                                            '`IMPORT` 確認。\n',
-                                                'sha256': '09f6f2821bb9b67932ac633d8f3f08c773a87ecefea37d33b1b79e4019f1a773'},
+                                                'sha256': '91914da34a71e0e9997f2b9f006ea0b5c6dcb136de0f8496799a20f5a3e78284'},
            'company/README.md': {'content': '# SPMS 公司版：SQLite 離線功能驗收\n'
                                             '\n'
                                             '只使用本機 Python 與 SQLite，不連接或更新 Supabase。尚未開放內網或在公司正式資料庫匯入舊資料。\n'
@@ -191,7 +198,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '- 新增、再次送修與詳細資料共用原版式 Fail Log '
                                             '選檔按鈕，顯示檔名／大小並可清除尚未上傳的選擇；清除選擇不刪除已存附件，格式與容量仍由前後端檢查。\n'
                                             '- 結案：只限「取回驗證」且金額已設定（0 可結案）。PASS 結案；FAIL '
-                                            '與下一筆待送修原子建立，分類、描述、附件獨立，日期由台北當日取得。連續送修鏈可從詳細資料查閱。已結案可編輯基本內容但不能直接重開；連續送修鏈不允許刪除，單獨案件可確認後刪除並移除附件。\n'
+                                            '與下一筆待送修原子建立，分類、描述、附件獨立，日期由台北當日取得。連續送修鏈可從詳細資料查閱。已結案可編輯基本內容但不能直接重開；刪除須從最後一輪逐筆往前，確認後刪除該筆及附件並保留異動，不變更前一輪狀態。\n'
                                             '- '
                                             '統計：按年看各月／按月份看各年；首輪案件計損壞頻率及機台排行，再次送修不重複算損壞次數。各輪結案金額依結案日及維修分類加總，NULL '
                                             '未設定另計，不當成零；提供長條圖及表格。現有統計沒有登入後的人員區分。\n'
@@ -213,8 +220,9 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '- 詳細資料的連續送修歷史逐輪顯示日期、狀態、維修分類、金額、異常類別、描述與該輪附件；標示目前案件，可點選切換，不將同 '
                                             'S/N 的其他獨立送修混入本鏈。只有單筆未結案時顯示「尚無連續送修紀錄」。S/N 主檔表單提供獨立唯讀 PN '
                                             '預覽。此輪畫面仍未經 Windows／視覺驗收。\n'
-                                            '- 再次送修的進行中案件顯示前一輪 FAIL 提醒；連續送修鏈在詳細資料停用刪除按鈕（後端仍檢查）。未設定金額時保留但停用 '
-                                            'PASS／FAIL 按鈕，提示補價後明確重新套用價目；重新計價另有儲存前確認，取消不寫入且保留表單。\n'
+                                            '- 再次送修的進行中案件顯示前一輪 FAIL '
+                                            '提醒；有後續送修時停用刪除按鈕，後端在交易內再次檢查，須先刪最後一輪。未設定金額時保留但停用 PASS／FAIL '
+                                            '按鈕，提示補價後明確重新套用價目；重新計價另有儲存前確認，取消不寫入且保留表單。\n'
                                             '- 離線匯入、SQLite 備份驗證與復原到新檔工具已提供（下方）。`legacy_import.py` 可處理本次核准的 '
                                             '13 份 CSV 與實體附件，保留來源欄位、來源異動、時間、金額及 '
                                             'PIN；公司正式匯入仍須另行確認。程式不會讀雲端取得資料。\n'
@@ -537,7 +545,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '產生；公司版程式更新後必須重新產生。\n'
                                             '安裝測試：`python -m unittest discover -s scripts -p '
                                             '"test_company_installer.py" -v`。\n',
-                                 'sha256': 'e649e51d607404c1a989633e6f9919b6f0ae09fb2321e22deaa42a2546d4b6a4'},
+                                 'sha256': '5e925dda765a8a51882d830493e0c7bbb6dc82b9755e6d417ff6d5e95e2c2dd9'},
            'company/database.py': {'content': '"""Shared SQLite connections and additive, backed-up module '
                                               'migrations."""\n'
                                               'import json\n'
@@ -3660,12 +3668,11 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                                 '            version(row, '
                                                                 "payload.get('expected_version'))\n"
                                                                 "            if kind == 'records' and "
-                                                                "(row['retry_of_record_id'] or "
                                                                 "connection.execute('SELECT 1 FROM "
                                                                 "repair_records WHERE retry_of_record_id=?', "
-                                                                '(identity,)).fetchone()):\n'
+                                                                '(identity,)).fetchone():\n'
                                                                 '                raise '
-                                                                "APIError('此筆屬於連續送修鏈，為保留歷史關聯不允許刪除', 409)\n"
+                                                                "APIError('此筆仍有後續送修，請先從最後一輪開始刪除', 409)\n"
                                                                 "            if kind == 'records':\n"
                                                                 '                meta = '
                                                                 'attachments.metadata(connection, identity)\n'
@@ -4109,7 +4116,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                                 "identity, 'UPDATE' if old else 'INSERT', "
                                                                 'dict(old) if old else None, after)\n'
                                                                 "        return {'data': after}\n",
-                                                     'sha256': '9b8fdd9b2dc63fd818ff14e04911cef9258de21a21a978b59b20057c2e71fdf4'},
+                                                     'sha256': '40d0a82eec1b7c3497c0dfbb5463c1f3cbf6c825c4c2b7369cbc5f176bc952e3'},
            'company/modules/repairs/schema.sql': {'content': 'CREATE TABLE repair_machine_models (\n'
                                                              '    machine_code TEXT PRIMARY KEY,\n'
                                                              '    model TEXT NOT NULL\n'
@@ -5716,9 +5723,71 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                    '        with self.assertRaises(APIError):\n'
                                                    "            ops.delete(self.path, 'records', row['id'], "
                                                    "{'expected_version':3})\n"
+                                                   "        ops.delete(self.path, 'records', child['id'], "
+                                                   "{'expected_version':1})\n"
+                                                   '        '
+                                                   'self.assertEqual(service.record_detail(self.path, '
+                                                   "row['id'])['data']['current_status'], '結案（FAIL）')\n"
+                                                   '        with connect(self.path) as connection:\n'
+                                                   "            self.assertEqual(connection.execute('SELECT "
+                                                   'count(*) FROM repair_attachments WHERE '
+                                                   "repair_record_id=?', (child['id'],)).fetchone()[0], 0)\n"
+                                                   "        ops.delete(self.path, 'records', row['id'], "
+                                                   "{'expected_version':3})\n"
+                                                   '\n'
+                                                   '    def '
+                                                   'test_three_rounds_delete_tail_first_preserves_parent_and_audit(self):\n'
+                                                   '        first = self.ready()\n'
+                                                   "        second = ops.resolve(self.path, first['id'], "
+                                                   "dict(expected_version=2, passed=False, repair_type='保固', "
+                                                   "failure_description='second'))['retry']\n"
+                                                   '        today = '
+                                                   'datetime.now(timezone(timedelta(hours=8))).date().isoformat()\n'
+                                                   '        second = service.save_record(self.path, '
+                                                   "example(repair_type='保固', expected_version=1, "
+                                                   'occurred_on=today,\n'
+                                                   "            current_status='取回驗證', sent_on=today, "
+                                                   "returned_on=today), second['id'])['data']\n"
+                                                   "        third = ops.resolve(self.path, second['id'], "
+                                                   "dict(expected_version=2, passed=False, repair_type='保固', "
+                                                   "failure_description='third', "
+                                                   "attachment=upload()))['retry']\n"
+                                                   '        parent_before = service.record_detail(self.path, '
+                                                   "second['id'])['data']\n"
+                                                   '        for record in (first, parent_before):\n'
+                                                   '            with self.assertRaises(APIError) as caught:\n'
+                                                   "                ops.delete(self.path, 'records', "
+                                                   "record['id'], {'expected_version':3})\n"
+                                                   '            self.assertEqual(caught.exception.status, '
+                                                   '409)\n'
                                                    '        with self.assertRaises(APIError):\n'
                                                    "            ops.delete(self.path, 'records', "
-                                                   "child['id'], {'expected_version':1})\n"
+                                                   "third['id'], {'expected_version':99})\n"
+                                                   "        ops.delete(self.path, 'records', third['id'], "
+                                                   "{'expected_version':1})\n"
+                                                   '        '
+                                                   'self.assertEqual(service.record_detail(self.path, '
+                                                   "second['id'])['data'], parent_before)\n"
+                                                   '        with connect(self.path) as connection:\n'
+                                                   "            self.assertEqual(connection.execute('SELECT "
+                                                   "count(*) FROM repair_attachments').fetchone()[0], 0)\n"
+                                                   '            self.assertEqual(connection.execute("SELECT '
+                                                   'count(*) FROM record_change_history WHERE '
+                                                   "operation='DELETE' AND "
+                                                   'source_table=\'repair_attachments\'").fetchone()[0], 1)\n'
+                                                   "        ops.delete(self.path, 'records', second['id'], "
+                                                   "{'expected_version':3})\n"
+                                                   "        ops.delete(self.path, 'records', first['id'], "
+                                                   "{'expected_version':3})\n"
+                                                   '        self.assertEqual(service.list_records(self.path, '
+                                                   "{})['total'], 0)\n"
+                                                   '        with connect(self.path) as connection:\n'
+                                                   '            self.assertEqual(connection.execute("SELECT '
+                                                   'count(*) FROM record_change_history WHERE '
+                                                   "operation='DELETE' AND "
+                                                   'source_table=\'repair_records\'").fetchone()[0], 3)\n'
+                                                   "            self.assertEqual(connection.execute('PRAGMA "
+                                                   "foreign_key_check').fetchall(), [])\n"
                                                    '\n'
                                                    '    def '
                                                    'test_retry_failure_rolls_back_both_records(self):\n'
@@ -6109,7 +6178,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                    '\n'
                                                    "if __name__ == '__main__':\n"
                                                    '    unittest.main()\n',
-                                        'sha256': 'b38280d7b1a3b6132cc280c48b407a284ce61447e4b447ef713a2daf9c01b887'},
+                                        'sha256': 'e3eb5eebb678139b3cb9827759642812dc280fab48de837d455df649e22c53ae'},
            'company/test_import_data.py': {'content': 'import json\n'
                                                       'import sqlite3\n'
                                                       'import unittest\n'
@@ -8189,19 +8258,22 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   "  const deleteButton = writeAction('刪除此筆送修', async () => "
                                                   '{\n'
                                                   '    if (!window.confirm(`永久刪除 ${record.serial_no} '
-                                                  '的這筆送修及附件？連續送修鏈不允許刪除。`)) return;\n'
+                                                  '的這筆送修及附件？刪除後無法復原，前一輪狀態不會改變。`)) return;\n'
                                                   "    await api('/api/repairs/records/' + "
                                                   "encodeURIComponent(record.id), 'DELETE', "
                                                   '{expected_version:record.version});\n'
                                                   '    detail.close(); selectedRecord = null; await '
                                                   'refreshFeatures();\n'
                                                   "  }, 'button danger');\n"
-                                                  '  deleteButton.disabled = chainResult.data.length > 1 || '
+                                                  '  const hasFollowing = chainResult.data.some(row => '
+                                                  'row.retry_of_record_id === record.id);\n'
+                                                  '  const chainKnown = chainResult.data.some(row => row.id '
+                                                  '=== record.id);\n'
+                                                  '  deleteButton.disabled = hasFollowing || !chainKnown || '
                                                   'Boolean(chainResult.error) || Boolean(meta.error);\n'
                                                   '  container.append(deleteButton);\n'
-                                                  '  if (chainResult.data.length > 1) '
-                                                  "container.append(element('p', 'hint', "
-                                                  "'此案屬於連續送修鏈，不能單獨刪除，以保留各輪追溯關係。'));\n"
+                                                  "  if (hasFollowing) container.append(element('p', 'hint', "
+                                                  "'此筆仍有後續送修，請先從最後一輪開始刪除。'));\n"
                                                   '}\n'
                                                   '\n'
                                                   'function renderRepairChain(record, rows) {\n'
@@ -8438,7 +8510,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   '= index + 1; last = row.count; return [rank, row.machine, '
                                                   'row.count];}))); container.append(rankingCard);\n'
                                                   '}\n',
-                                       'sha256': '10024386ab55748d3d154abd6bfb2ddb186d59bcffb70027d5a2d5031057a2d7'},
+                                       'sha256': 'b91a7f5ae31209b18ad1a563df6cb630a46dfa9f2df8a1a6f1932ece7502e3b4'},
            'company/web/index.html': {'content': '<!doctype html>\n'
                                                  '<html lang="zh-Hant">\n'
                                                  '<head>\n'
@@ -10303,7 +10375,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                 '@media(max-width:600px){main{margin:25px auto;padding:0 '
                                                 '16px}h1{font-size:22px}section{padding:18px}dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:10px}}\n',
                                      'sha256': '064406c8758be5620dfe7440f59d59ec1de5f6307e74f5bad85dd03e018c0769'}},
- 'version': '2026-11-04-spms-ui'}
+ 'version': '2026-11-04-tail-delete'}
 
 
 def check_local_path(path):

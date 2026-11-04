@@ -576,13 +576,15 @@ async function renderDetailFeatures(record, container, stillCurrent) {
     container.append(resolve);
   }
   const deleteButton = writeAction('刪除此筆送修', async () => {
-    if (!window.confirm(`永久刪除 ${record.serial_no} 的這筆送修及附件？連續送修鏈不允許刪除。`)) return;
+    if (!window.confirm(`永久刪除 ${record.serial_no} 的這筆送修及附件？刪除後無法復原，前一輪狀態不會改變。`)) return;
     await api('/api/repairs/records/' + encodeURIComponent(record.id), 'DELETE', {expected_version:record.version});
     detail.close(); selectedRecord = null; await refreshFeatures();
   }, 'button danger');
-  deleteButton.disabled = chainResult.data.length > 1 || Boolean(chainResult.error) || Boolean(meta.error);
+  const hasFollowing = chainResult.data.some(row => row.retry_of_record_id === record.id);
+  const chainKnown = chainResult.data.some(row => row.id === record.id);
+  deleteButton.disabled = hasFollowing || !chainKnown || Boolean(chainResult.error) || Boolean(meta.error);
   container.append(deleteButton);
-  if (chainResult.data.length > 1) container.append(element('p', 'hint', '此案屬於連續送修鏈，不能單獨刪除，以保留各輪追溯關係。'));
+  if (hasFollowing) container.append(element('p', 'hint', '此筆仍有後續送修，請先從最後一輪開始刪除。'));
 }
 
 function renderRepairChain(record, rows) {

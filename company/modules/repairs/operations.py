@@ -294,8 +294,8 @@ def delete(path, kind, identity, payload):
                 table = 'legacy_dbn_records'
             row = get_row(connection, table, identity)
             version(row, payload.get('expected_version'))
-            if kind == 'records' and (row['retry_of_record_id'] or connection.execute('SELECT 1 FROM repair_records WHERE retry_of_record_id=?', (identity,)).fetchone()):
-                raise APIError('此筆屬於連續送修鏈，為保留歷史關聯不允許刪除', 409)
+            if kind == 'records' and connection.execute('SELECT 1 FROM repair_records WHERE retry_of_record_id=?', (identity,)).fetchone():
+                raise APIError('此筆仍有後續送修，請先從最後一輪開始刪除', 409)
             if kind == 'records':
                 meta = attachments.metadata(connection, identity)
                 if meta:

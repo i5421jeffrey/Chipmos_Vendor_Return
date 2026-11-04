@@ -172,9 +172,16 @@ function assert(ok, message) {if (!ok) throw Error(message);}
   assert(featureContainer.textContent.includes('上次維修未完成'), 'Active retries visibly warn of preceding FAIL');
   const resolveSection = featureContainer.children.find(node => node.textContent.includes('驗證結果'));
   assert(resolveSection.children.filter(node => node.tag === 'button').every(node => node.disabled), 'Unset price blocks both verification outcomes');
-  assert(featureContainer.children.find(node => node.textContent === '刪除此筆送修').disabled, 'Retry chains visibly disable unsupported deletion');
+  assert(!featureContainer.children.find(node => node.textContent === '刪除此筆送修').disabled, 'Last retry round permits deletion');
+  const parentContainer = new TestNode();
+  await renderDetailFeatures(featureChain[0], parentContainer, () => true);
+  assert(parentContainer.children.find(node => node.textContent === '刪除此筆送修').disabled && parentContainer.textContent.includes('最後一輪'), 'Earlier rounds require deleting the tail first');
+  featureChain = [featureChain[0]];
+  const remainingContainer = new TestNode();
+  await renderDetailFeatures(featureChain[0], remainingContainer, () => true);
+  assert(!remainingContainer.children.find(node => node.textContent === '刪除此筆送修').disabled, 'Previous round becomes deletable once the next round is removed');
   const staleContainer = new TestNode();
-  await renderDetailFeatures(featureChain[1], staleContainer, () => false);
+  await renderDetailFeatures(featureChain[0], staleContainer, () => false);
   assert(!staleContainer.children.length, 'Late detail feature responses cannot populate a different record');
   featureChain = null;
   assert(nodes['record-detail'].open, 'Right-side detail opens');
