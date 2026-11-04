@@ -336,7 +336,7 @@ class Handler(BaseHTTPRequestHandler):
 def startup_options(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8765)
-    parser.add_argument('--host', help='Specific private IPv4 address; omitted uses approved 10.1.121.135 LAN profile; use 127.0.0.1 for local-only access')
+    parser.add_argument('--host', help='Specific private IPv4 address; omitted uses approved 10.1.121.61 LAN profile; use 127.0.0.1 for local-only access')
     parser.add_argument('--client-subnet', action='append', default=[], help='Allowed IPv4 CIDR; repeat for multiple IT-approved subnets')
     parser.add_argument('--tls-cert', type=Path, help='IT-issued PEM certificate with IP subjectAltName')
     parser.add_argument('--tls-key', type=Path, help='Protected PEM private key; never package or commit')
@@ -345,7 +345,7 @@ def startup_options(argv=None):
     # User-approved host profile. An explicit --host does not inherit its
     # plaintext acknowledgement or subnet; custom LANs remain explicit.
     if args.host is None:
-        args.host = '10.1.121.135'
+        args.host = '10.1.121.61'
         if not args.client_subnet:
             args.client_subnet = ['10.1.121.0/24']
         if not args.tls_cert and not args.tls_key:

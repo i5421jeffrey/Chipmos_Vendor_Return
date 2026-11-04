@@ -12,6 +12,8 @@
 
 ## Company-local staged migration
 
+- Latest user host override: default SPMS test host is now `10.1.121.61` (supersedes `.135` below), with the same HTTP port 8765 and `10.1.121.0/24` allowlist. Copying a test host requires a stopped-service full data copy, new-machine venv recreation and pre-start verification; never run diverging copies as simultaneous production writers or claim that a changed IP fixes Proxy/firewall restrictions.
+
 - Subsequent explicit user override: no-argument `company/server.py` now uses the approved HTTP host profile `10.1.121.135:8765` and `10.1.121.0/24`. This supersedes older localhost-default wording below. Use `--host 127.0.0.1` for local-only startup. Explicit alternative hosts still require explicit client subnets and TLS or HTTP acknowledgement. Do not silently fall back when the configured IP is unavailable; this does not fix company Proxy/firewall policy.
 
 - `company/server.py` uses only Python's standard library and host SQLite, with no Supabase connection. Run `python company/server.py` from the repository root. `/` is the SPMS landing page; `/repairs/` is the spare-parts module. Machine maintenance is reserved, not installed. Default bind remains localhost. The user approved the existing Windows 11 host for about 10 LAN users with IT permission: explicit private IPv4 `--host`, repeated `--client-subnet`, and TLS cert/key or explicit `--allow-http-lan` are supported. See `company/LAN_SETUP.md`; never open wildcard/public listeners or automatically change firewall/tasks. Shared-password unlocking is not individual authentication; LAN reads are open within allowed subnets. Real Windows deployment/load, certificates, scheduled backups and service startup remain IT work, not verified by loopback tests.
