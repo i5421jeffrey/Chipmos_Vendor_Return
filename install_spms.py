@@ -18,6 +18,16 @@ from uuid import uuid4
 
 BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管理：本機功能整批對照與交付界線\n'
                                                            '\n'
+                                                           '## 核准內網共用（2026-11-04）\n'
+                                                           '\n'
+                                                           '使用者確認 Windows 11 現有電腦作主機、約 10 人、IT '
+                                                           '允許內網與防火牆設定。新增指定私有 IPv4、來源 CIDR 白名單、精確 '
+                                                           'Host／同源寫入、HTTPS 憑證參數及明確 HTTP 明文風險選項；預設仍為 '
+                                                           'localhost。SQLite 仍只存主機，不作共享磁碟資料庫。`LAN_SETUP.md` '
+                                                           '提供限縮防火牆、IT 憑證、啟動／工作排程器與備份指引；程式不自動更改 Windows '
+                                                           '設定。模擬十個 HTTP 用戶同案衝突及 TLS 測試不等於 Windows '
+                                                           '真實網路／持續負載驗收，並非公開網站或高可用服務。\n'
+                                                           '\n'
                                                            '## 連續送修刪除規則（2026-11-04）\n'
                                                            '\n'
                                                            '只能從最後一輪逐筆往前刪除；有後續送修時，介面停用刪除，後端在寫入交易內重新檢查。刪除包含該筆附件並保留刪除異動，不變更前一輪的 '
@@ -125,8 +135,10 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                            '為唯讀來源封存，不是新業務欄位；`repair_machines/repair_models` '
                                                            '僅完整封存，非另一套維護介面。詳見 README。不是通用 SQL dump／任意 CSV '
                                                            '轉換或增量同步；手動匯出亦未證明雲端最新完整快照。\n'
-                                                           '5. **正式內網、服務啟動管理、排程／異地備份仍未部署**。只監聽 '
-                                                           'localhost；不可自行改綁定位址或開防火牆作正式服務。需 IT 核准與主機設定。\n'
+                                                           '5. **實際內網、服務啟動管理、排程／異地備份仍待公司配置**。使用者已確認 IT '
+                                                           '核准；程式提供明確內網設定與部署指引，預設仍只監聽 localhost。需取得實際 '
+                                                           'IP／網段、配置憑證或明確接受 HTTP '
+                                                           '風險及限縮防火牆；不宣稱已完成公司部署或十人負載驗收。\n'
                                                            '6. 機台保養模組仍僅預留，不在目前備品優先範圍。\n'
                                                            '7. 第二輪 '
                                                            'PASS、統計、主檔同步、人工復原及本輪畫面仍未通過公司驗收；使用者要求最後統一驗收，不將開發自動測試當作代替。\n'
@@ -153,10 +165,146 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                            '`.venv`，也不自動啟動服務、匯入真實舊資料或開放內網。\n'
                                                            '真實來源包與預覽結果只保存在使用者核准的本機資料夾，不放入儲存庫或通用安裝檔；公司正式匯入仍需停止服務、預檢及 '
                                                            '`IMPORT` 確認。\n',
-                                                'sha256': '91914da34a71e0e9997f2b9f006ea0b5c6dcb136de0f8496799a20f5a3e78284'},
+                                                'sha256': '974d43944a610d426f138cd783b9c7a083debca5efcc40aef1e8ce23d69434b0'},
+           'company/LAN_SETUP.md': {'content': '# SPMS：Windows 11 內網共用\n'
+                                               '\n'
+                                               '使用者已確認目前電腦作主機、預計 10 人使用、IT '
+                                               '允許內網及防火牆設定。本文件是部署步驟，不代表已在公司操作或通過實際負載測試。\n'
+                                               '\n'
+                                               '## 架構與限制\n'
+                                               '\n'
+                                               '- 只有主機執行一個 Python 服務；同事只開瀏覽器，**不各自安裝資料庫或開啟共享 SQLite 檔**。\n'
+                                               '- 沿用 '
+                                               '`D:\\Python\\SPMS\\company\\data\\spms.sqlite3`、附件及編輯密碼，不重新匯入。不放 '
+                                               'OneDrive、網路磁碟或 SMB 共享目錄。\n'
+                                               '- SQLite WAL 允許多人讀取，寫入會依序交易；版本衝突要求重新載入，不會自動覆寫或重送。10 個模擬 HTTP '
+                                               '用戶同時改一案的測試，不等於 10 人實際業務效能驗收。\n'
+                                               '- 共用密碼僅防誤觸，無個人帳號／具名稽核；**允許的網段內未解鎖者仍能讀取紀錄和附件**。IT '
+                                               '必須評估網段成員與資料敏感度。\n'
+                                               '- 標準庫 HTTP server 是輕量內部服務，不是公開網站伺服器；沒有完整的連線配額、DDoS 防護、高可用或 '
+                                               'Windows Service 管理。只用於受信任內網；不可開路由器轉送、公開 IP、外網或訪客網段。\n'
+                                               '- 只接受指定 RFC1918 IPv4 綁定、來源網段白名單及精確 Host／Origin；不接受 '
+                                               '`0.0.0.0`，也不信任轉送來源標頭。現階段網址用該主機 IP，不另設別名／反向代理。\n'
+                                               '\n'
+                                               '## 1. 主機資料（先取得，不猜網段）\n'
+                                               '\n'
+                                               '在主機 PowerShell 執行：\n'
+                                               '\n'
+                                               '```powershell\n'
+                                               'ipconfig\n'
+                                               'Get-NetConnectionProfile\n'
+                                               '```\n'
+                                               '\n'
+                                               '取正在使用的網卡之 **IPv4 位址、子網路遮罩**；不要貼無關的 VPN／虛擬網卡。請 IT 確認允許同事連入的 '
+                                               'CIDR 網段、固定 IP 或 DHCP 保留，以及 Domain／Private 防火牆設定檔。相同 Wi-Fi '
+                                               '名稱不保證可互連，VPN／VLAN／無線隔離由 IT 檢查。\n'
+                                               '\n'
+                                               '下列 `192.168.10.20`、`192.168.10.0/24` 都只是範例，**必須替換**；不是所有網段都用 '
+                                               '`/24`。\n'
+                                               '\n'
+                                               '## 2. 更新及啟動（推薦 HTTPS）\n'
+                                               '\n'
+                                               '停止原服務，把新版 `install_spms.py` 放到 `D:\\Python\\SPMS`，在該目錄執行：\n'
+                                               '\n'
+                                               '```powershell\n'
+                                               '.\\.venv\\Scripts\\python.exe .\\install_spms.py --check\n'
+                                               '.\\.venv\\Scripts\\python.exe .\\install_spms.py\n'
+                                               '```\n'
+                                               '\n'
+                                               '確認目標後輸入 '
+                                               '`INSTALL`。安裝器不開防火牆、不啟動服務、不改資料或密碼；不可再匯入已匯入的來源包。網路模式要求已設定編輯密碼，若尚未設定才執行 '
+                                               '`company\\edit_access.py`。\n'
+                                               '\n'
+                                               '請 IT 提供包含主機 IPv4 subjectAltName 的 PEM 憑證／私鑰、在同事電腦信任公司簽發 '
+                                               'CA，將檔案保存在例如 `company\\data\\tls\\`，限制私鑰 NTFS 存取權限。私鑰不得放 '
+                                               'GitHub、公開資料夾或傳給同事；不要要求使用者略過憑證警告。\n'
+                                               '\n'
+                                               '```powershell\n'
+                                               'cd D:\\Python\\SPMS\n'
+                                               '.\\.venv\\Scripts\\python.exe .\\company\\server.py --host '
+                                               '192.168.10.20 --client-subnet 192.168.10.0/24 --tls-cert '
+                                               '.\\company\\data\\tls\\server-cert.pem --tls-key '
+                                               '.\\company\\data\\tls\\server-key.pem\n'
+                                               '```\n'
+                                               '\n'
+                                               'TLS 最低 1.2；讀取憑證失敗會停止，不會自動退回 HTTP。多個核准網段可重複 '
+                                               '`--client-subnet`。\n'
+                                               '\n'
+                                               '### 暫用 HTTP 的風險與明確選項\n'
+                                               '\n'
+                                               '沒有憑證時，不會預設開放明文內網。**HTTP 會明文傳送共用密碼、編輯 '
+                                               'token、紀錄及附件**；同網路遭監聽時，密碼雜湊存檔也無法保護傳輸。只有 IT '
+                                               '明確接受此傳輸風險且網段可信任時，才改用：\n'
+                                               '\n'
+                                               '```powershell\n'
+                                               '.\\.venv\\Scripts\\python.exe .\\company\\server.py --host '
+                                               '192.168.10.20 --client-subnet 192.168.10.0/24 '
+                                               '--allow-http-lan\n'
+                                               '```\n'
+                                               '\n'
+                                               '未帶網路參數的原命令仍只監聽 `127.0.0.1`，可以作為立即停用內網的方式。綁定內網 IP '
+                                               '時，主機也須使用內網網址；`127.0.0.1` 不再是該服務的監聽位址。\n'
+                                               '\n'
+                                               '## 3. 限縮防火牆（由 IT／系統管理員執行）\n'
+                                               '\n'
+                                               '先看目前設定檔與既有規則。不要關閉防火牆、改安全政策或接受全網段 Python 自動放行；若已有廣泛允許 '
+                                               'Python／8765 的規則，請 IT 審查限縮，新增窄規則不會抵消舊的廣泛規則。\n'
+                                               '\n'
+                                               '管理員 PowerShell，先填真實核准值：\n'
+                                               '\n'
+                                               '```powershell\n'
+                                               "$ServerIP = '192.168.10.20'\n"
+                                               "$ClientSubnet = '192.168.10.0/24'\n"
+                                               "$Python = 'D:\\Python\\SPMS\\.venv\\Scripts\\python.exe'\n"
+                                               "New-NetFirewallRule -DisplayName 'SPMS TCP 8765' -Direction "
+                                               'Inbound -Action Allow -Protocol TCP -LocalPort 8765 '
+                                               '-LocalAddress $ServerIP -RemoteAddress $ClientSubnet '
+                                               '-Program $Python -Profile Domain,Private\n'
+                                               '```\n'
+                                               '\n'
+                                               '若 Windows 將公司網路列為 Public，先請 IT 確認，不自行改網路類型或新增 Public '
+                                               '全開規則。若使用不同 port，服務參數、網址與防火牆必須一致。\n'
+                                               '\n'
+                                               '## 4. 同事連線與集中檢查\n'
+                                               '\n'
+                                               '同事不需安裝 Python，使用 Edge／Chrome：\n'
+                                               '\n'
+                                               '```text\n'
+                                               'HTTPS：https://192.168.10.20:8765/repairs/\n'
+                                               'HTTP（僅經風險確認）：http://192.168.10.20:8765/repairs/\n'
+                                               '```\n'
+                                               '\n'
+                                               'PowerShell 可先檢查 TCP（不寫資料）：\n'
+                                               '\n'
+                                               '```powershell\n'
+                                               'Test-NetConnection 192.168.10.20 -Port 8765\n'
+                                               '```\n'
+                                               '\n'
+                                               '集中確認項目：第二台電腦能查詢、附件可讀、預設唯讀、解鎖後正常儲存、兩台同改一案會出現衝突而非覆寫；10 '
+                                               '人同時查詢／儲存與實際網路延遲仍未驗證。確認非核准網段不能連入。不用真實案件製造無法回復的測試異動。\n'
+                                               '\n'
+                                               '連不上：先看主機服務視窗／IP 是否變動、網卡及網段、Domain／Private 設定檔、防火牆與 VLAN。403 '
+                                               '通常要確認網址的 IP／port、Host／Origin 是否一致；不要以放行任意 Host／CORS 解決。\n'
+                                               '\n'
+                                               '## 5. 持續運作與備份\n'
+                                               '\n'
+                                               '- 主機插電、由 IT 設定不休眠及系統更新維護時段；關閉終端會停止目前手動啟動的服務。\n'
+                                               '- 自動啟動可由 IT 在工作排程器建立開機工作：程式指定 venv 的 '
+                                               '`python.exe`，引數使用上面核准的完整啟動參數，開始位置 `D:\\Python\\SPMS`。使用能讀寫 '
+                                               'data／備份、讀取私鑰的專用低權限本機身分；不要以管理員執行網站。設定「不要啟動新的執行個體」及失敗重啟，延遲啟動以等待網卡，保留錯誤記錄。不要另開第二個手動服務。這些工作不會由安裝器自動建立。\n'
+                                               '- 使用 `maintenance.py backup` 的 SQLite backup API，包含已提交 WAL '
+                                               '與附件。排程／異地副本與保留天數由 IT 管理；密碼設定與 TLS 私鑰在 SQLite '
+                                               '外，須另行保管。不可在運作中只複製 SQLite 主檔。\n'
+                                               '- 資料匯入、更新或復原前先停服務；復原只能到新檔核對，不覆蓋運作中資料庫。不因網路錯誤刪除／重建資料庫。\n'
+                                               '\n'
+                                               '停用內網：Ctrl+C 停服務，由 IT 停用 `SPMS TCP 8765` 規則；改用原本無 `--host` '
+                                               '命令啟動，即只允許本機。若工作排程器已啟用，須同步停用該工作，避免自動重新開放。\n',
+                                    'sha256': 'ab6bc9c92776eed714cc083d1869ec8e0d5674e6e9f0c531b8a23def77b046f9'},
            'company/README.md': {'content': '# SPMS 公司版：SQLite 離線功能驗收\n'
                                             '\n'
-                                            '只使用本機 Python 與 SQLite，不連接或更新 Supabase。尚未開放內網或在公司正式資料庫匯入舊資料。\n'
+                                            '只使用 Python 與主機 SQLite，不連接或更新 Supabase。預設只監聽 localhost；使用者已核准 '
+                                            'Windows 11 主機、約 10 人的內網共用，啟用步驟見 '
+                                            '[LAN_SETUP.md](LAN_SETUP.md)。公司舊資料匯入及 verify 結果已由使用者回報完成，不需重匯。\n'
                                             '已提供共用密碼解鎖編輯，以及核准 CSV／附件的離線轉換、來源封存與副本試匯入；不是個人帳號／角色系統。\n'
                                             '不需安裝第三方套件。目標環境：Windows 11、Python 3.13、現代瀏覽器。\n'
                                             '\n'
@@ -227,8 +375,9 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '13 份 CSV 與實體附件，保留來源欄位、來源異動、時間、金額及 '
                                             'PIN；公司正式匯入仍須另行確認。程式不會讀雲端取得資料。\n'
                                             '- '
-                                            '使用者指定以**共用密碼解鎖編輯防誤觸**，不採個人帳號／角色管理。所有寫入有後端工作階段檢查，但異動不是具名人員稽核；這不是正式內網的身分安全方案。正式內網部署與排程／異地備份、Windows '
-                                            '本輪操作及視覺驗收仍未完成，不得直接開放內網作正式服務。\n'
+                                            '使用者指定以**共用密碼解鎖編輯防誤觸**，不採個人帳號／角色管理。所有寫入有後端工作階段檢查，但異動不是具名人員稽核。內網需明確指定私有 '
+                                            'IP、來源網段，推薦 IT 憑證 HTTPS；HTTP 須明確接受明文風險。實際部署、排程／異地備份、Windows '
+                                            '操作及視覺驗收仍須公司配置與確認，不能公開到網際網路。\n'
                                             '\n'
                                             '內附 `modules/repairs/catalog.json` 為 Git 內兩份已知來源的離線基礎對應，\n'
                                             '來源檔名及 SHA256 記錄於 JSON；不是 Supabase 線上資料快照，也不是完整機台管理清冊。\n'
@@ -353,8 +502,9 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             'SQLite 使用 WAL 模式；運作中不要只複製主資料庫檔來備份。下列備份工具使用 SQLite backup '
                                             'API；排程、保管及異地副本仍須依公司規範設置。\n'
                                             '\n'
-                                            '此階段僅監聽 `127.0.0.1`。不要開防火牆、轉送連接埠或改成對外開放；\n'
-                                            '共用密碼解鎖僅防誤觸，不提供個人角色或具名稽核；正式多人／內網部署尚未完成。保留本機版本衝突保護、交易、升級備份及人工備份／復原驗證。\n'
+                                            '預設僅監聽 `127.0.0.1`；經 IT 核准的內網部署請依 `LAN_SETUP.md` 指定 '
+                                            'IP／網段並限縮防火牆，不可轉送連接埠或對外公開。\n'
+                                            '共用密碼解鎖僅防誤觸，不提供個人角色或具名稽核；網段內預設可瀏覽資料。保留版本衝突保護、交易、升級備份及人工備份／復原驗證；實際十人負載與網路連線尚未驗證。\n'
                                             '停止時若出現錯誤，保留 PowerShell 訊息供排查，不要刪除資料庫重試。\n'
                                             '\n'
                                             '## SQLite 備份、驗證與復原演練\n'
@@ -445,7 +595,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '- 「結束編輯」撤銷 token；有未儲存表單須確認，有正在送出的操作則等完成後再結束。服務重啟、密碼變更或 8 '
                                             '小時到期也會失效。\n'
                                             '- 工作階段到期的寫入不自動重送，表單保留輸入；可按表單內「重新開啟編輯」後自行確認再儲存。\n'
-                                            '- 連續錯誤五次暫停嘗試 30 秒。沒有預設密碼、個人帳號或角色，不能據此識別實際操作人員；仍只限 localhost。\n'
+                                            '- 連續錯誤五次暫停嘗試 30 秒。沒有預設密碼、個人帳號或角色，不能據此識別實際操作人員；預設只限 '
+                                            'localhost，核准內網啟動方式見 `LAN_SETUP.md`。\n'
                                             '\n'
                                             '## 真實 CSV／附件：一次性來源移轉包\n'
                                             '\n'
@@ -545,7 +696,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '產生；公司版程式更新後必須重新產生。\n'
                                             '安裝測試：`python -m unittest discover -s scripts -p '
                                             '"test_company_installer.py" -v`。\n',
-                                 'sha256': '5e925dda765a8a51882d830493e0c7bbb6dc82b9755e6d417ff6d5e95e2c2dd9'},
+                                 'sha256': '5a00f1dee860bb57e31421cb04330950797564499cbc9fc3a72612739a127a70'},
            'company/database.py': {'content': '"""Shared SQLite connections and additive, backed-up module '
                                               'migrations."""\n'
                                               'import json\n'
@@ -4765,7 +4916,9 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             'import argparse\n'
                                             'import base64\n'
                                             'import json\n'
+                                            'import ipaddress\n'
                                             'import sqlite3\n'
+                                            'import ssl\n'
                                             'from contextlib import closing\n'
                                             'from http.server import BaseHTTPRequestHandler, '
                                             'ThreadingHTTPServer\n'
@@ -4780,6 +4933,26 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '\n'
                                             '\n'
                                             'ROOT = Path(__file__).resolve().parent\n'
+                                            'PRIVATE_NETWORKS = tuple(ipaddress.ip_network(value) for value '
+                                            "in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'))\n"
+                                            '\n'
+                                            '\n'
+                                            'def bind_address(value):\n'
+                                            '    address = ipaddress.IPv4Address(value)\n'
+                                            '    if not address.is_loopback and not any(address in network '
+                                            'for network in PRIVATE_NETWORKS):\n'
+                                            "        raise ValueError('host must be a specific private IPv4 "
+                                            "address (not 0.0.0.0 or a public IP)')\n"
+                                            '    return str(address)\n'
+                                            '\n'
+                                            '\n'
+                                            'def client_network(value):\n'
+                                            '    network = ipaddress.IPv4Network(value, strict=True)\n'
+                                            '    if not any(network.subnet_of(private) for private in '
+                                            'PRIVATE_NETWORKS):\n'
+                                            "        raise ValueError('client subnet must be inside 10/8, "
+                                            "172.16/12 or 192.168/16')\n"
+                                            '    return network\n'
                                             'ASSETS = {\n'
                                             '    "/": ("index.html", "text/html; charset=utf-8"),\n'
                                             '    "/index.html": ("index.html", "text/html; charset=utf-8"),\n'
@@ -4846,18 +5019,58 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             'class LocalServer(ThreadingHTTPServer):\n'
                                             '    daemon_threads = True\n'
                                             '\n'
-                                            '    def __init__(self, address, database):\n'
+                                            '    request_queue_size = 32\n'
+                                            '\n'
+                                            '    def __init__(self, address, database, client_networks=(), '
+                                            'tls_context=None):\n'
+                                            '        host = bind_address(address[0])\n'
+                                            '        self.lan = not ipaddress.ip_address(host).is_loopback\n'
+                                            '        self.client_networks = tuple(client_network(str(value)) '
+                                            'for value in client_networks)\n'
+                                            '        if self.lan and not self.client_networks:\n'
+                                            "            raise ValueError('LAN access requires at least one "
+                                            "allowed client subnet')\n"
+                                            "        self.scheme = 'https' if tls_context else 'http'\n"
                                             '        self.database = database\n'
                                             '        self.edit_gate = EditGate(Path(database).parent / '
                                             "'edit-password.json')\n"
-                                            '        super().__init__(address, Handler)\n'
+                                            '        super().__init__((host, address[1]), Handler)\n'
+                                            "        self.allowed_hosts = {f'{host}:{self.server_port}'}\n"
+                                            '        if not self.lan:\n'
+                                            '            '
+                                            "self.allowed_hosts.add(f'localhost:{self.server_port}')\n"
+                                            '        if tls_context:\n'
+                                            '            # Handshake occurs in the request thread, not the '
+                                            'accept loop.\n'
+                                            '            self.tls_context = tls_context\n'
+                                            '        else:\n'
+                                            '            self.tls_context = None\n'
+                                            '\n'
+                                            '    def verify_request(self, request, client_address):\n'
+                                            '        address = ipaddress.ip_address(client_address[0])\n'
+                                            '        return address.version == 4 and (address.is_loopback or '
+                                            'any(address in network for network in self.client_networks))\n'
+                                            '\n'
+                                            '    def finish_request(self, request, client_address):\n'
+                                            '        request.settimeout(15)\n'
+                                            '        if self.tls_context:\n'
+                                            '            try:\n'
+                                            '                with self.tls_context.wrap_socket(request, '
+                                            'server_side=True) as secure:\n'
+                                            '                    self.RequestHandlerClass(secure, '
+                                            'client_address, self)\n'
+                                            '            except (ssl.SSLError, TimeoutError, '
+                                            'ConnectionError):\n'
+                                            '                return\n'
+                                            '        else:\n'
+                                            '            super().finish_request(request, client_address)\n'
                                             '\n'
                                             '\n'
                                             'class Handler(BaseHTTPRequestHandler):\n'
                                             '    def allowed_host(self):\n'
-                                            '        return self.headers.get("Host") in (\n'
-                                            '            f"127.0.0.1:{self.server.server_port}", '
-                                            'f"localhost:{self.server.server_port}")\n'
+                                            "        hosts = self.headers.get_all('Host', [])\n"
+                                            '        return len(hosts) == 1 and hosts[0] in '
+                                            'self.server.allowed_hosts\n'
                                             '\n'
                                             '    def send_json(self, status, payload, head=False):\n'
                                             '        self.send_content(status, json.dumps(payload, '
@@ -4910,6 +5123,9 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '            try:\n'
                                             '                payload = '
                                             'database_status(self.server.database)\n'
+                                            "                payload['access'] = 'lan-allowlist' if "
+                                            "self.server.lan else 'localhost-only'\n"
+                                            "                payload['transport'] = self.server.scheme\n"
                                             '                status = 200\n'
                                             '            except (sqlite3.Error, TypeError, ValueError, '
                                             'OSError):\n'
@@ -5028,12 +5244,14 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '        self.write_record()\n'
                                             '\n'
                                             '    def write_record(self):\n'
+                                            '        body_read = False\n'
                                             '        try:\n'
-                                            '            origins = '
-                                            '(f"http://127.0.0.1:{self.server.server_port}", '
-                                            'f"http://localhost:{self.server.server_port}")\n'
-                                            '            if not self.allowed_host() or '
-                                            'self.headers.get("Origin", origins[0]) not in origins:\n'
+                                            '            expected_origin = '
+                                            'f\'{self.server.scheme}://{self.headers.get("Host", "")}\'\n'
+                                            "            origins = self.headers.get_all('Origin', [])\n"
+                                            '            if not self.allowed_host() or (origins and origins '
+                                            "!= [expected_origin]) or self.headers.get('Sec-Fetch-Site') == "
+                                            "'cross-site':\n"
                                             '                raise APIError("不允許跨網站寫入", 403)\n'
                                             '            if self.headers.get("X-SPMS-Request") != "1":\n'
                                             '                raise APIError("操作驗證失敗，請重新整理頁面後再試", 403)\n'
@@ -5042,6 +5260,9 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '                raise APIError("請使用 JSON 格式", 415)\n'
                                             '            if self.headers.get("Transfer-Encoding"):\n'
                                             '                raise APIError("不支援此傳輸格式", 400)\n'
+                                            "            if len(self.headers.get_all('Content-Length', [])) "
+                                            '!= 1:\n'
+                                            "                raise APIError('內容長度錯誤', 400)\n"
                                             '            try:\n'
                                             '                length = int(self.headers.get("Content-Length", '
                                             '"0"))\n'
@@ -5051,6 +5272,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '                raise APIError("內容大小超過限制或為空", 413)\n'
                                             '            self.connection.settimeout(10)\n'
                                             '            try:\n'
+                                            '                body_read = True\n'
                                             '                raw = self.rfile.read(length)\n'
                                             '                if len(raw) != length:\n'
                                             '                    raise ValueError()\n'
@@ -5127,24 +5349,96 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '            else:\n'
                                             '                raise APIError("此端點不支援寫入", 405)\n'
                                             '        except (APIError, sqlite3.Error) as error:\n'
+                                            '            # Drain a bounded, well-framed rejected body before '
+                                            'closing TLS.\n'
+                                            '            # Otherwise unread POST bytes may reset the socket '
+                                            'and hide the 403.\n'
+                                            '            if not body_read and not '
+                                            "self.headers.get('Transfer-Encoding'):\n"
+                                            '                lengths = '
+                                            "self.headers.get_all('Content-Length', [])\n"
+                                            '                if len(lengths) == 1 and lengths[0].isascii() '
+                                            'and lengths[0].isdigit():\n'
+                                            '                    remaining = int(lengths[0]) if '
+                                            'len(lengths[0]) < 10 else 0\n'
+                                            '                    if 0 < remaining <= 7 * 1024 * 1024 + '
+                                            '65536:\n'
+                                            '                        self.connection.settimeout(2)\n'
+                                            '                        try:\n'
+                                            '                            self.rfile.read(remaining)\n'
+                                            '                        except (OSError, TimeoutError):\n'
+                                            '                            pass\n'
                                             '            self.api_error(error)\n'
                                             '\n'
                                             '\n'
-                                            'def main():\n'
+                                            'def startup_options(argv=None):\n'
                                             '    parser = argparse.ArgumentParser(description=__doc__)\n'
                                             '    parser.add_argument("--port", type=int, default=8765)\n'
-                                            '    args = parser.parse_args()\n'
+                                            "    parser.add_argument('--host', default='127.0.0.1', "
+                                            "help='Specific private IPv4 address; default is loopback "
+                                            "only')\n"
+                                            "    parser.add_argument('--client-subnet', action='append', "
+                                            "default=[], help='Allowed IPv4 CIDR; repeat for multiple "
+                                            "IT-approved subnets')\n"
+                                            "    parser.add_argument('--tls-cert', type=Path, "
+                                            "help='IT-issued PEM certificate with IP subjectAltName')\n"
+                                            "    parser.add_argument('--tls-key', type=Path, help='Protected "
+                                            "PEM private key; never package or commit')\n"
+                                            "    parser.add_argument('--allow-http-lan', "
+                                            "action='store_true', help='Explicitly accept plaintext "
+                                            "transport on the trusted LAN')\n"
+                                            '    args = parser.parse_args(argv)\n'
                                             '    if not 1 <= args.port <= 65535:\n'
                                             '        parser.error("port must be between 1 and 65535")\n'
+                                            '    try:\n'
+                                            '        args.host = bind_address(args.host)\n'
+                                            '        args.client_subnet = [client_network(value) for value '
+                                            'in args.client_subnet]\n'
+                                            '    except ValueError as error:\n'
+                                            '        parser.error(str(error))\n'
+                                            '    if bool(args.tls_cert) != bool(args.tls_key):\n'
+                                            "        parser.error('--tls-cert and --tls-key must be used "
+                                            "together')\n"
+                                            '    args.lan = not ipaddress.ip_address(args.host).is_loopback\n'
+                                            '    if args.lan and not args.client_subnet:\n'
+                                            "        parser.error('LAN access requires --client-subnet')\n"
+                                            '    if args.lan and not args.tls_cert and not '
+                                            'args.allow_http_lan:\n'
+                                            "        parser.error('LAN access requires TLS or explicit "
+                                            "--allow-http-lan acknowledgement of plaintext passwords/data')\n"
+                                            '    return args\n'
+                                            '\n'
+                                            '\n'
+                                            'def main():\n'
+                                            '    args = startup_options()\n'
+                                            '    context = None\n'
+                                            '    if args.tls_cert:\n'
+                                            '        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)\n'
+                                            '        context.minimum_version = ssl.TLSVersion.TLSv1_2\n'
+                                            '        context.load_cert_chain(args.tls_cert, args.tls_key)\n'
                                             '    database = ROOT / "data" / "spms.sqlite3"\n'
+                                            '    if args.lan and not EditGate(database.parent / '
+                                            "'edit-password.json').status()['configured']:\n"
+                                            "        raise SystemExit('Set the edit password with "
+                                            "company/edit_access.py before enabling LAN access.')\n"
                                             '    initialize_database(database)\n'
-                                            '    with LocalServer(("127.0.0.1", args.port), database) as '
-                                            'server:\n'
-                                            '        print(f"SPMS local: http://127.0.0.1:{args.port}", '
+                                            '    with LocalServer((args.host, args.port), database, '
+                                            'args.client_subnet, context) as server:\n'
+                                            '        print(f"SPMS: '
+                                            '{server.scheme}://{args.host}:{args.port}/repairs/", '
                                             'flush=True)\n'
                                             '        print(f"SQLite: {database}", flush=True)\n'
-                                            '        print("Local computer only. Stop with Ctrl+C.", '
-                                            'flush=True)\n'
+                                            '        if args.lan:\n'
+                                            "            print('Allowed client subnets: ' + ', "
+                                            "'.join(map(str, args.client_subnet)), flush=True)\n"
+                                            "            print('LAN only: restrict the firewall to these "
+                                            "subnets. No public port forwarding.', flush=True)\n"
+                                            '            if not context:\n'
+                                            "                print('WARNING: HTTP is plaintext, including "
+                                            'the edit password and records. Use only with IT approval; TLS '
+                                            "is recommended.', flush=True)\n"
+                                            "        print('Stop with Ctrl+C. Keep this host awake. Back up "
+                                            "the database regularly.', flush=True)\n"
                                             '        try:\n'
                                             '            server.serve_forever()\n'
                                             '        except KeyboardInterrupt:\n'
@@ -5153,7 +5447,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '\n'
                                             'if __name__ == "__main__":\n'
                                             '    main()\n',
-                                 'sha256': '27a51205dcfb9a6069bb6e647ab58204e477f8ca8a4531a234432cea6eab78d2'},
+                                 'sha256': '577847915e4d0f0f846c36f078cb304e9bd82ef505be29c1ffad0ad8be5a525a'},
            'company/test_edit_access.py': {'content': 'import json\n'
                                                       'import tempfile\n'
                                                       'import time\n'
@@ -6343,6 +6637,204 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                       "if __name__ == '__main__':\n"
                                                       '    unittest.main()\n',
                                            'sha256': '8eb001c16c15aa65463a04b789a0f6171abe9b73d858c75d559ceaee60718553'},
+           'company/test_lan.py': {'content': '"""Loopback network simulations, not a Windows LAN/firewall '
+                                              'acceptance test."""\n'
+                                              'import concurrent.futures\n'
+                                              'import contextlib\n'
+                                              'import io\n'
+                                              'import json\n'
+                                              'import shutil\n'
+                                              'import ssl\n'
+                                              'import subprocess\n'
+                                              'import tempfile\n'
+                                              'import threading\n'
+                                              'import unittest\n'
+                                              'from pathlib import Path\n'
+                                              'from urllib.error import HTTPError\n'
+                                              'from urllib.request import Request, urlopen\n'
+                                              '\n'
+                                              'from edit_access import configure\n'
+                                              'from server import LocalServer, bind_address, client_network, '
+                                              'initialize_database, startup_options\n'
+                                              'from modules.repairs import service\n'
+                                              'from test_repairs import example\n'
+                                              '\n'
+                                              '\n'
+                                              'class LANOptionsTests(unittest.TestCase):\n'
+                                              '    def test_default_loopback_and_explicit_lan(self):\n'
+                                              '        self.assertEqual(startup_options([]).host, '
+                                              "'127.0.0.1')\n"
+                                              '        args = '
+                                              "startup_options(['--host','192.168.10.20','--client-subnet','192.168.10.0/24','--allow-http-lan'])\n"
+                                              '        self.assertTrue(args.lan)\n'
+                                              '        self.assertEqual(str(args.client_subnet[0]), '
+                                              "'192.168.10.0/24')\n"
+                                              '\n'
+                                              '    def test_reject_unsafe_or_incomplete_options(self):\n'
+                                              "        cases = [ ['--host','0.0.0.0'], ['--host','8.8.8.8'], "
+                                              "['--host','localhost'],\n"
+                                              "                  ['--host','192.168.1.2'], "
+                                              "['--host','192.168.1.2','--client-subnet','192.168.1.0/24'],\n"
+                                              "                  ['--client-subnet','0.0.0.0/0'], "
+                                              "['--client-subnet','192.168.1.2/24'],\n"
+                                              "                  ['--tls-cert','cert.pem'], ['--port','0'] "
+                                              ']\n'
+                                              '        for values in cases:\n'
+                                              '            with self.subTest(values=values), '
+                                              'contextlib.redirect_stderr(io.StringIO()), '
+                                              'self.assertRaises(SystemExit):\n'
+                                              '                startup_options(values)\n'
+                                              '        args = '
+                                              "startup_options(['--host','10.1.1.20','--client-subnet','10.1.1.0/24','--tls-cert','cert.pem','--tls-key','key.pem'])\n"
+                                              '        self.assertTrue(args.lan)\n'
+                                              '\n'
+                                              '    def '
+                                              'test_server_constructor_requires_specific_bind_and_allowlist(self):\n'
+                                              "        for host in ('0.0.0.0','8.8.8.8','192.168.1.10'):\n"
+                                              '            with self.subTest(host=host), '
+                                              'self.assertRaises(ValueError):\n'
+                                              "                LocalServer((host,0),Path('unused.sqlite3'))\n"
+                                              '\n'
+                                              '\n'
+                                              'class LANHTTPTests(unittest.TestCase):\n'
+                                              '    def setUp(self):\n'
+                                              '        folder = tempfile.TemporaryDirectory()\n'
+                                              '        self.addCleanup(folder.cleanup)\n'
+                                              '        self.root = Path(folder.name)\n'
+                                              "        self.database = self.root / 'spms.sqlite3'\n"
+                                              '        initialize_database(self.database)\n'
+                                              '        configure(self.root / '
+                                              "'edit-password.json','test-only')\n"
+                                              '\n'
+                                              '    def start(self, context=None):\n'
+                                              "        server = LocalServer(('127.0.0.1',0), self.database, "
+                                              "[client_network('192.168.10.0/24')], context)\n"
+                                              '        thread = '
+                                              'threading.Thread(target=server.serve_forever, daemon=True)\n'
+                                              '        thread.start()\n'
+                                              '        self.addCleanup(server.server_close)\n'
+                                              '        self.addCleanup(thread.join,5)\n'
+                                              '        self.addCleanup(server.shutdown)\n'
+                                              '        return server\n'
+                                              '\n'
+                                              "    def request(self, server, path, method='GET', body=None, "
+                                              'headers=None, context=None):\n'
+                                              '        defaults = '
+                                              "{'X-SPMS-Request':'1','Content-Type':'application/json'}\n"
+                                              '        defaults.update(headers or {})\n'
+                                              '        url = '
+                                              "f'{server.scheme}://127.0.0.1:{server.server_port}{path}'\n"
+                                              '        request = Request(url, data=json.dumps(body).encode() '
+                                              'if body is not None else None, method=method, '
+                                              'headers=defaults)\n'
+                                              '        try:\n'
+                                              '            with urlopen(request,timeout=10,context=context) '
+                                              'as response:\n'
+                                              '                return response.status,json.load(response)\n'
+                                              '        except HTTPError as error:\n'
+                                              '            with error:\n'
+                                              '                return error.code,json.load(error)\n'
+                                              '\n'
+                                              '    def test_client_filter_and_host_origin_pairing(self):\n'
+                                              '        server = self.start()\n'
+                                              '        '
+                                              "self.assertTrue(server.verify_request(None,('192.168.10.45',1234)))\n"
+                                              '        '
+                                              "self.assertFalse(server.verify_request(None,('192.168.11.45',1234)))\n"
+                                              '        '
+                                              "self.assertFalse(server.verify_request(None,('8.8.8.8',1234)))\n"
+                                              '        '
+                                              "self.assertFalse(server.verify_request(None,('::1',1234)))\n"
+                                              '        # Simulate the exact Host a private-address listener '
+                                              'will accept.\n'
+                                              "        lan_host = f'192.168.10.20:{server.server_port}'\n"
+                                              '        server.allowed_hosts = {lan_host}\n'
+                                              '        '
+                                              "self.assertEqual(self.request(server,'/api/health',headers={'Host':lan_host})[0],200)\n"
+                                              '        server.lan = True\n'
+                                              '        '
+                                              "self.assertEqual(self.request(server,'/api/health',headers={'Host':lan_host})[1]['access'],'lan-allowlist')\n"
+                                              '        '
+                                              "self.assertEqual(self.request(server,'/api/health',headers={'Host':'attacker.example'})[0],403)\n"
+                                              "        for origin in ('http://attacker.example', 'null', "
+                                              "'https://'+lan_host, "
+                                              "'http://localhost:'+str(server.server_port)):\n"
+                                              '            status,_ = '
+                                              "self.request(server,'/api/edit/unlock','POST',{'password':'test-only'}, "
+                                              "{'Host':lan_host,'Origin':origin})\n"
+                                              '            self.assertEqual(status,403)\n'
+                                              '        status,data = '
+                                              "self.request(server,'/api/edit/unlock','POST',{'password':'test-only'}, "
+                                              "{'Host':lan_host,'Origin':'http://'+lan_host})\n"
+                                              '        self.assertEqual(status,200)\n'
+                                              "        self.assertTrue(data['token'])\n"
+                                              '        '
+                                              "self.assertEqual(self.request(server,'/api/edit/unlock','POST',{'password':'test-only'}, "
+                                              "{'Host':lan_host,'Sec-Fetch-Site':'cross-site'})[0],403)\n"
+                                              '\n'
+                                              '    def '
+                                              'test_ten_clients_keep_sessions_and_record_conflicts_isolated(self):\n'
+                                              '        server = self.start()\n'
+                                              '        row = '
+                                              "service.save_record(self.database,example())['data']\n"
+                                              '        barrier = threading.Barrier(10)\n'
+                                              '        def edit(index):\n'
+                                              '            status,data = '
+                                              "self.request(server,'/api/edit/unlock','POST',{'password':'test-only'})\n"
+                                              '            self.assertEqual(status,200)\n'
+                                              "            token = data['token']\n"
+                                              '            barrier.wait(timeout=15)\n'
+                                              '            status,_ = '
+                                              "self.request(server,'/api/repairs/records/'+row['id'],'PUT',\n"
+                                              '                '
+                                              "example(expected_version=1,failure_description=f'client "
+                                              "{index}'),{'X-SPMS-Edit-Token':token})\n"
+                                              '            return token,status\n'
+                                              '        with '
+                                              'concurrent.futures.ThreadPoolExecutor(max_workers=10) as '
+                                              'pool:\n'
+                                              '            results = list(pool.map(edit, range(10)))\n'
+                                              '        self.assertEqual(len({token for token,_ in '
+                                              'results}),10)\n'
+                                              '        self.assertEqual(sorted(status for _,status in '
+                                              'results),[200]+[409]*9)\n'
+                                              '        '
+                                              "self.assertEqual(service.record_detail(self.database,row['id'])['data']['version'],2)\n"
+                                              "        self.request(server,'/api/edit/lock','POST',{}, "
+                                              "{'X-SPMS-Edit-Token':results[0][0]})\n"
+                                              '        server.edit_gate.require(results[1][0])\n'
+                                              '        status,_ = '
+                                              "self.request(server,'/api/repairs/records','POST',example())\n"
+                                              '        self.assertEqual(status,401)\n'
+                                              '\n'
+                                              "    @unittest.skipUnless(shutil.which('openssl'), 'OpenSSL "
+                                              "CLI required for temporary test certificate')\n"
+                                              '    def '
+                                              'test_tls_transport_origin_and_certificate_validation(self):\n'
+                                              "        cert,key = self.root/'cert.pem',self.root/'key.pem'\n"
+                                              '        '
+                                              "subprocess.run(['openssl','req','-x509','-newkey','rsa:2048','-nodes','-days','1',\n"
+                                              '            '
+                                              "'-keyout',str(key),'-out',str(cert),'-subj','/CN=127.0.0.1','-addext','subjectAltName=IP:127.0.0.1'],\n"
+                                              '            check=True,capture_output=True,timeout=30)\n'
+                                              '        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)\n'
+                                              '        context.minimum_version = ssl.TLSVersion.TLSv1_2\n'
+                                              '        context.load_cert_chain(cert,key)\n'
+                                              '        server = self.start(context)\n'
+                                              '        client = '
+                                              'ssl.create_default_context(cafile=str(cert))\n'
+                                              '        '
+                                              "self.assertEqual(self.request(server,'/api/health',context=client)[1]['transport'],'https')\n"
+                                              "        origin = f'https://127.0.0.1:{server.server_port}'\n"
+                                              '        '
+                                              "self.assertEqual(self.request(server,'/api/edit/unlock','POST',{'password':'test-only'},{'Origin':origin},client)[0],200)\n"
+                                              '        '
+                                              "self.assertEqual(self.request(server,'/api/edit/unlock','POST',{'password':'test-only'},{'Origin':origin.replace('https:','http:')},client)[0],403)\n"
+                                              '\n'
+                                              '\n'
+                                              "if __name__ == '__main__':\n"
+                                              '    unittest.main()\n',
+                                   'sha256': '3bbe68b65e12b74fbfbb4a35b6c04be685d01b31ae75b5862447f63946607cac'},
            'company/test_legacy_import.py': {'content': 'import csv\n'
                                                         'import io\n'
                                                         'import json\n'
@@ -10375,7 +10867,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                 '@media(max-width:600px){main{margin:25px auto;padding:0 '
                                                 '16px}h1{font-size:22px}section{padding:18px}dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:10px}}\n',
                                      'sha256': '064406c8758be5620dfe7440f59d59ec1de5f6307e74f5bad85dd03e018c0769'}},
- 'version': '2026-11-04-tail-delete'}
+ 'version': '2026-11-04-lan'}
 
 
 def check_local_path(path):

@@ -3,7 +3,9 @@
 import argparse
 import base64
 import json
+import ipaddress
 import sqlite3
+import ssl
 from contextlib import closing
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -17,6 +19,21 @@ from modules.repairs import operations
 
 
 ROOT = Path(__file__).resolve().parent
+PRIVATE_NETWORKS = tuple(ipaddress.ip_network(value) for value in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'))
+
+
+def bind_address(value):
+    address = ipaddress.IPv4Address(value)
+    if not address.is_loopback and not any(address in network for network in PRIVATE_NETWORKS):
+        raise ValueError('host must be a specific private IPv4 address (not 0.0.0.0 or a public IP)')
+    return str(address)
+
+
+def client_network(value):
+    network = ipaddress.IPv4Network(value, strict=True)
+    if not any(network.subnet_of(private) for private in PRIVATE_NETWORKS):
+        raise ValueError('client subnet must be inside 10/8, 172.16/12 or 192.168/16')
+    return network
 ASSETS = {
     "/": ("index.html", "text/html; charset=utf-8"),
     "/index.html": ("index.html", "text/html; charset=utf-8"),
@@ -70,16 +87,47 @@ def database_status(path):
 class LocalServer(ThreadingHTTPServer):
     daemon_threads = True
 
-    def __init__(self, address, database):
+    request_queue_size = 32
+
+    def __init__(self, address, database, client_networks=(), tls_context=None):
+        host = bind_address(address[0])
+        self.lan = not ipaddress.ip_address(host).is_loopback
+        self.client_networks = tuple(client_network(str(value)) for value in client_networks)
+        if self.lan and not self.client_networks:
+            raise ValueError('LAN access requires at least one allowed client subnet')
+        self.scheme = 'https' if tls_context else 'http'
         self.database = database
         self.edit_gate = EditGate(Path(database).parent / 'edit-password.json')
-        super().__init__(address, Handler)
+        super().__init__((host, address[1]), Handler)
+        self.allowed_hosts = {f'{host}:{self.server_port}'}
+        if not self.lan:
+            self.allowed_hosts.add(f'localhost:{self.server_port}')
+        if tls_context:
+            # Handshake occurs in the request thread, not the accept loop.
+            self.tls_context = tls_context
+        else:
+            self.tls_context = None
+
+    def verify_request(self, request, client_address):
+        address = ipaddress.ip_address(client_address[0])
+        return address.version == 4 and (address.is_loopback or any(address in network for network in self.client_networks))
+
+    def finish_request(self, request, client_address):
+        request.settimeout(15)
+        if self.tls_context:
+            try:
+                with self.tls_context.wrap_socket(request, server_side=True) as secure:
+                    self.RequestHandlerClass(secure, client_address, self)
+            except (ssl.SSLError, TimeoutError, ConnectionError):
+                return
+        else:
+            super().finish_request(request, client_address)
 
 
 class Handler(BaseHTTPRequestHandler):
     def allowed_host(self):
-        return self.headers.get("Host") in (
-            f"127.0.0.1:{self.server.server_port}", f"localhost:{self.server.server_port}")
+        hosts = self.headers.get_all('Host', [])
+        return len(hosts) == 1 and hosts[0] in self.server.allowed_hosts
 
     def send_json(self, status, payload, head=False):
         self.send_content(status, json.dumps(payload, ensure_ascii=False).encode("utf-8"),
@@ -124,6 +172,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/health":
             try:
                 payload = database_status(self.server.database)
+                payload['access'] = 'lan-allowlist' if self.server.lan else 'localhost-only'
+                payload['transport'] = self.server.scheme
                 status = 200
             except (sqlite3.Error, TypeError, ValueError, OSError):
                 payload, status = {"status": "error", "message": "SQLite unavailable"}, 503
@@ -201,9 +251,11 @@ class Handler(BaseHTTPRequestHandler):
         self.write_record()
 
     def write_record(self):
+        body_read = False
         try:
-            origins = (f"http://127.0.0.1:{self.server.server_port}", f"http://localhost:{self.server.server_port}")
-            if not self.allowed_host() or self.headers.get("Origin", origins[0]) not in origins:
+            expected_origin = f'{self.server.scheme}://{self.headers.get("Host", "")}'
+            origins = self.headers.get_all('Origin', [])
+            if not self.allowed_host() or (origins and origins != [expected_origin]) or self.headers.get('Sec-Fetch-Site') == 'cross-site':
                 raise APIError("不允許跨網站寫入", 403)
             if self.headers.get("X-SPMS-Request") != "1":
                 raise APIError("操作驗證失敗，請重新整理頁面後再試", 403)
@@ -211,6 +263,8 @@ class Handler(BaseHTTPRequestHandler):
                 raise APIError("請使用 JSON 格式", 415)
             if self.headers.get("Transfer-Encoding"):
                 raise APIError("不支援此傳輸格式", 400)
+            if len(self.headers.get_all('Content-Length', [])) != 1:
+                raise APIError('內容長度錯誤', 400)
             try:
                 length = int(self.headers.get("Content-Length", "0"))
             except ValueError:
@@ -219,6 +273,7 @@ class Handler(BaseHTTPRequestHandler):
                 raise APIError("內容大小超過限制或為空", 413)
             self.connection.settimeout(10)
             try:
+                body_read = True
                 raw = self.rfile.read(length)
                 if len(raw) != length:
                     raise ValueError()
@@ -263,21 +318,67 @@ class Handler(BaseHTTPRequestHandler):
             else:
                 raise APIError("此端點不支援寫入", 405)
         except (APIError, sqlite3.Error) as error:
+            # Drain a bounded, well-framed rejected body before closing TLS.
+            # Otherwise unread POST bytes may reset the socket and hide the 403.
+            if not body_read and not self.headers.get('Transfer-Encoding'):
+                lengths = self.headers.get_all('Content-Length', [])
+                if len(lengths) == 1 and lengths[0].isascii() and lengths[0].isdigit():
+                    remaining = int(lengths[0]) if len(lengths[0]) < 10 else 0
+                    if 0 < remaining <= 7 * 1024 * 1024 + 65536:
+                        self.connection.settimeout(2)
+                        try:
+                            self.rfile.read(remaining)
+                        except (OSError, TimeoutError):
+                            pass
             self.api_error(error)
 
 
-def main():
+def startup_options(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8765)
-    args = parser.parse_args()
+    parser.add_argument('--host', default='127.0.0.1', help='Specific private IPv4 address; default is loopback only')
+    parser.add_argument('--client-subnet', action='append', default=[], help='Allowed IPv4 CIDR; repeat for multiple IT-approved subnets')
+    parser.add_argument('--tls-cert', type=Path, help='IT-issued PEM certificate with IP subjectAltName')
+    parser.add_argument('--tls-key', type=Path, help='Protected PEM private key; never package or commit')
+    parser.add_argument('--allow-http-lan', action='store_true', help='Explicitly accept plaintext transport on the trusted LAN')
+    args = parser.parse_args(argv)
     if not 1 <= args.port <= 65535:
         parser.error("port must be between 1 and 65535")
+    try:
+        args.host = bind_address(args.host)
+        args.client_subnet = [client_network(value) for value in args.client_subnet]
+    except ValueError as error:
+        parser.error(str(error))
+    if bool(args.tls_cert) != bool(args.tls_key):
+        parser.error('--tls-cert and --tls-key must be used together')
+    args.lan = not ipaddress.ip_address(args.host).is_loopback
+    if args.lan and not args.client_subnet:
+        parser.error('LAN access requires --client-subnet')
+    if args.lan and not args.tls_cert and not args.allow_http_lan:
+        parser.error('LAN access requires TLS or explicit --allow-http-lan acknowledgement of plaintext passwords/data')
+    return args
+
+
+def main():
+    args = startup_options()
+    context = None
+    if args.tls_cert:
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.minimum_version = ssl.TLSVersion.TLSv1_2
+        context.load_cert_chain(args.tls_cert, args.tls_key)
     database = ROOT / "data" / "spms.sqlite3"
+    if args.lan and not EditGate(database.parent / 'edit-password.json').status()['configured']:
+        raise SystemExit('Set the edit password with company/edit_access.py before enabling LAN access.')
     initialize_database(database)
-    with LocalServer(("127.0.0.1", args.port), database) as server:
-        print(f"SPMS local: http://127.0.0.1:{args.port}", flush=True)
+    with LocalServer((args.host, args.port), database, args.client_subnet, context) as server:
+        print(f"SPMS: {server.scheme}://{args.host}:{args.port}/repairs/", flush=True)
         print(f"SQLite: {database}", flush=True)
-        print("Local computer only. Stop with Ctrl+C.", flush=True)
+        if args.lan:
+            print('Allowed client subnets: ' + ', '.join(map(str, args.client_subnet)), flush=True)
+            print('LAN only: restrict the firewall to these subnets. No public port forwarding.', flush=True)
+            if not context:
+                print('WARNING: HTTP is plaintext, including the edit password and records. Use only with IT approval; TLS is recommended.', flush=True)
+        print('Stop with Ctrl+C. Keep this host awake. Back up the database regularly.', flush=True)
         try:
             server.serve_forever()
         except KeyboardInterrupt:

@@ -26,6 +26,7 @@ class InstallerTests(unittest.TestCase):
             "company/data/spms.sqlite3": b"existing database; never open or overwrite",
             "company/data/spms.sqlite3-wal": b"existing WAL",
             "company/data/edit-password.json": b"existing local password hash",
+            "company/data/tls/server-key.pem": b"existing protected TLS private key",
             ".venv/keep.txt": b"existing venv",
             "company/unlisted.txt": b"user work",
         }.items():
@@ -37,6 +38,7 @@ class InstallerTests(unittest.TestCase):
         self.assertEqual((self.base / "company/data/spms.sqlite3").read_bytes(), b"existing database; never open or overwrite")
         self.assertEqual((self.base / "company/data/spms.sqlite3-wal").read_bytes(), b"existing WAL")
         self.assertEqual((self.base / "company/data/edit-password.json").read_bytes(), b"existing local password hash")
+        self.assertEqual((self.base / "company/data/tls/server-key.pem").read_bytes(), b"existing protected TLS private key")
         self.assertEqual((self.base / ".venv/keep.txt").read_bytes(), b"existing venv")
         self.assertEqual((self.base / "company/unlisted.txt").read_bytes(), b"user work")
 
