@@ -23,6 +23,8 @@ class LANOptionsTests(unittest.TestCase):
     def test_approved_default_and_explicit_lan(self):
         default = startup_options([])
         self.assertEqual(default.host, '10.1.121.61')
+        self.assertEqual(default.port, 8085)
+        self.assertEqual(startup_options(['--port','3080']).port, 3080)
         self.assertEqual(list(map(str, default.client_subnet)), ['10.1.121.0/24'])
         self.assertTrue(default.lan)
         self.assertTrue(default.allow_http_lan)

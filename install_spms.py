@@ -18,6 +18,12 @@ from uuid import uuid4
 
 BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管理：本機功能整批對照與交付界線\n'
                                                            '\n'
+                                                           '## 預設連接埠更新\n'
+                                                           '\n'
+                                                           '使用者指定預設連接埠改為 8085，主機維持 `10.1.121.61`、網段 '
+                                                           '`10.1.121.0/24`，採 HTTP。此設定取代下方歷史版本的 8765；支援 '
+                                                           '`--port` 覆蓋，不改資料、密碼、防火牆或 Proxy。\n'
+                                                           '\n'
                                                            '## 換機測試（2026-11-04）\n'
                                                            '\n'
                                                            '使用者要求預設主機由 `10.1.121.135` 改為 `10.1.121.61`，保留 '
@@ -181,8 +187,14 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                            '`.venv`，也不自動啟動服務、匯入真實舊資料或開放內網。\n'
                                                            '真實來源包與預覽結果只保存在使用者核准的本機資料夾，不放入儲存庫或通用安裝檔；公司正式匯入仍需停止服務、預檢及 '
                                                            '`IMPORT` 確認。\n',
-                                                'sha256': 'cabcf2d7258e8b7418a991cef5afffd1703ff1fbc856e234ce23050b6f815c4b'},
+                                                'sha256': 'c553c421d5f10d7103b087a216d027385c84733105080085ad6737dd180aae63'},
            'company/LAN_SETUP.md': {'content': '# SPMS：Windows 11 內網共用\n'
+                                               '\n'
+                                               '## 最新預設連接埠：8085\n'
+                                               '\n'
+                                               '依使用者後續要求，預設改為 `http://10.1.121.61:8085/repairs/`；此設定取代下方舊的 '
+                                               '8765 說明及範例。直接執行 `company/server.py` 即採用新埠；仍可用 `--port` '
+                                               '指定其他埠。防火牆／代理規則若仍是舊埠，須由有權限者調整；程式不自動改規則，改埠不保證解決代理限制。資料及編輯密碼不變。\n'
                                                '\n'
                                                '使用者已確認目前電腦作主機、預計 10 人使用、IT '
                                                '允許內網及防火牆設定。本文件是部署步驟，不代表已在公司操作或通過實際負載測試。\n'
@@ -354,11 +366,11 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                '停用內網：Ctrl+C 停服務，由 IT 停用 `SPMS TCP 8765` 規則；以現有 venv Python '
                                                '執行 `company/server.py --host '
                                                '127.0.0.1`，即只允許本機。若工作排程器已啟用，須同步停用或修改該工作，避免自動重新開放。\n',
-                                    'sha256': '74f6065be27edd21fb61a8e0eb228cd6c2e823034b165c2f81840ec97c126112'},
+                                    'sha256': '6b59cc1d930b06ef5b30e176ab110f7c04af8f672f0897011d54fae7d328fa25'},
            'company/README.md': {'content': '# SPMS 公司版：SQLite 離線功能驗收\n'
                                             '\n'
                                             '只使用 Python 與主機 SQLite，不連接或更新 Supabase。依使用者指定，預設改用測試主機 '
-                                            '`10.1.121.61:8765`、允許 `10.1.121.0/24`，採 HTTP；僅本機須加 `--host '
+                                            '`10.1.121.61:8085`、允許 `10.1.121.0/24`，採 HTTP；僅本機須加 `--host '
                                             '127.0.0.1`。搬移及內網步驟見 [LAN_SETUP.md](LAN_SETUP.md)。公司舊資料匯入及 '
                                             'verify 結果已由使用者回報完成，不需重匯。\n'
                                             '已提供共用密碼解鎖編輯，以及核准 CSV／附件的離線轉換、來源封存與副本試匯入；不是個人帳號／角色系統。\n'
@@ -507,10 +519,10 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '.\\.venv\\Scripts\\python.exe .\\company\\server.py\n'
                                             '```\n'
                                             '\n'
-                                            '保持此視窗開啟，用瀏覽器開啟 `http://10.1.121.61:8765`。\n'
+                                            '保持此視窗開啟，用瀏覽器開啟 `http://10.1.121.61:8085`。\n'
                                             '應看到「連線正常」。不需啟用 PowerShell 指令碼執行權限。主機必須擁有此 '
                                             'IP，且已設定編輯密碼；Proxy／防火牆可能仍需公司設定。\n'
-                                            '點「進入備品管理」，或開啟 `http://10.1.121.61:8765/repairs/`。\n'
+                                            '點「進入備品管理」，或開啟 `http://10.1.121.61:8085/repairs/`。\n'
                                             '\n'
                                             '若埠已被使用，可執行以下指令，再開啟 `http://10.1.121.61:8766`（防火牆規則須同步調整）：\n'
                                             '\n'
@@ -754,7 +766,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '產生；公司版程式更新後必須重新產生。\n'
                                             '安裝測試：`python -m unittest discover -s scripts -p '
                                             '"test_company_installer.py" -v`。\n',
-                                 'sha256': 'e00f0884d4f37811da770044d8c71b978617719fdead15d19d11ca5a542ae20b'},
+                                 'sha256': 'a66ba1ad6dc987b5e27f7b101e624bc6d1a9b2f08157af77fd7548e89f433f93'},
            'company/database.py': {'content': '"""Shared SQLite connections and additive, backed-up module '
                                               'migrations."""\n'
                                               'import json\n'
@@ -5431,7 +5443,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '\n'
                                             'def startup_options(argv=None):\n'
                                             '    parser = argparse.ArgumentParser(description=__doc__)\n'
-                                            '    parser.add_argument("--port", type=int, default=8765)\n'
+                                            '    parser.add_argument("--port", type=int, default=8085)\n'
                                             "    parser.add_argument('--host', help='Specific private IPv4 "
                                             'address; omitted uses approved 10.1.121.61 LAN profile; use '
                                             "127.0.0.1 for local-only access')\n"
@@ -5515,7 +5527,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '\n'
                                             'if __name__ == "__main__":\n'
                                             '    main()\n',
-                                 'sha256': '2403745d679797ad8237a5aca2355754d445b084276d3ad249f197e458e61a52'},
+                                 'sha256': '26a37e9f4429772598f315ac99336740b03f087083a69ca41708cd4bcd5e1916'},
            'company/test_edit_access.py': {'content': 'import json\n'
                                                       'import tempfile\n'
                                                       'import time\n'
@@ -6732,6 +6744,10 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                               '    def test_approved_default_and_explicit_lan(self):\n'
                                               '        default = startup_options([])\n'
                                               "        self.assertEqual(default.host, '10.1.121.61')\n"
+                                              '        self.assertEqual(default.port, 8085)\n'
+                                              '        '
+                                              "self.assertEqual(startup_options(['--port','3080']).port, "
+                                              '3080)\n'
                                               '        self.assertEqual(list(map(str, '
                                               "default.client_subnet)), ['10.1.121.0/24'])\n"
                                               '        self.assertTrue(default.lan)\n'
@@ -6914,7 +6930,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                               '\n'
                                               "if __name__ == '__main__':\n"
                                               '    unittest.main()\n',
-                                   'sha256': '1446d24ee902189b1a1ca8f13319277ca90820b14b28d82609f9ad831812e76d'},
+                                   'sha256': 'ecb465ae4f78bab90c5c28f3a54c92d3bf7434125598b1d76871f67c8d66243e'},
            'company/test_legacy_import.py': {'content': 'import csv\n'
                                                         'import io\n'
                                                         'import json\n'
@@ -10947,7 +10963,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                 '@media(max-width:600px){main{margin:25px auto;padding:0 '
                                                 '16px}h1{font-size:22px}section{padding:18px}dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:10px}}\n',
                                      'sha256': '064406c8758be5620dfe7440f59d59ec1de5f6307e74f5bad85dd03e018c0769'}},
- 'version': '2026-11-04-test-host-61'}
+ 'version': '2026-11-04-port-8085'}
 
 
 def check_local_path(path):

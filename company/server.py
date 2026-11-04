@@ -335,7 +335,7 @@ class Handler(BaseHTTPRequestHandler):
 
 def startup_options(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--port", type=int, default=8765)
+    parser.add_argument("--port", type=int, default=8085)
     parser.add_argument('--host', help='Specific private IPv4 address; omitted uses approved 10.1.121.61 LAN profile; use 127.0.0.1 for local-only access')
     parser.add_argument('--client-subnet', action='append', default=[], help='Allowed IPv4 CIDR; repeat for multiple IT-approved subnets')
     parser.add_argument('--tls-cert', type=Path, help='IT-issued PEM certificate with IP subjectAltName')

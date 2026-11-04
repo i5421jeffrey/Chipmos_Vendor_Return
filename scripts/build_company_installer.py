@@ -4,7 +4,7 @@ import pprint
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "2026-11-04-test-host-61"
+VERSION = "2026-11-04-port-8085"
 FILES = (
     "README.md", "LAN_SETUP.md", "IMPLEMENTATION_STATUS.md", "server.py", "database.py", "errors.py", "maintenance.py", "import_data.py", "edit_access.py", "legacy_import.py",
     "test_server.py", "test_repairs.py", "test_features.py", "test_import_data.py", "test_edit_access.py", "test_legacy_import.py", "test_lan.py",

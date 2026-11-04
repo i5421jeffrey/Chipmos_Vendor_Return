@@ -12,6 +12,8 @@
 
 ## Company-local staged migration
 
+- Latest port override: default SPMS port is now 8085 on `10.1.121.61`, superseding historical 8765 references below. Keep `--port` overrides working. Changing ports does not alter firewall/Proxy rules or guarantee connectivity.
+
 - Latest user host override: default SPMS test host is now `10.1.121.61` (supersedes `.135` below), with the same HTTP port 8765 and `10.1.121.0/24` allowlist. Copying a test host requires a stopped-service full data copy, new-machine venv recreation and pre-start verification; never run diverging copies as simultaneous production writers or claim that a changed IP fixes Proxy/firewall restrictions.
 
 - Subsequent explicit user override: no-argument `company/server.py` now uses the approved HTTP host profile `10.1.121.135:8765` and `10.1.121.0/24`. This supersedes older localhost-default wording below. Use `--host 127.0.0.1` for local-only startup. Explicit alternative hosts still require explicit client subnets and TLS or HTTP acknowledgement. Do not silently fall back when the configured IP is unavailable; this does not fix company Proxy/firewall policy.
