@@ -30,3 +30,18 @@ PS C:\Users\S27456> Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.IPAd
 InterfaceAlias IPAddress
 -------------- ---------
 乙太網路       10.1.121.135
+
+
+
+搬到新電腦
+1. 舊電腦先 Ctrl+C 停止服務，再複製整個 SPMS 資料夾，包含完整 company\data。舊檔保留。
+2. 新電腦放到 D:\Python\SPMS。
+3. .venv 不建議直接搬用：將複製來的 .venv 改名保留，再重建（新電腦須已安裝 Python 3.13）：
+cd D:\Python\SPMS
+py -3.13 -m venv .venv
+4. 將新版安裝檔放到該目錄，執行並輸入 INSTALL：
+.\.venv\Scripts\python.exe .\install_spms.py
+5. 先驗證資料，成功後才啟動：
+.\.venv\Scripts\python.exe .\company\maintenance.py verify
+.\.venv\Scripts\python.exe .\company\server.py
+新網址：http://10.1.121.61:8765/repairs/
