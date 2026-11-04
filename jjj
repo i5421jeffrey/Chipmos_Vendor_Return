@@ -1,0 +1,32 @@
+Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.IPAddress -notlike '127.*'} | Select-Object InterfaceAlias,IPAddress
+Get-NetTCPConnection -LocalPort 8765 -State Listen -ErrorAction SilentlyContinue | Select-Object LocalAddress,LocalPort,OwningProcess
+Invoke-RestMethod http://10.1.121.135:8765/api/health
+
+
+PS C:\Users\S27456> Get-NetTCPConnection -LocalPort 8765 -State Listen -ErrorAction SilentlyContinue | Select-Object LocalAddress,LocalPort,OwningProcess
+
+LocalAddress LocalPort OwningProcess
+------------ --------- -------------
+10.1.121.135      8765         29552
+
+
+PS C:\Users\S27456> Invoke-RestMethod http://10.1.121.135:8765/api/health
+
+
+status         : ok
+database       : SQLite
+sqlite_version : 3.50.4
+schema_version : 1
+initialized_at : 2026-11-02 03:48:13
+phase          : 3
+access         : lan-allowlist
+modules        : @{repairs=2; legacy_import=1; machines=}
+transport      : http
+
+
+
+PS C:\Users\S27456> Get-NetIPAddress -AddressFamily IPv4 | Where-Object {$_.IPAddress -notlike '127.*'} | Select-Object InterfaceAlias,IPAddress
+
+InterfaceAlias IPAddress
+-------------- ---------
+乙太網路       10.1.121.135
