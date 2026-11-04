@@ -20,8 +20,19 @@ from test_repairs import example
 
 
 class LANOptionsTests(unittest.TestCase):
-    def test_default_loopback_and_explicit_lan(self):
-        self.assertEqual(startup_options([]).host, '127.0.0.1')
+    def test_approved_default_and_explicit_lan(self):
+        default = startup_options([])
+        self.assertEqual(default.host, '10.1.121.135')
+        self.assertEqual(list(map(str, default.client_subnet)), ['10.1.121.0/24'])
+        self.assertTrue(default.lan)
+        self.assertTrue(default.allow_http_lan)
+        local = startup_options(['--host','127.0.0.1'])
+        self.assertFalse(local.lan)
+        self.assertFalse(local.allow_http_lan)
+        self.assertEqual(local.client_subnet, [])
+        secure = startup_options(['--tls-cert','cert.pem','--tls-key','key.pem'])
+        self.assertEqual(secure.host, default.host)
+        self.assertFalse(secure.allow_http_lan)
         args = startup_options(['--host','192.168.10.20','--client-subnet','192.168.10.0/24','--allow-http-lan'])
         self.assertTrue(args.lan)
         self.assertEqual(str(args.client_subnet[0]), '192.168.10.0/24')

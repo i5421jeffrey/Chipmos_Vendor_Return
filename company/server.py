@@ -336,12 +336,20 @@ class Handler(BaseHTTPRequestHandler):
 def startup_options(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8765)
-    parser.add_argument('--host', default='127.0.0.1', help='Specific private IPv4 address; default is loopback only')
+    parser.add_argument('--host', help='Specific private IPv4 address; omitted uses approved 10.1.121.135 LAN profile; use 127.0.0.1 for local-only access')
     parser.add_argument('--client-subnet', action='append', default=[], help='Allowed IPv4 CIDR; repeat for multiple IT-approved subnets')
     parser.add_argument('--tls-cert', type=Path, help='IT-issued PEM certificate with IP subjectAltName')
     parser.add_argument('--tls-key', type=Path, help='Protected PEM private key; never package or commit')
     parser.add_argument('--allow-http-lan', action='store_true', help='Explicitly accept plaintext transport on the trusted LAN')
     args = parser.parse_args(argv)
+    # User-approved host profile. An explicit --host does not inherit its
+    # plaintext acknowledgement or subnet; custom LANs remain explicit.
+    if args.host is None:
+        args.host = '10.1.121.135'
+        if not args.client_subnet:
+            args.client_subnet = ['10.1.121.0/24']
+        if not args.tls_cert and not args.tls_key:
+            args.allow_http_lan = True
     if not 1 <= args.port <= 65535:
         parser.error("port must be between 1 and 65535")
     try:
