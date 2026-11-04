@@ -9,6 +9,21 @@ from build_company_ui_assets import ROOT, build
 
 
 class OriginalAssetsTests(unittest.TestCase):
+    def test_everyday_pages_use_spms_brand_without_deployment_labels(self):
+        for name in ('index.html','repairs.html','app.js','repairs.js','features.js'):
+            content = (ROOT / 'company/web' / name).read_text(encoding='utf-8')
+            self.assertNotRegex(content, r'本機|離線|驗收|公司版|移植|[Ss]upabase|SQLite|Python|來源歷史|匯入當時')
+            if name.endswith('.html'):
+                self.assertIn('<title>SPMS</title>', content)
+        home = (ROOT / 'company/web/index.html').read_text(encoding='utf-8')
+        self.assertIn('<h1>SPMS</h1>', home)
+        self.assertIn('<a href="/repairs/">進入備品管理</a>', home)
+        self.assertNotIn('<aside', home)
+        self.assertNotIn('<dl', home)
+        repairs = (ROOT / 'company/web/repairs.html').read_text(encoding='utf-8')
+        self.assertNotIn('class="local-information"', repairs)
+        self.assertIn('value="IMPORT">資料建立', repairs)
+
     def test_runtime_pages_only_use_packaged_local_assets_and_keep_master_navigation(self):
         class Page(HTMLParser):
             def __init__(self):

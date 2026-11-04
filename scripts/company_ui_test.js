@@ -257,7 +257,7 @@ function assert(ok, message) {if (!ok) throw Error(message);}
   assert(auditContainer.textContent.includes('尚無對應') && auditContainer.textContent.includes('<script>text</script>'), 'History safely renders missing PINs and untrusted text');
   const importContainer = new TestNode();
   renderHistory([{source_table:'repair_records',operation:'IMPORT',changed_at:'2026-11-02T00:00:00Z',changes:{repair_amount:{old:null,new:0}}}], importContainer);
-  assert(importContainer.textContent.includes('送修／離線匯入'), 'Imported audit events are clearly distinguished from original source history');
+  assert(importContainer.textContent.includes('送修／資料建立') && importContainer.textContent.includes('維修金額'), 'Imported audit events remain visible without deployment labels');
   await openWorkspace('statistics');
   assert(nodes['history-filters'].hidden, 'Other workspaces hide history filters');
   assert(nodes['workspace-content'].textContent.includes('F45'), 'Statistics chart/table/ranking render');

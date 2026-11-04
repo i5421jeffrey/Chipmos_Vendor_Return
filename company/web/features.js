@@ -7,7 +7,7 @@ const fieldContainers = new WeakMap();
 const filePickerUpdates = new WeakMap();
 const workspaceTitles = {dbn:'DBN 紀錄', mappings:'S/N 主檔維護', history:'全站異動紀錄', statistics:'統計資料', masters:'機台／板件／價格對應'};
 const operationsDialog = byId('operations-modal');
-const descriptions = {dbn:'DBN 紀錄獨立於送修案件；DUT／PIN 保存當時快照。未記錄類型的舊案不猜測，編輯須補齊。', mappings:'主檔只保存 S/N、板名與 PN；歷史同步須先預覽及確認，不重算金額。', history:'本機及來源異動紀錄；共用密碼解鎖不代表具名操作人員稽核。', statistics:'首輪損壞頻率與機台排行；依結案日期加總各輪已知金額。', masters:'修改只影響後續選擇與儲存，不自動改寫既有案件、S/N 或價格快照。'};
+const descriptions = {dbn:'查看與維護 DBN 紀錄及 DUT／PIN 資訊。', mappings:'維護 S/N、板件名稱與 Part Number；同步歷史前須先預覽及確認。', history:'查看送修、DBN、主檔及價格的異動紀錄。', statistics:'首輪損壞頻率與機台排行；依結案日期加總各輪金額。', masters:'維護機台、板件與價格；修改不自動改寫既有案件。'};
 
 function invalidateFeatureRequests() {workspaceRequest++; operationRequest++;}
 
@@ -191,7 +191,7 @@ async function loadWorkspace() {
 
 function renderHistory(events, container) {
   const sources = {repair_records:'送修',dbn_records:'DBN',serial_board_mappings:'S/N 對應',repair_machine_models:'機台對應',repair_model_boards:'板件對應',repair_board_prices:'價格',repair_attachments:'附件'};
-  const operations = {INSERT:'新增',UPDATE:'修改',DELETE:'刪除',IMPORT:'離線匯入'};
+  const operations = {INSERT:'新增',UPDATE:'修改',DELETE:'刪除',IMPORT:'資料建立'};
   const labels = {...fieldLabels,board_name:'板件名稱',customer_code:'客戶',product_code:'產品',station_code:'站點',issue_type:'DBN 類型',issue_description:'異常描述',dut:'DUT',socket_file_id:'Socket File 版本',dut_pin_snapshot:'PIN',board_repair_cents:'板修金額（分）',external_repair_cents:'外修金額（分）',contract_repair_cents:'合約金額（分）',warranty_repair_cents:'保固金額（分）'};
   function value(field, data) {
     if (data == null) return '—';
@@ -203,8 +203,7 @@ function renderHistory(events, container) {
   const rows = [];
   for (const event of events) {
     const identity = `${event.serial_no || '—'}－${event.board_name || '—'}`;
-    const origin = String(event.id || '').startsWith('legacy-') ? '（來源歷史）' : '';
-    const prefix = [sourceDate(event.changed_at).toLocaleString('zh-TW', {timeZone:'Asia/Taipei'}), `${sources[event.source_table] || event.source_table}／${operations[event.operation] || event.operation}${origin}`, identity];
+    const prefix = [sourceDate(event.changed_at).toLocaleString('zh-TW', {timeZone:'Asia/Taipei'}), `${sources[event.source_table] || event.source_table}／${operations[event.operation] || event.operation}`, identity];
     const changes = Object.entries(event.changes || {}).filter(([field]) => !['id','version','created_at','updated_at','source_system','source_record_id'].includes(field));
     for (const [field, change] of changes) rows.push([...prefix, labels[field] || field, value(field, change.old), value(field, change.new)]);
     if (!changes.length) rows.push([...prefix, '—', '—', '—']);
@@ -243,7 +242,7 @@ function labeledCell(label, value, className = '') {
 
 function renderDbnRow(record) {
   const row = element('div', 'dbn-row'), board = labeledCell('板件名稱', record.board_name);
-  board.append(element('div', 'dbn-issue-type', record.issue_type || '舊資料：未記錄類型（未推測 PIN）'));
+  board.append(element('div', 'dbn-issue-type', record.issue_type || '類型未設定'));
   if (record.dut) board.append(pinDetails(record));
   if (record.issue_description) board.append(element('p', 'detail-text', record.issue_description));
   const controls = labeledCell('操作', '', 'dbn-actions');
@@ -571,7 +570,7 @@ async function renderDetailFeatures(record, container, stillCurrent) {
     const failButton = writeAction('FAIL・建立下一筆維修', () => retryRepair(record), 'button danger');
     const invalidDates = !record.sent_on || !record.returned_on || record.returned_on < record.sent_on || record.sent_on < record.occurred_on;
     passButton.disabled = failButton.disabled = record.repair_amount == null || Boolean(chainResult.error) || invalidDates;
-    if (invalidDates) resolve.append(element('p', 'notice', '來源日期缺漏或先後異常，請核對並明確更正後再結案。'));
+    if (invalidDates) resolve.append(element('p', 'notice', '日期缺漏或先後有誤，請確認並更正後再結案。'));
     resolve.append(passButton, failButton);
     if (record.repair_amount == null) resolve.append(element('p', 'hint', '金額未設定，請先補齊價格，在編輯案件時勾選「重新套用目前價目」並儲存，再結案。'));
     container.append(resolve);
@@ -605,6 +604,9 @@ function renderRepairChain(record, rows) {
     button.append(date, pill, description);
     const content = element('div', 'history-entry-detail');
     content.append(element('div', 'history-failure-description', '異常描述：' + (row.failure_description || '未提供')));
+    if (index && rows[index - 1].closed_on && row.occurred_on && row.occurred_on < rows[index - 1].closed_on) {
+      content.append(element('p', 'notice', '本次損壞日期早於前次結案日期，請確認日期。'));
+    }
     if (row.attachment) {
       const link = element('a', 'history-log-link', 'Fail Log：' + row.attachment.filename);
       link.href = '/api/repairs/attachments/' + encodeURIComponent(row.attachment.id) + '?download=1'; content.append(link);
@@ -624,7 +626,7 @@ function retryRepair(record) {
     operationsDialog.close(); await refreshFeatures(); await openDetail(result.retry.id);
   });
   type = formField('下一筆維修分類', 'select', record.repair_type, catalogs.repair_types);
-  const amount = formField('金額（依目前本機價目）'); amount.readOnly = true; amount.required = false;
+  const amount = formField('金額（依目前價目）'); amount.readOnly = true; amount.required = false;
   function previewAmount() {
     const cents = repairPrice(record.model, record.description, record.board_part_code, type.value);
     amount.value = cents == null ? '未設定' : (cents/100).toLocaleString('zh-TW') + ' 元';

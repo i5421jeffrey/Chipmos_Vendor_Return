@@ -94,7 +94,7 @@
   faultPrefixes.set('/api/repairs/catalog', 'INVALID_JSON');
   const before = requests.length; let message = '';
   try {await api('/api/repairs/catalog');} catch (error) {message = error.message;}
-  assert(message.includes('不是有效 JSON') && requests.length === before + 1, 'Invalid service responses are explained and never automatically retried');
+  assert(message.includes('服務回應異常') && message.includes('避免重複操作') && requests.length === before + 1, 'Invalid service responses keep the no-retry warning without exposing implementation details');
   faultPrefixes.clear();
   assert(requests.every(request => request.path.startsWith('/api/')), 'Failure and recovery paths remain local-only');
   const rankingContainer = new TestNode();

@@ -21,9 +21,9 @@ async function api(path, method = 'GET', body) {
   try {
     let response, data;
     try {response = await fetch(path, options);}
-    catch (error) {throw new Error('本機服務連線失敗，請確認 Python 服務仍在執行：' + error.message);}
+    catch {throw new Error('暫時無法連線，請稍後再試。儲存結果不明時，請先查詢確認，避免重複操作。');}
     try {data = await response.json();}
-    catch {throw new Error('本機服務回應不是有效 JSON；請保留錯誤並確認服務版本。寫入結果未知時勿直接重送。');}
+    catch {throw new Error('服務回應異常，請稍後再試。儲存結果不明時，請先查詢確認，避免重複操作。');}
     if (!response.ok) {
       if (response.status === 401 && !path.startsWith('/api/edit/')) {editToken = ''; updateEditControls();}
       const error = new Error(data.error || '操作失敗'); error.status = response.status; throw error;
@@ -37,7 +37,7 @@ function sourceDate(value) {
   return new Date(String(value).replace(' ', 'T').replace(/([+-]\d{2})$/, '$1:00').replace(/(\.\d{3})\d+/, '$1'));
 }
 function updateEditControls() {
-  byId('edit-mode-state').textContent = editToken ? '編輯模式（共用密碼，非個人帳號）' : '唯讀模式';
+  byId('edit-mode-state').textContent = editToken ? '編輯模式' : '唯讀模式';
   byId('toggle-edit').textContent = editToken ? '結束編輯' : '開啟編輯';
   for (const button of document.querySelectorAll('[data-edit-only]')) button.hidden = !editToken;
   for (const id of ['editor-unlock','operations-unlock']) byId(id).hidden = Boolean(editToken);
@@ -171,6 +171,14 @@ function detailSection(title, fields) {
   return section;
 }
 
+function recordDateWarnings(record) {
+  const warnings = [];
+  if (record.sent_on && record.sent_on < record.occurred_on) warnings.push('送修日期早於損壞日期，請確認日期。');
+  if (record.returned_on && (!record.sent_on || record.returned_on < record.sent_on)) warnings.push('回修日期早於送修日期或未填送修日期，請確認日期。');
+  if (record.closed_on && record.returned_on && record.closed_on < record.returned_on) warnings.push('結案日期早於回修日期，請確認日期。');
+  return warnings;
+}
+
 async function openDetail(id) {
   const request = ++detailRequest;
   byId('detail-message').textContent = '';
@@ -192,12 +200,7 @@ async function openDetail(id) {
     const failure = element('section', 'detail-section');
     failure.append(element('h3', '', '異常描述'), element('div', 'detail-text', record.failure_description));
     body.append(failure);
-    if (record.legacy_source) {
-      const source = element('details', 'detail-section'); source.append(element('summary', '', '唯讀來源欄位（匯入當時）'));
-      for (const [key, value] of Object.entries(record.legacy_source)) source.append(element('p', 'detail-text', `${key}: ${value || '（空白）'}`));
-      body.append(source);
-    }
-    for (const warning of record.legacy_warnings || []) body.append(element('p', 'notice', '來源核對提醒（匯入時）：' + warning));
+    for (const warning of recordDateWarnings(record)) body.append(element('p', 'notice', warning));
     if (!detail.open) detail.showModal();
     if (typeof renderDetailFeatures === 'function') await renderDetailFeatures(record, body, () => request === detailRequest);
     if (request !== detailRequest) return;
@@ -261,7 +264,7 @@ async function searchSerial() {
       const allDbn = element('button', 'quick-card', '前往 DBN 清單查看全部'); allDbn.type = 'button';
       allDbn.addEventListener('click', () => openWorkspace('dbn', serial)); byId('quick-results').append(allDbn);
     }
-    byId('quick-message').textContent = outcomes.some(row => row.status === 'rejected') ? '部分查詢失敗，以下只顯示已成功讀取的資料；不可當成完整歷史或零筆。可再按 Search 重新查詢。' : records.total || dbn.total ? '點選送修紀錄查看詳細資料。' : '此 S/N 尚無本機送修或 DBN 紀錄。';
+    byId('quick-message').textContent = outcomes.some(row => row.status === 'rejected') ? '部分查詢失敗，以下只顯示已成功讀取的資料；不可當成完整歷史或零筆。可再按 Search 重新查詢。' : records.total || dbn.total ? '點選送修紀錄查看詳細資料。' : '此 S/N 尚無送修或 DBN 紀錄。';
   } catch (error) {if (request === quickRequest) byId('quick-message').textContent = error.message;}
 }
 
@@ -423,7 +426,7 @@ async function openEditor(record = null) {
         const item = document.createElement('li');
         const time = sourceDate(event.changed_at).toLocaleString('zh-TW', {timeZone:'Asia/Taipei', hour12:false});
         if (event.operation === 'INSERT') item.textContent = `${time} 新增 ${event.serial_no}－${event.board_name}`;
-        else item.textContent = `${time} ${event.operation === 'IMPORT' ? '匯入' : '修改'}\n` + Object.entries(event.changes).map(([field, change]) => `${fieldLabels[field] || field}：${typeof change.old === 'object' && change.old !== null ? JSON.stringify(change.old) : change.old ?? '—'} → ${typeof change.new === 'object' && change.new !== null ? JSON.stringify(change.new) : change.new ?? '—'}`).join('\n');
+        else item.textContent = `${time} ${event.operation === 'IMPORT' ? '資料建立' : '修改'}\n` + Object.entries(event.changes).map(([field, change]) => `${fieldLabels[field] || field}：${typeof change.old === 'object' && change.old !== null ? JSON.stringify(change.old) : change.old ?? '—'} → ${typeof change.new === 'object' && change.new !== null ? JSON.stringify(change.new) : change.new ?? '—'}`).join('\n');
         byId('history').append(item);
       }
     }
@@ -531,7 +534,7 @@ async function initializeApp() {
     byId('create').disabled = false;
     await loadRecords();
   } catch (error) {
-    byId('startup-error').hidden = false; byId('startup-message').textContent = '無法載入本機對應表：' + error.message;
+    byId('startup-error').hidden = false; byId('startup-message').textContent = '無法載入對應表：' + error.message;
     byId('message').textContent = error.message; byId('message').dataset.error = 'true';
   } finally {catalogsLoading = false; byId('reload-catalogs').disabled = false;}
 }

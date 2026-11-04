@@ -89,7 +89,7 @@ class Handler(BaseHTTPRequestHandler):
         if isinstance(error, APIError):
             self.send_json(error.status, {"error": str(error)})
         else:
-            self.send_json(503, {"error": "本機資料庫暫時無法使用，請稍後重試；若持續失敗請保留資料庫並聯絡維護人員"})
+            self.send_json(503, {"error": "暫時無法取得資料，請稍後重試；若持續失敗請聯絡管理人員"})
 
     def send_content(self, status, body, content_type, head=False, headers=None):
         self.send_response(status)
@@ -206,7 +206,7 @@ class Handler(BaseHTTPRequestHandler):
             if not self.allowed_host() or self.headers.get("Origin", origins[0]) not in origins:
                 raise APIError("不允許跨網站寫入", 403)
             if self.headers.get("X-SPMS-Request") != "1":
-                raise APIError("缺少本機操作驗證標頭", 403)
+                raise APIError("操作驗證失敗，請重新整理頁面後再試", 403)
             if self.headers.get_content_type() != "application/json":
                 raise APIError("請使用 JSON 格式", 415)
             if self.headers.get("Transfer-Encoding"):

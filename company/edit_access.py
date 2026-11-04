@@ -50,7 +50,7 @@ class EditGate:
         except FileNotFoundError:
             raw = b''
         except OSError:
-            raise APIError('無法讀取編輯密碼設定，請檢查公司主機檔案權限', 503)
+            raise APIError('無法讀取編輯密碼設定，請聯絡管理人員', 503)
         fingerprint = hashlib.sha256(raw).hexdigest()
         if self.fingerprint != fingerprint:
             self.sessions.clear()
@@ -63,7 +63,7 @@ class EditGate:
                 raise ValueError()
             return value
         except (ValueError, KeyError, TypeError):
-            raise APIError('編輯密碼設定損壞，請在公司主機重新設定', 503)
+            raise APIError('編輯密碼設定異常，請聯絡管理人員', 503)
 
     def status(self):
         with self.lock:
@@ -73,7 +73,7 @@ class EditGate:
         with self.lock:
             settings = self.settings()
             if settings is None:
-                raise APIError('尚未設定共用編輯密碼，請在公司主機執行 edit_access.py', 403)
+                raise APIError('尚未設定編輯密碼，請聯絡管理人員', 403)
             now = time.monotonic()
             if now < self.blocked_until:
                 raise APIError('密碼嘗試過多，請等候 30 秒再試', 429)
@@ -86,7 +86,7 @@ class EditGate:
             self.failures = 0
             self.sessions = {key: expires for key, expires in self.sessions.items() if expires > now}
             if len(self.sessions) >= 128:
-                raise APIError('編輯視窗過多，請重啟本機服務清除工作階段', 429)
+                raise APIError('編輯視窗過多，請稍後再試或聯絡管理人員', 429)
             token = secrets.token_urlsafe(32)
             self.sessions[token] = now + 8 * 60 * 60
             return dict(token=token, expires_in=8 * 60 * 60)

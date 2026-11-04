@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>SPMS 公司版 — 備品管理</title>
+  <title>SPMS</title>
   <meta name="theme-color" content="#101113">
   <link rel="icon" type="image/png" href="/repairs/ghost-logo.png">
   <link rel="stylesheet" href="/repairs/original.css">
@@ -15,7 +15,7 @@
 <body>
 <div class="app">
   <aside class="sidebar">
-    <details class="system-switcher"><summary class="switcher-trigger"><span class="brand-mark"><img src="/repairs/ghost-logo.png" alt=""></span><span class="brand-copy"><span class="brand-title">SPMS</span><span class="brand-subtitle">Spare Parts Management System</span></span><span class="switcher-chevron">⌄</span></summary><div class="switcher-menu"><a href="/repairs/" aria-current="page"><span>▧</span><span>備品管理系統<small>板件送修管理 · SQLite</small></span><span class="switcher-check">✓</span></a><span class="switcher-unavailable">▦ 機台管理系統<small>預留模組，尚未安裝</small></span></div></details>
+    <details class="system-switcher"><summary class="switcher-trigger"><span class="brand-mark"><img src="/repairs/ghost-logo.png" alt=""></span><span class="brand-copy"><span class="brand-title">SPMS</span><span class="brand-subtitle">Spare Parts Management System</span></span><span class="switcher-chevron">⌄</span></summary><div class="switcher-menu"><a href="/repairs/" aria-current="page"><span>▧</span><span>備品管理系統<small>板件送修管理</small></span><span class="switcher-check">✓</span></a><span class="switcher-unavailable">▦ 機台管理系統<small>未啟用</small></span></div></details>
     <nav aria-label="快速搜尋"><button class="nav-item" id="nav-quick" type="button" aria-current="page"><span aria-hidden="true">⌕</span>快速搜尋</button></nav>
     <div class="nav-label">紀錄項目</div>
     <nav id="status-nav" aria-label="送修狀態">
@@ -27,17 +27,16 @@
       <button class="nav-item" data-status="結案（FAIL）" type="button"><span aria-hidden="true">×</span>FAIL<span class="count" data-count="結案（FAIL）">0</span></button>
     </nav>
     <div class="nav-label">管理與查詢</div>
-    <nav class="management-nav" aria-label="管理與查詢"><button class="nav-item" data-workspace="dbn">DBN 紀錄</button><button class="nav-item" data-workspace="mappings">S/N 主檔維護</button><button class="nav-item" data-workspace="statistics">統計資料</button><button class="nav-item" data-workspace="history">全站異動紀錄</button><button class="nav-item" data-workspace="masters">機台／板件／價格對應</button><button class="nav-item" disabled>機台保養模組（未安裝）</button></nav>
-    <a class="environment-link" href="/">SQLite 環境檢查</a>
+    <nav class="management-nav" aria-label="管理與查詢"><button class="nav-item" data-workspace="dbn">DBN 紀錄</button><button class="nav-item" data-workspace="mappings">S/N 主檔維護</button><button class="nav-item" data-workspace="statistics">統計資料</button><button class="nav-item" data-workspace="history">全站異動紀錄</button><button class="nav-item" data-workspace="masters">機台／板件／價格對應</button><button class="nav-item" disabled>機台保養（未啟用）</button></nav>
+    <a class="environment-link" href="/">系統首頁</a>
     <div class="edit-mode-controls"><p id="edit-mode-state" role="status">唯讀模式</p><button id="toggle-edit" type="button">開啟編輯</button><p id="edit-access-message" role="status"></p></div>
   </aside>
   <main class="content">
     <div id="startup-error" class="notice" role="alert" hidden><p id="startup-message"></p><button id="reload-catalogs" type="button">重新讀取對應表</button></div>
-    <details class="local-information"><summary>SQLite 本機移植版 · 不連接 Supabase</summary><p class="notice">公司端略過的驗證仍標為未驗收。密碼解鎖僅供防誤觸，不是個人登入或具名稽核。來源資料須另行確認匯入；畫面一致性及正式內網部署仍待驗收／IT 核准。</p></details>
     <section id="quick-view" class="quick-search-view">
       <div class="quick-search-intro"><h1>SPMS</h1><p>Enter a board S/N to quickly view related repair and DBN records.</p></div>
       <form id="quick-form" class="quick-search-form"><label for="quick-query">S/N</label><div class="quick-search-controls"><input id="quick-query" class="quick-search-input" type="search" placeholder="001234567" maxlength="64" required autocomplete="off" enterkeyhint="search" spellcheck="false"><button class="button primary quick-search-submit" type="submit">Search</button></div></form>
-      <p id="quick-message" role="status" aria-live="polite">輸入 S/N 查詢本機送修與 DBN 紀錄。</p>
+      <p id="quick-message" role="status" aria-live="polite">輸入 S/N 查詢送修與 DBN 紀錄。</p>
       <div id="quick-results" class="quick-search-results"></div>
     </section>
     <section id="records-view" hidden>
@@ -52,7 +51,7 @@
       <form id="workspace-search" class="toolbar"><input id="workspace-query" type="search" maxlength="200" placeholder="搜尋 S/N、板名或相關資訊" aria-label="管理清單搜尋"><button>查詢</button></form>
       <div id="history-filters" class="history-filters" hidden>
         <label>資料類型<select id="history-source" form="workspace-search"><option value="">全部</option><option value="repair_records">送修</option><option value="dbn_records">DBN</option><option value="serial_board_mappings">S/N 對應</option><option value="repair_machine_models">機台對應</option><option value="repair_model_boards">板件對應</option><option value="repair_board_prices">價格</option><option value="repair_attachments">附件</option></select></label>
-        <label>操作<select id="history-operation" form="workspace-search"><option value="">全部</option><option value="INSERT">新增</option><option value="UPDATE">修改</option><option value="DELETE">刪除</option><option value="IMPORT">離線匯入</option></select></label>
+        <label>操作<select id="history-operation" form="workspace-search"><option value="">全部</option><option value="INSERT">新增</option><option value="UPDATE">修改</option><option value="DELETE">刪除</option><option value="IMPORT">資料建立</option></select></label>
         <label>開始日期<input id="history-start" type="date" form="workspace-search"></label>
         <label>結束日期<input id="history-end" type="date" form="workspace-search"></label>
       </div>
@@ -88,7 +87,7 @@
       <label>回修日期<input type="date" name="returned_on" id="returned-on" aria-describedby="date-hint"></label>
       <p id="date-hint" class="wide hint" role="status" aria-live="polite"></p>
       <div id="create-attachment-field" class="wide"><label for="create-attachment">Fail Log（新增時選填）</label><input type="file" id="create-attachment" accept=".txt,.asc"><p class="hint">每筆限一個非空 .txt／.asc，最大 5 MB；編輯附件請至詳細資料。</p></div>
-      <p class="hint">新增依本機價目計價；一般編輯保留原金額。未設定不等於 0 元。</p>
+      <p class="hint">新增依目前價目計價；一般編輯保留原金額。未設定不等於 0 元。</p>
     </div>
     <p id="form-message" role="status" aria-live="polite"></p>
     <div class="actions"><button id="editor-unlock" type="button">重新開啟編輯</button><button id="reload-record" type="button" hidden>重新載入此案</button><button id="cancel" type="button">取消</button><button id="save" type="submit">儲存</button></div>

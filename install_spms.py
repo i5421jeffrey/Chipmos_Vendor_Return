@@ -18,6 +18,17 @@ from uuid import uuid4
 
 BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管理：本機功能整批對照與交付界線\n'
                                                            '\n'
+                                                           '## SPMS 介面文字整理（2026-11-04）\n'
+                                                           '\n'
+                                                           '- 日常頁面統一使用 '
+                                                           'SPMS，移除公司版、移植、技術環境及驗收說明；首頁連結只顯示「進入備品管理」。維護文件保留真實部署界線。\n'
+                                                           '- 不顯示來源封存欄位或來源標籤；歷史事件仍保留，IMPORT '
+                                                           '顯示為「資料建立」。資料庫、附件、備份與編輯保護不變。\n'
+                                                           '- 日期問題改以目前欄位重新判斷並提供一般提醒；送修鏈日期提醒與結案阻擋仍保留。未設定 DBN '
+                                                           '類型不推測 PIN。\n'
+                                                           '- 首頁新增獨立 mock-DOM 測試，另有禁止技術／移植標籤的資源回歸檢查；不代表 '
+                                                           'Windows 真實瀏覽器或視覺驗收。\n'
+                                                           '\n'
                                                            '本文件記錄目前**開發交付範圍**，不是公司驗收簽核，也不代表已完成真實舊資料移轉或正式上線。\n'
                                                            '依使用者要求，先集中完成開發與自動測試，再統一安排公司端驗收；略過的檢查仍是未驗收。\n'
                                                            '\n'
@@ -135,7 +146,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                            '`.venv`，也不自動啟動服務、匯入真實舊資料或開放內網。\n'
                                                            '真實來源包與預覽結果只保存在使用者核准的本機資料夾，不放入儲存庫或通用安裝檔；公司正式匯入仍需停止服務、預檢及 '
                                                            '`IMPORT` 確認。\n',
-                                                'sha256': '884c80c4048895d90db83cbca73d0170556b701ec21a199781469f5298e0cdaa'},
+                                                'sha256': '09f6f2821bb9b67932ac633d8f3f08c773a87ecefea37d33b1b79e4019f1a773'},
            'company/README.md': {'content': '# SPMS 公司版：SQLite 離線功能驗收\n'
                                             '\n'
                                             '只使用本機 Python 與 SQLite，不連接或更新 Supabase。尚未開放內網或在公司正式資料庫匯入舊資料。\n'
@@ -731,7 +742,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  '        except FileNotFoundError:\n'
                                                  "            raw = b''\n"
                                                  '        except OSError:\n'
-                                                 "            raise APIError('無法讀取編輯密碼設定，請檢查公司主機檔案權限', 503)\n"
+                                                 "            raise APIError('無法讀取編輯密碼設定，請聯絡管理人員', 503)\n"
                                                  '        fingerprint = hashlib.sha256(raw).hexdigest()\n'
                                                  '        if self.fingerprint != fingerprint:\n'
                                                  '            self.sessions.clear()\n'
@@ -746,7 +757,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  '                raise ValueError()\n'
                                                  '            return value\n'
                                                  '        except (ValueError, KeyError, TypeError):\n'
-                                                 "            raise APIError('編輯密碼設定損壞，請在公司主機重新設定', 503)\n"
+                                                 "            raise APIError('編輯密碼設定異常，請聯絡管理人員', 503)\n"
                                                  '\n'
                                                  '    def status(self):\n'
                                                  '        with self.lock:\n'
@@ -757,8 +768,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  '        with self.lock:\n'
                                                  '            settings = self.settings()\n'
                                                  '            if settings is None:\n'
-                                                 "                raise APIError('尚未設定共用編輯密碼，請在公司主機執行 "
-                                                 "edit_access.py', 403)\n"
+                                                 "                raise APIError('尚未設定編輯密碼，請聯絡管理人員', 403)\n"
                                                  '            now = time.monotonic()\n'
                                                  '            if now < self.blocked_until:\n'
                                                  "                raise APIError('密碼嘗試過多，請等候 30 秒再試', 429)\n"
@@ -775,7 +785,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  '            self.sessions = {key: expires for key, expires '
                                                  'in self.sessions.items() if expires > now}\n'
                                                  '            if len(self.sessions) >= 128:\n'
-                                                 "                raise APIError('編輯視窗過多，請重啟本機服務清除工作階段', "
+                                                 "                raise APIError('編輯視窗過多，請稍後再試或聯絡管理人員', "
                                                  '429)\n'
                                                  '            token = secrets.token_urlsafe(32)\n'
                                                  '            self.sessions[token] = now + 8 * 60 * 60\n'
@@ -817,7 +827,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  '\n'
                                                  "if __name__ == '__main__':\n"
                                                  '    raise SystemExit(main())\n',
-                                      'sha256': '163745f5cbe9f2ac9e9e00c7e0d1a00a61f7479c2ce49714c49cd4477fe83199'},
+                                      'sha256': 'ee5c8d6eb391397324d878944742351fa4ec47194bc785250ec21611e18e7054'},
            'company/errors.py': {'content': 'class APIError(Exception):\n'
                                             '    def __init__(self, message, status=400):\n'
                                             '        super().__init__(message)\n'
@@ -3452,7 +3462,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                                 "row['returned_on'] < row['sent_on'] or "
                                                                 "row['sent_on'] < row['occurred_on']:\n"
                                                                 '            raise '
-                                                                "APIError('舊案日期先後異常，請核對並明確更正後再結案', 409)\n"
+                                                                "APIError('日期先後有誤，請確認並更正後再結案', 409)\n"
                                                                 '        before = '
                                                                 'service.public_record(row)\n'
                                                                 "        status = '結案（PASS）' if "
@@ -4099,7 +4109,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                                 "identity, 'UPDATE' if old else 'INSERT', "
                                                                 'dict(old) if old else None, after)\n'
                                                                 "        return {'data': after}\n",
-                                                     'sha256': '86ed0b56c38570801f9d6ad20e6b11e3912f6dedee67f95ca97c1fd96b207917'},
+                                                     'sha256': '9b8fdd9b2dc63fd818ff14e04911cef9258de21a21a978b59b20057c2e71fdf4'},
            'company/modules/repairs/schema.sql': {'content': 'CREATE TABLE repair_machine_models (\n'
                                                              '    machine_code TEXT PRIMARY KEY,\n'
                                                              '    model TEXT NOT NULL\n'
@@ -4572,8 +4582,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                              'machine_code=?", '
                                                              '(result["machine_code"],)).fetchone()\n'
                                                              '    if not machine:\n'
-                                                             '        raise '
-                                                             'APIError("機台不在目前本機對應表，請先核對對應資料")\n'
+                                                             '        raise APIError("機台不在目前對應表，請先確認對應資料")\n'
                                                              '    result["model"] = machine["model"]\n'
                                                              '    board = connection.execute("SELECT 1 FROM '
                                                              'repair_model_boards WHERE model=? AND '
@@ -4655,7 +4664,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                              "previous['current_status']\n"
                                                              "            if not previous['closed_on']:\n"
                                                              '                raise '
-                                                             "APIError('此舊案缺少結案日期，請先核對來源，不會自動補日期', 409)\n"
+                                                             "APIError('此案件缺少結案日期，請先確認日期', 409)\n"
                                                              "            if values['returned_on'] > "
                                                              "previous['closed_on']:\n"
                                                              '                raise '
@@ -4742,7 +4751,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                              'json.loads(entry["changes"])\n'
                                                              '            result.append(entry)\n'
                                                              '        return {"data": result}\n',
-                                                  'sha256': '935c02213097d12181e5c4299baf46ece2bf953449e56642a926c1444c0cdec0'},
+                                                  'sha256': 'bb7d7f9c47c919ca7f98427e96eab9a2b9bbe90281921f86caff5161094c453f'},
            'company/server.py': {'content': '"""Local SPMS service. Python standard library only; no cloud '
                                             'connections."""\n'
                                             '\n'
@@ -4855,7 +4864,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             'str(error)})\n'
                                             '        else:\n'
                                             '            self.send_json(503, {"error": '
-                                            '"本機資料庫暫時無法使用，請稍後重試；若持續失敗請保留資料庫並聯絡維護人員"})\n'
+                                            '"暫時無法取得資料，請稍後重試；若持續失敗請聯絡管理人員"})\n'
                                             '\n'
                                             '    def send_content(self, status, body, content_type, '
                                             'head=False, headers=None):\n'
@@ -5020,7 +5029,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             'self.headers.get("Origin", origins[0]) not in origins:\n'
                                             '                raise APIError("不允許跨網站寫入", 403)\n'
                                             '            if self.headers.get("X-SPMS-Request") != "1":\n'
-                                            '                raise APIError("缺少本機操作驗證標頭", 403)\n'
+                                            '                raise APIError("操作驗證失敗，請重新整理頁面後再試", 403)\n'
                                             '            if self.headers.get_content_type() != '
                                             '"application/json":\n'
                                             '                raise APIError("請使用 JSON 格式", 415)\n'
@@ -5137,7 +5146,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '\n'
                                             'if __name__ == "__main__":\n'
                                             '    main()\n',
-                                 'sha256': '6422b331c2678f861e4512db779d9af7416bdaa8b99829292771e251454502f6'},
+                                 'sha256': '27a51205dcfb9a6069bb6e647ab58204e477f8ca8a4531a234432cea6eab78d2'},
            'company/test_edit_access.py': {'content': 'import json\n'
                                                       'import tempfile\n'
                                                       'import time\n'
@@ -7087,30 +7096,16 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                              '  button.disabled = true;\n'
                                              "  status.textContent = '正在檢查…';\n"
                                              "  status.dataset.state = '';\n"
-                                             "  for (const id of ['sqlite-version', 'schema-version', "
-                                             "'initialized-at', 'repairs-module']) {\n"
-                                             "    document.getElementById(id).textContent = '—';\n"
-                                             '  }\n'
                                              '  try {\n'
                                              "    const response = await fetch('/api/health', { cache: "
                                              "'no-store', signal: AbortSignal.timeout(5000) });\n"
                                              '    const data = await response.json();\n'
                                              "    if (!response.ok || data.status !== 'ok') throw new "
                                              "Error('連線檢查失敗');\n"
-                                             "    document.getElementById('sqlite-version').textContent = "
-                                             'data.sqlite_version;\n'
-                                             "    document.getElementById('schema-version').textContent = "
-                                             'data.schema_version;\n'
-                                             "    document.getElementById('repairs-module').textContent = "
-                                             'data.modules?.repairs\n'
-                                             "      ? `版本 ${data.modules.repairs}（SQLite 離線功能驗收版）` : '未安裝';\n"
-                                             "    document.getElementById('initialized-at').textContent = "
-                                             'data.initialized_at;\n'
-                                             "    status.textContent = 'Python 服務正常，SQLite 已連線。';\n"
+                                             "    status.textContent = '連線正常。';\n"
                                              "    status.dataset.state = 'ok';\n"
                                              '  } catch {\n'
-                                             "    status.textContent = '無法連線，請確認 PowerShell "
-                                             "中的服務仍在執行，並查看是否有錯誤。';\n"
+                                             "    status.textContent = '暫時無法連線，請稍後重新檢查。';\n"
                                              "    status.dataset.state = 'error';\n"
                                              '  } finally {\n'
                                              '    button.disabled = false;\n'
@@ -7120,7 +7115,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                              "document.getElementById('refresh').addEventListener('click', "
                                              'checkConnection);\n'
                                              'checkConnection();\n',
-                                  'sha256': '5638337313579f6c3f2ad606761e87e027cd225aa0e5f9fb7933b943f525a8de'},
+                                  'sha256': '5cf059f39bcd3ca5c10d2ef65f5f3308824e130e14b35c0d96551eceefe63101'},
            'company/web/branding.json': {'content': '{\n'
                                                     '  "source": "docs/repairs/ghost-logo.png",\n'
                                                     '  "sha256": '
@@ -7145,12 +7140,11 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   "主檔維護', history:'全站異動紀錄', statistics:'統計資料', "
                                                   "masters:'機台／板件／價格對應'};\n"
                                                   "const operationsDialog = byId('operations-modal');\n"
-                                                  "const descriptions = {dbn:'DBN 紀錄獨立於送修案件；DUT／PIN "
-                                                  "保存當時快照。未記錄類型的舊案不猜測，編輯須補齊。', mappings:'主檔只保存 S/N、板名與 "
-                                                  "PN；歷史同步須先預覽及確認，不重算金額。', "
-                                                  "history:'本機及來源異動紀錄；共用密碼解鎖不代表具名操作人員稽核。', "
-                                                  "statistics:'首輪損壞頻率與機台排行；依結案日期加總各輪已知金額。', "
-                                                  "masters:'修改只影響後續選擇與儲存，不自動改寫既有案件、S/N 或價格快照。'};\n"
+                                                  "const descriptions = {dbn:'查看與維護 DBN 紀錄及 DUT／PIN 資訊。', "
+                                                  "mappings:'維護 S/N、板件名稱與 Part Number；同步歷史前須先預覽及確認。', "
+                                                  "history:'查看送修、DBN、主檔及價格的異動紀錄。', "
+                                                  "statistics:'首輪損壞頻率與機台排行；依結案日期加總各輪金額。', "
+                                                  "masters:'維護機台、板件與價格；修改不自動改寫既有案件。'};\n"
                                                   '\n'
                                                   'function invalidateFeatureRequests() {workspaceRequest++; '
                                                   'operationRequest++;}\n'
@@ -7455,7 +7449,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   "{repair_records:'送修',dbn_records:'DBN',serial_board_mappings:'S/N "
                                                   "對應',repair_machine_models:'機台對應',repair_model_boards:'板件對應',repair_board_prices:'價格',repair_attachments:'附件'};\n"
                                                   '  const operations = '
-                                                  "{INSERT:'新增',UPDATE:'修改',DELETE:'刪除',IMPORT:'離線匯入'};\n"
+                                                  "{INSERT:'新增',UPDATE:'修改',DELETE:'刪除',IMPORT:'資料建立'};\n"
                                                   '  const labels = '
                                                   "{...fieldLabels,board_name:'板件名稱',customer_code:'客戶',product_code:'產品',station_code:'站點',issue_type:'DBN "
                                                   "類型',issue_description:'異常描述',dut:'DUT',socket_file_id:'Socket "
@@ -7477,13 +7471,11 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   '  for (const event of events) {\n'
                                                   '    const identity = `${event.serial_no || '
                                                   "'—'}－${event.board_name || '—'}`;\n"
-                                                  '    const origin = String(event.id || '
-                                                  "'').startsWith('legacy-') ? '（來源歷史）' : '';\n"
                                                   '    const prefix = '
                                                   "[sourceDate(event.changed_at).toLocaleString('zh-TW', "
                                                   "{timeZone:'Asia/Taipei'}), `${sources[event.source_table] "
                                                   '|| event.source_table}／${operations[event.operation] || '
-                                                  'event.operation}${origin}`, identity];\n'
+                                                  'event.operation}`, identity];\n'
                                                   '    const changes = Object.entries(event.changes || '
                                                   '{}).filter(([field]) => '
                                                   "!['id','version','created_at','updated_at','source_system','source_record_id'].includes(field));\n"
@@ -7547,7 +7539,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   "  const row = element('div', 'dbn-row'), board = "
                                                   "labeledCell('板件名稱', record.board_name);\n"
                                                   "  board.append(element('div', 'dbn-issue-type', "
-                                                  "record.issue_type || '舊資料：未記錄類型（未推測 PIN）'));\n"
+                                                  "record.issue_type || '類型未設定'));\n"
                                                   '  if (record.dut) board.append(pinDetails(record));\n'
                                                   "  if (record.issue_description) board.append(element('p', "
                                                   "'detail-text', record.issue_description));\n"
@@ -8187,7 +8179,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   'record.repair_amount == null || '
                                                   'Boolean(chainResult.error) || invalidDates;\n'
                                                   "    if (invalidDates) resolve.append(element('p', "
-                                                  "'notice', '來源日期缺漏或先後異常，請核對並明確更正後再結案。'));\n"
+                                                  "'notice', '日期缺漏或先後有誤，請確認並更正後再結案。'));\n"
                                                   '    resolve.append(passButton, failButton);\n'
                                                   '    if (record.repair_amount == null) '
                                                   "resolve.append(element('p', 'hint', "
@@ -8246,6 +8238,12 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   "    content.append(element('div', "
                                                   "'history-failure-description', '異常描述：' + "
                                                   "(row.failure_description || '未提供')));\n"
+                                                  '    if (index && rows[index - 1].closed_on && '
+                                                  'row.occurred_on && row.occurred_on < rows[index - '
+                                                  '1].closed_on) {\n'
+                                                  "      content.append(element('p', 'notice', "
+                                                  "'本次損壞日期早於前次結案日期，請確認日期。'));\n"
+                                                  '    }\n'
                                                   '    if (row.attachment) {\n'
                                                   "      const link = element('a', 'history-log-link', 'Fail "
                                                   "Log：' + row.attachment.filename);\n"
@@ -8278,8 +8276,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   '  });\n'
                                                   "  type = formField('下一筆維修分類', 'select', "
                                                   'record.repair_type, catalogs.repair_types);\n'
-                                                  "  const amount = formField('金額（依目前本機價目）'); "
-                                                  'amount.readOnly = true; amount.required = false;\n'
+                                                  "  const amount = formField('金額（依目前價目）'); amount.readOnly "
+                                                  '= true; amount.required = false;\n'
                                                   '  function previewAmount() {\n'
                                                   '    const cents = repairPrice(record.model, '
                                                   'record.description, record.board_part_code, type.value);\n'
@@ -8440,49 +8438,31 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                   '= index + 1; last = row.count; return [rank, row.machine, '
                                                   'row.count];}))); container.append(rankingCard);\n'
                                                   '}\n',
-                                       'sha256': 'bcc8064b7622727adf93225674e6f5915c0823b485d194783e5a80a3046ff4db'},
+                                       'sha256': '10024386ab55748d3d154abd6bfb2ddb186d59bcffb70027d5a2d5031057a2d7'},
            'company/web/index.html': {'content': '<!doctype html>\n'
                                                  '<html lang="zh-Hant">\n'
                                                  '<head>\n'
                                                  '  <meta charset="utf-8">\n'
                                                  '  <meta name="viewport" content="width=device-width, '
                                                  'initial-scale=1">\n'
-                                                 '  <title>SPMS 公司版 — 環境與模組</title>\n'
+                                                 '  <title>SPMS</title>\n'
                                                  '  <link rel="stylesheet" href="/style.css">\n'
                                                  '  <script src="/app.js" defer></script>\n'
                                                  '</head>\n'
                                                  '<body>\n'
                                                  '  <main>\n'
-                                                 '    <p class="brand">SPMS · 公司版</p>\n'
-                                                 '    <h1>本機環境與模組</h1>\n'
-                                                 '    <p class="intro">Python 網站服務＋本機 SQLite。此頁不會連接 Supabase '
-                                                 '或其他外部服務。</p>\n'
-                                                 '    <p><a href="/repairs/">進入備品管理（SQLite 離線功能驗收版）</a></p>\n'
+                                                 '    <h1>SPMS</h1>\n'
+                                                 '    <p><a href="/repairs/">進入備品管理</a></p>\n'
                                                  '    <section aria-labelledby="connection-title">\n'
                                                  '      <h2 id="connection-title">連線狀態</h2>\n'
                                                  '      <p id="status" role="status" '
                                                  'aria-live="polite">正在檢查…</p>\n'
-                                                 '      <dl>\n'
-                                                 '        <dt>主資料庫</dt><dd>SQLite（本機）</dd>\n'
-                                                 '        <dt>SQLite 版本</dt><dd id="sqlite-version">—</dd>\n'
-                                                 '        <dt>結構版本</dt><dd id="schema-version">—</dd>\n'
-                                                 '        <dt>備品管理模組</dt><dd id="repairs-module">—</dd>\n'
-                                                 '        <dt>首次建立時間（UTC）</dt><dd '
-                                                 'id="initialized-at">—</dd>\n'
-                                                 '        <dt>存取範圍</dt><dd>僅這台電腦</dd>\n'
-                                                 '      </dl>\n'
                                                  '      <button id="refresh" type="button">重新檢查</button>\n'
                                                  '    </section>\n'
-                                                 '    <aside>\n'
-                                                 '      <strong>備品管理正在分段移植；機台管理模組預留，尚未安裝。</strong>\n'
-                                                 '      <p>可驗證送修、DBN／Socket、附件、結案／再次送修、S/N '
-                                                 '及基礎對應維護、異動紀錄與統計。舊資料尚未匯入，登入權限及正式內網部署待公司設定與 IT '
-                                                 '核准。請勿開放防火牆或當作正式服務。</p>\n'
-                                                 '    </aside>\n'
                                                  '  </main>\n'
                                                  '</body>\n'
                                                  '</html>\n',
-                                      'sha256': 'e3f833145f438ba46b30c72f729db17042a12276b0de9f41ef2976facfec9571'},
+                                      'sha256': '2bc74e069d07875723e02fe1a81f7d412e8fb52dfe1d5931cd52a19a428977b3'},
            'company/web/original.css': {'content': '/* Original SPMS CSS from docs/repairs/index.html; '
                                                    'generated by scripts/build_company_ui_assets.py. */\n'
                                                    ':root{color-scheme:dark;--bg:#101113;--side:#151618;--panel:#191a1c;--raised:#202124;--line:#292a2d;--text:#e7e7e8;--muted:#88898d;--soft:#b5b6ba;--accent:#8b8df8;--green:#65c98a;--yellow:#e3b341;--red:#ef7777;--purple:#bd91f4}\n'
@@ -9183,7 +9163,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                    '  <meta charset="utf-8">\n'
                                                    '  <meta name="viewport" content="width=device-width, '
                                                    'initial-scale=1">\n'
-                                                   '  <title>SPMS 公司版 — 備品管理</title>\n'
+                                                   '  <title>SPMS</title>\n'
                                                    '  <meta name="theme-color" content="#101113">\n'
                                                    '  <link rel="icon" type="image/png" '
                                                    'href="/repairs/ghost-logo.png">\n'
@@ -9205,11 +9185,10 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                    'System</span></span><span '
                                                    'class="switcher-chevron">⌄</span></summary><div '
                                                    'class="switcher-menu"><a href="/repairs/" '
-                                                   'aria-current="page"><span>▧</span><span>備品管理系統<small>板件送修管理 '
-                                                   '· SQLite</small></span><span '
+                                                   'aria-current="page"><span>▧</span><span>備品管理系統<small>板件送修管理</small></span><span '
                                                    'class="switcher-check">✓</span></a><span '
                                                    'class="switcher-unavailable">▦ '
-                                                   '機台管理系統<small>預留模組，尚未安裝</small></span></div></details>\n'
+                                                   '機台管理系統<small>未啟用</small></span></div></details>\n'
                                                    '    <nav aria-label="快速搜尋"><button class="nav-item" '
                                                    'id="nav-quick" type="button" aria-current="page"><span '
                                                    'aria-hidden="true">⌕</span>快速搜尋</button></nav>\n'
@@ -9245,9 +9224,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                    'data-workspace="history">全站異動紀錄</button><button '
                                                    'class="nav-item" '
                                                    'data-workspace="masters">機台／板件／價格對應</button><button '
-                                                   'class="nav-item" disabled>機台保養模組（未安裝）</button></nav>\n'
-                                                   '    <a class="environment-link" href="/">SQLite '
-                                                   '環境檢查</a>\n'
+                                                   'class="nav-item" disabled>機台保養（未啟用）</button></nav>\n'
+                                                   '    <a class="environment-link" href="/">系統首頁</a>\n'
                                                    '    <div class="edit-mode-controls"><p '
                                                    'id="edit-mode-state" role="status">唯讀模式</p><button '
                                                    'id="toggle-edit" type="button">開啟編輯</button><p '
@@ -9258,10 +9236,6 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                    'hidden><p id="startup-message"></p><button '
                                                    'id="reload-catalogs" '
                                                    'type="button">重新讀取對應表</button></div>\n'
-                                                   '    <details class="local-information"><summary>SQLite '
-                                                   '本機移植版 · 不連接 Supabase</summary><p '
-                                                   'class="notice">公司端略過的驗證仍標為未驗收。密碼解鎖僅供防誤觸，不是個人登入或具名稽核。來源資料須另行確認匯入；畫面一致性及正式內網部署仍待驗收／IT '
-                                                   '核准。</p></details>\n'
                                                    '    <section id="quick-view" class="quick-search-view">\n'
                                                    '      <div '
                                                    'class="quick-search-intro"><h1>SPMS</h1><p>Enter a board '
@@ -9278,7 +9252,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                    'quick-search-submit" '
                                                    'type="submit">Search</button></div></form>\n'
                                                    '      <p id="quick-message" role="status" '
-                                                   'aria-live="polite">輸入 S/N 查詢本機送修與 DBN 紀錄。</p>\n'
+                                                   'aria-live="polite">輸入 S/N 查詢送修與 DBN 紀錄。</p>\n'
                                                    '      <div id="quick-results" '
                                                    'class="quick-search-results"></div>\n'
                                                    '    </section>\n'
@@ -9339,7 +9313,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                    'value="INSERT">新增</option><option '
                                                    'value="UPDATE">修改</option><option '
                                                    'value="DELETE">刪除</option><option '
-                                                   'value="IMPORT">離線匯入</option></select></label>\n'
+                                                   'value="IMPORT">資料建立</option></select></label>\n'
                                                    '        <label>開始日期<input id="history-start" type="date" '
                                                    'form="workspace-search"></label>\n'
                                                    '        <label>結束日期<input id="history-end" type="date" '
@@ -9430,7 +9404,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                    'id="create-attachment" accept=".txt,.asc"><p '
                                                    'class="hint">每筆限一個非空 .txt／.asc，最大 5 '
                                                    'MB；編輯附件請至詳細資料。</p></div>\n'
-                                                   '      <p class="hint">新增依本機價目計價；一般編輯保留原金額。未設定不等於 0 '
+                                                   '      <p class="hint">新增依目前價目計價；一般編輯保留原金額。未設定不等於 0 '
                                                    '元。</p>\n'
                                                    '    </div>\n'
                                                    '    <p id="form-message" role="status" '
@@ -9470,7 +9444,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                    'type="submit">開啟編輯</button></div></form></dialog>\n'
                                                    '</body>\n'
                                                    '</html>\n',
-                                        'sha256': '3691d54e1c9d3c590fb9a90ea0915cbe832c8116be1b6fe71d44192684b2f847'},
+                                        'sha256': '61e4e04f3132c060334a1f7cb4bc28cd42d3294bed4ca8933fec4bb144a3703e'},
            'company/web/repairs.js': {'content': 'const byId = id => document.getElementById(id);\n'
                                                  'let catalogs, current = null, mapping = null, '
                                                  'mappingRequest = 0, saving = false;\n'
@@ -9509,11 +9483,11 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  '  try {\n'
                                                  '    let response, data;\n'
                                                  '    try {response = await fetch(path, options);}\n'
-                                                 "    catch (error) {throw new Error('本機服務連線失敗，請確認 Python "
-                                                 "服務仍在執行：' + error.message);}\n"
+                                                 '    catch {throw new '
+                                                 "Error('暫時無法連線，請稍後再試。儲存結果不明時，請先查詢確認，避免重複操作。');}\n"
                                                  '    try {data = await response.json();}\n'
-                                                 "    catch {throw new Error('本機服務回應不是有效 "
-                                                 "JSON；請保留錯誤並確認服務版本。寫入結果未知時勿直接重送。');}\n"
+                                                 '    catch {throw new '
+                                                 "Error('服務回應異常，請稍後再試。儲存結果不明時，請先查詢確認，避免重複操作。');}\n"
                                                  '    if (!response.ok) {\n'
                                                  '      if (response.status === 401 && '
                                                  "!path.startsWith('/api/edit/')) {editToken = ''; "
@@ -9534,8 +9508,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  "'$1:00').replace(/(\\.\\d{3})\\d+/, '$1'));\n"
                                                  '}\n'
                                                  'function updateEditControls() {\n'
-                                                 "  byId('edit-mode-state').textContent = editToken ? "
-                                                 "'編輯模式（共用密碼，非個人帳號）' : '唯讀模式';\n"
+                                                 "  byId('edit-mode-state').textContent = editToken ? '編輯模式' "
+                                                 ": '唯讀模式';\n"
                                                  "  byId('toggle-edit').textContent = editToken ? '結束編輯' : "
                                                  "'開啟編輯';\n"
                                                  '  for (const button of '
@@ -9729,6 +9703,19 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  '  return section;\n'
                                                  '}\n'
                                                  '\n'
+                                                 'function recordDateWarnings(record) {\n'
+                                                 '  const warnings = [];\n'
+                                                 '  if (record.sent_on && record.sent_on < '
+                                                 "record.occurred_on) warnings.push('送修日期早於損壞日期，請確認日期。');\n"
+                                                 '  if (record.returned_on && (!record.sent_on || '
+                                                 'record.returned_on < record.sent_on)) '
+                                                 "warnings.push('回修日期早於送修日期或未填送修日期，請確認日期。');\n"
+                                                 '  if (record.closed_on && record.returned_on && '
+                                                 'record.closed_on < record.returned_on) '
+                                                 "warnings.push('結案日期早於回修日期，請確認日期。');\n"
+                                                 '  return warnings;\n'
+                                                 '}\n'
+                                                 '\n'
                                                  'async function openDetail(id) {\n'
                                                  '  const request = ++detailRequest;\n'
                                                  "  byId('detail-message').textContent = '';\n"
@@ -9762,18 +9749,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  "element('div', 'detail-text', "
                                                  'record.failure_description));\n'
                                                  '    body.append(failure);\n'
-                                                 '    if (record.legacy_source) {\n'
-                                                 "      const source = element('details', 'detail-section'); "
-                                                 "source.append(element('summary', '', '唯讀來源欄位（匯入當時）'));\n"
-                                                 '      for (const [key, value] of '
-                                                 'Object.entries(record.legacy_source)) '
-                                                 "source.append(element('p', 'detail-text', `${key}: ${value "
-                                                 "|| '（空白）'}`));\n"
-                                                 '      body.append(source);\n'
-                                                 '    }\n'
-                                                 '    for (const warning of record.legacy_warnings || []) '
-                                                 "body.append(element('p', 'notice', '來源核對提醒（匯入時）：' + "
-                                                 'warning));\n'
+                                                 '    for (const warning of recordDateWarnings(record)) '
+                                                 "body.append(element('p', 'notice', warning));\n"
                                                  '    if (!detail.open) detail.showModal();\n'
                                                  "    if (typeof renderDetailFeatures === 'function') await "
                                                  'renderDetailFeatures(record, body, () => request === '
@@ -9871,7 +9848,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  "=> row.status === 'rejected') ? "
                                                  "'部分查詢失敗，以下只顯示已成功讀取的資料；不可當成完整歷史或零筆。可再按 Search 重新查詢。' : "
                                                  "records.total || dbn.total ? '點選送修紀錄查看詳細資料。' : '此 S/N "
-                                                 "尚無本機送修或 DBN 紀錄。';\n"
+                                                 "尚無送修或 DBN 紀錄。';\n"
                                                  '  } catch (error) {if (request === quickRequest) '
                                                  "byId('quick-message').textContent = error.message;}\n"
                                                  '}\n'
@@ -10129,7 +10106,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  "        if (event.operation === 'INSERT') item.textContent "
                                                  '= `${time} 新增 ${event.serial_no}－${event.board_name}`;\n'
                                                  '        else item.textContent = `${time} ${event.operation '
-                                                 "=== 'IMPORT' ? '匯入' : '修改'}\\n` + "
+                                                 "=== 'IMPORT' ? '資料建立' : '修改'}\\n` + "
                                                  'Object.entries(event.changes).map(([field, change]) => '
                                                  '`${fieldLabels[field] || field}：${typeof change.old === '
                                                  "'object' && change.old !== null ? "
@@ -10295,7 +10272,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  '    await loadRecords();\n'
                                                  '  } catch (error) {\n'
                                                  "    byId('startup-error').hidden = false; "
-                                                 "byId('startup-message').textContent = '無法載入本機對應表：' + "
+                                                 "byId('startup-message').textContent = '無法載入對應表：' + "
                                                  'error.message;\n'
                                                  "    byId('message').textContent = error.message; "
                                                  "byId('message').dataset.error = 'true';\n"
@@ -10305,7 +10282,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                  "byId('reload-catalogs').addEventListener('click', "
                                                  'initializeApp);\n'
                                                  'initializeApp();\n',
-                                      'sha256': '0f41f0e68b833bc9591187c6e47b09a52050ba0a5d80340b6e1ee8a4d74ee45a'},
+                                      'sha256': '1e9f6518845ba8897119ad69851bda5d7b419287cb73b9b940459c2c92099a84'},
            'company/web/style.css': {'content': ':root{color-scheme:dark;font-family:"Segoe '
                                                 'UI",sans-serif;background:#101113;color:#e7e7e8}\n'
                                                 '*{box-sizing:border-box}body{margin:0}main{max-width:850px;margin:60px '
@@ -10326,7 +10303,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                 '@media(max-width:600px){main{margin:25px auto;padding:0 '
                                                 '16px}h1{font-size:22px}section{padding:18px}dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:10px}}\n',
                                      'sha256': '064406c8758be5620dfe7440f59d59ec1de5f6307e74f5bad85dd03e018c0769'}},
- 'version': '2026-11-02-edit-legacy'}
+ 'version': '2026-11-04-spms-ui'}
 
 
 def check_local_path(path):

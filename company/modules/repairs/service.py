@@ -165,7 +165,7 @@ def validate(connection, payload, historical=False):
         raise APIError("回修日期不得早於送修日期，且須有送修日期")
     machine = connection.execute("SELECT model FROM repair_machine_models WHERE machine_code=?", (result["machine_code"],)).fetchone()
     if not machine:
-        raise APIError("機台不在目前本機對應表，請先核對對應資料")
+        raise APIError("機台不在目前對應表，請先確認對應資料")
     result["model"] = machine["model"]
     board = connection.execute("SELECT 1 FROM repair_model_boards WHERE model=? AND board_name=? AND board_part_code=?",
                                (result["model"], result["description"], result["board_part_code"])).fetchone()
@@ -210,7 +210,7 @@ def save_record(path, payload, record_id=None):
         if previous and previous['current_status'] not in ACTIVE_STATUSES:
             values['current_status'] = previous['current_status']
             if not previous['closed_on']:
-                raise APIError('此舊案缺少結案日期，請先核對來源，不會自動補日期', 409)
+                raise APIError('此案件缺少結案日期，請先確認日期', 409)
             if values['returned_on'] > previous['closed_on']:
                 raise APIError('回修日期不得晚於結案日期')
         if not record_id and values["current_status"] != "待送修":

@@ -201,7 +201,7 @@ def resolve(path, identity, payload):
         if today < row['returned_on']:
             raise APIError('回修日期在未來，不能結案')
         if not row['sent_on'] or row['returned_on'] < row['sent_on'] or row['sent_on'] < row['occurred_on']:
-            raise APIError('舊案日期先後異常，請核對並明確更正後再結案', 409)
+            raise APIError('日期先後有誤，請確認並更正後再結案', 409)
         before = service.public_record(row)
         status = '結案（PASS）' if payload['passed'] else '結案（FAIL）'
         if payload['passed'] and set(payload) - {'expected_version', 'passed'}:
