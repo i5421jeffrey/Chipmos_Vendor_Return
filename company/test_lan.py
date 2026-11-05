@@ -22,7 +22,7 @@ from test_repairs import example
 class LANOptionsTests(unittest.TestCase):
     def test_approved_default_and_explicit_lan(self):
         default = startup_options([])
-        self.assertEqual(default.host, '10.1.121.135')
+        self.assertEqual(default.host, '0.0.0.0')
         self.assertEqual(default.port, 8082)
         self.assertEqual(startup_options(['--port','3080']).port, 3080)
         self.assertEqual(list(map(str, default.client_subnet)), ['10.1.121.0/24'])
@@ -38,6 +38,8 @@ class LANOptionsTests(unittest.TestCase):
         args = startup_options(['--host','192.168.10.20','--client-subnet','192.168.10.0/24','--allow-http-lan'])
         self.assertTrue(args.lan)
         self.assertEqual(str(args.client_subnet[0]), '192.168.10.0/24')
+        wildcard = startup_options(['--host','0.0.0.0','--client-subnet','10.1.121.0/24','--allow-http-lan'])
+        self.assertEqual(wildcard.host, '0.0.0.0')
 
     def test_reject_unsafe_or_incomplete_options(self):
         cases = [ ['--host','0.0.0.0'], ['--host','8.8.8.8'], ['--host','localhost'],
@@ -65,14 +67,33 @@ class LANHTTPTests(unittest.TestCase):
         initialize_database(self.database)
         configure(self.root / 'edit-password.json','test-only')
 
-    def start(self, context=None):
-        server = LocalServer(('127.0.0.1',0), self.database, [client_network('192.168.10.0/24')], context)
+    def start(self, context=None, host='127.0.0.1', subnets=('192.168.10.0/24',)):
+        server = LocalServer((host,0), self.database, [client_network(value) for value in subnets], context)
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         self.addCleanup(server.server_close)
         self.addCleanup(thread.join,5)
         self.addCleanup(server.shutdown)
         return server
+
+    def test_wildcard_listener_keeps_host_subnet_and_edit_guards(self):
+        server = self.start(host='0.0.0.0', subnets=('10.1.121.0/24',))
+        self.assertEqual(server.server_address[0], '0.0.0.0')
+        self.assertEqual(self.request(server,'/api/health')[0], 200)
+        for host in ('localhost', '10.1.121.135'):
+            status,_ = self.request(server,'/api/health', headers={'Host':f'{host}:{server.server_port}'})
+            self.assertEqual(status,200)
+        for host in ('0.0.0.0','attacker.example','10.1.121.61'):
+            self.assertEqual(self.request(server,'/api/health',headers={'Host':f'{host}:{server.server_port}'})[0],403)
+        self.assertTrue(server.verify_request(None,('10.1.121.45',1234)))
+        self.assertFalse(server.verify_request(None,('10.1.122.45',1234)))
+        self.assertFalse(server.verify_request(None,('8.8.8.8',1234)))
+        self.assertEqual(self.request(server,'/api/repairs/records','POST',example())[0],401)
+        origin = f'http://127.0.0.1:{server.server_port}'
+        status,data = self.request(server,'/api/edit/unlock','POST',{'password':'test-only'}, {'Origin':origin})
+        self.assertEqual(status,200)
+        self.assertEqual(self.request(server,'/api/repairs/records','POST',example(), {'Origin':origin,'X-SPMS-Edit-Token':data['token']})[0],201)
+        self.assertEqual(self.request(server,'/api/edit/unlock','POST',{'password':'test-only'}, {'Origin':'http://attacker.example'})[0],403)
 
     def request(self, server, path, method='GET', body=None, headers=None, context=None):
         defaults = {'X-SPMS-Request':'1','Content-Type':'application/json'}

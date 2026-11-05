@@ -24,8 +24,8 @@ PRIVATE_NETWORKS = tuple(ipaddress.ip_network(value) for value in ('10.0.0.0/8',
 
 def bind_address(value):
     address = ipaddress.IPv4Address(value)
-    if not address.is_loopback and not any(address in network for network in PRIVATE_NETWORKS):
-        raise ValueError('host must be a specific private IPv4 address (not 0.0.0.0 or a public IP)')
+    if str(address) != '0.0.0.0' and not address.is_loopback and not any(address in network for network in PRIVATE_NETWORKS):
+        raise ValueError('host must be a private IPv4, loopback or the approved 0.0.0.0 test listener')
     return str(address)
 
 
@@ -99,8 +99,13 @@ class LocalServer(ThreadingHTTPServer):
         self.database = database
         self.edit_gate = EditGate(Path(database).parent / 'edit-password.json')
         super().__init__((host, address[1]), Handler)
-        self.allowed_hosts = {f'{host}:{self.server_port}'}
-        if not self.lan:
+        # Wildcard listening does not mean accepting arbitrary Host headers.
+        # This test profile exposes only the user's known LAN URL and loopback.
+        access_host = '10.1.121.135' if host == '0.0.0.0' else host
+        self.allowed_hosts = {f'{access_host}:{self.server_port}'}
+        if host == '0.0.0.0':
+            self.allowed_hosts.add(f'127.0.0.1:{self.server_port}')
+        if not self.lan or host == '0.0.0.0':
             self.allowed_hosts.add(f'localhost:{self.server_port}')
         if tls_context:
             # Handshake occurs in the request thread, not the accept loop.
@@ -336,7 +341,7 @@ class Handler(BaseHTTPRequestHandler):
 def startup_options(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8082)
-    parser.add_argument('--host', help='Specific private IPv4 address; omitted uses approved 10.1.121.135 LAN profile; use 127.0.0.1 for local-only access')
+    parser.add_argument('--host', help='IPv4 bind address; default uses approved 0.0.0.0 test listener; use 10.1.121.135 for one interface or 127.0.0.1 for local-only access')
     parser.add_argument('--client-subnet', action='append', default=[], help='Allowed IPv4 CIDR; repeat for multiple IT-approved subnets')
     parser.add_argument('--tls-cert', type=Path, help='IT-issued PEM certificate with IP subjectAltName')
     parser.add_argument('--tls-key', type=Path, help='Protected PEM private key; never package or commit')
@@ -345,7 +350,7 @@ def startup_options(argv=None):
     # User-approved host profile. An explicit --host does not inherit its
     # plaintext acknowledgement or subnet; custom LANs remain explicit.
     if args.host is None:
-        args.host = '10.1.121.135'
+        args.host = '0.0.0.0'
         if not args.client_subnet:
             args.client_subnet = ['10.1.121.0/24']
         if not args.tls_cert and not args.tls_key:
@@ -379,7 +384,11 @@ def main():
         raise SystemExit('Set the edit password with company/edit_access.py before enabling LAN access.')
     initialize_database(database)
     with LocalServer((args.host, args.port), database, args.client_subnet, context) as server:
-        print(f"SPMS: {server.scheme}://{args.host}:{args.port}/repairs/", flush=True)
+        access_host = '10.1.121.135' if args.host == '0.0.0.0' else args.host
+        print(f"SPMS: {server.scheme}://{access_host}:{args.port}/repairs/", flush=True)
+        if args.host == '0.0.0.0':
+            print(f'Listening on all IPv4 interfaces: 0.0.0.0:{args.port}', flush=True)
+            print(f'Local URL: {server.scheme}://127.0.0.1:{args.port}/repairs/', flush=True)
         print(f"SQLite: {database}", flush=True)
         if args.lan:
             print('Allowed client subnets: ' + ', '.join(map(str, args.client_subnet)), flush=True)

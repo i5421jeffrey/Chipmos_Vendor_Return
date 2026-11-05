@@ -18,6 +18,15 @@ from uuid import uuid4
 
 BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管理：本機功能整批對照與交付界線\n'
                                                            '\n'
+                                                           '## 所有 IPv4 網卡監聽對照測試（2026-11-05）\n'
+                                                           '\n'
+                                                           '使用者明確選擇選項 2：預設監聽 `0.0.0.0:8082`，網址仍為 '
+                                                           '`10.1.121.135:8082`，並可使用 '
+                                                           '`127.0.0.1:8082`／`localhost:8082`。本節取代下方歷史預設與禁止 '
+                                                           'wildcard 的描述。來源網段、精確 Host、同源及編輯密碼保護保留；其他網卡／VPN '
+                                                           '也會監聽，但不擴大來源白名單。不設定防火牆或 Proxy、不保證解決代理驗證，Windows '
+                                                           '實際效果未驗證。\n'
+                                                           '\n'
                                                            '## 預設連接埠 8082（2026-11-05）\n'
                                                            '\n'
                                                            '使用者指定預設 port 改為 `8082`，IP 維持 `10.1.121.135`，HTTP '
@@ -187,8 +196,25 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                            '`.venv`，也不自動啟動服務、匯入真實舊資料或開放內網。\n'
                                                            '真實來源包與預覽結果只保存在使用者核准的本機資料夾，不放入儲存庫或通用安裝檔；公司正式匯入仍需停止服務、預檢及 '
                                                            '`IMPORT` 確認。\n',
-                                                'sha256': '837af42715f7505d484a15598d74e622530b6259c1d5b2841e243e66f31e426a'},
+                                                'sha256': 'e431297543ddc94d9f7c2b620a034e1ff5e6002947578deed74f33c588faac56'},
            'company/LAN_SETUP.md': {'content': '# SPMS：Windows 11 內網共用\n'
+                                               '\n'
+                                               '## 最新監聽對照測試：0.0.0.0（2026-11-05）\n'
+                                               '\n'
+                                               '使用者明確同意測試所有 IPv4 網卡，預設改成 `0.0.0.0:8082`。本節取代下方歷史單一 IP 綁定與禁止 '
+                                               'wildcard 的描述。無參數啟動即可；本機開 `http://127.0.0.1:8082/repairs/` 或 '
+                                               '`http://localhost:8082/repairs/`，其他電腦開 '
+                                               '`http://10.1.121.135:8082/repairs/`。**不要在瀏覽器使用 '
+                                               '0.0.0.0**；它是監聽位址，不會把 Windows 網卡 IP 改成 0.0.0.0。\n'
+                                               '\n'
+                                               '來源仍限 loopback 與 `10.1.121.0/24`；Host 只允許上述三種名稱與實際 '
+                                               'port，不接受任意主機名稱或其他網卡 IP。寫入仍須同源與編輯 token。所有 IPv4 網卡（含 '
+                                               'VPN）會有監聽，防火牆應維持公司核准的範圍；不開放公共來源、不改系統網路設定。此變更不會解除 Proxy 驗證，主機 '
+                                               '`.135` 位址是否存在亦不再由 bind 保證，須確認 ipconfig。\n'
+                                               '\n'
+                                               '回到單一網卡：使用 `--host 10.1.121.135 --client-subnet 10.1.121.0/24 '
+                                               '--allow-http-lan`；僅本機：使用 `--host 127.0.0.1`。保持單一服務執行，先 '
+                                               'Ctrl+C 停服務再換設定。若要更換對外 IP／名稱，須另外檢查 Host 白名單，不能只改 Windows IP。\n'
                                                '\n'
                                                '## 最新預設連接埠：8082（2026-11-05）\n'
                                                '\n'
@@ -351,13 +377,15 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                '停用內網：Ctrl+C 停服務，由 IT 停用 `SPMS TCP 8765` 規則；以現有 venv Python '
                                                '執行 `company/server.py --host '
                                                '127.0.0.1`，即只允許本機。若工作排程器已啟用，須同步停用或修改該工作，避免自動重新開放。\n',
-                                    'sha256': '5a7a3e7676233661a2bfb7ed8ce2a36cce79a91682db883f34dfaca2c950d247'},
+                                    'sha256': 'd99160101849a035de939b457adf4455e11b39ada38e7dedbf6334eb7ee7ca28'},
            'company/README.md': {'content': '# SPMS 公司版：SQLite 離線功能驗收\n'
                                             '\n'
-                                            '只使用 Python 與主機 SQLite，不連接或更新 Supabase。依使用者要求使用原主機 '
-                                            '`10.1.121.135:8082`、允許 `10.1.121.0/24`，採 HTTP；僅本機須加 `--host '
-                                            '127.0.0.1`。內網步驟見 [LAN_SETUP.md](LAN_SETUP.md)。公司舊資料匯入及 verify '
-                                            '結果已由使用者回報完成，不需重匯。\n'
+                                            '只使用 Python 與主機 SQLite，不連接或更新 Supabase。依使用者明確同意，測試預設監聽所有 IPv4 網卡 '
+                                            '`0.0.0.0:8082`，內網網址 `http://10.1.121.135:8082/repairs/`，本機亦可用 '
+                                            '`http://127.0.0.1:8082/repairs/`。來源仍限 '
+                                            '`10.1.121.0/24`／loopback，Host 與編輯保護保留；僅本機須加 `--host '
+                                            '127.0.0.1`。此設定取代下方舊的單一 IP 監聽說明，詳見 '
+                                            '[LAN_SETUP.md](LAN_SETUP.md)。公司舊資料匯入及 verify 結果已由使用者回報完成，不需重匯。\n'
                                             '已提供共用密碼解鎖編輯，以及核准 CSV／附件的離線轉換、來源封存與副本試匯入；不是個人帳號／角色系統。\n'
                                             '不需安裝第三方套件。目標環境：Windows 11、Python 3.13、現代瀏覽器。\n'
                                             '\n'
@@ -751,7 +779,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '產生；公司版程式更新後必須重新產生。\n'
                                             '安裝測試：`python -m unittest discover -s scripts -p '
                                             '"test_company_installer.py" -v`。\n',
-                                 'sha256': '5551e44d8c10e77588afb1ff6e5b01992ea5469da316aaa18791dcf0e5fb9d2f'},
+                                 'sha256': '5a80b2ad6584e8693d59752bd5cc35f3857c3e90abd9581bc6cb061fac2eabff'},
            'company/database.py': {'content': '"""Shared SQLite connections and additive, backed-up module '
                                               'migrations."""\n'
                                               'import json\n'
@@ -4994,10 +5022,11 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '\n'
                                             'def bind_address(value):\n'
                                             '    address = ipaddress.IPv4Address(value)\n'
-                                            '    if not address.is_loopback and not any(address in network '
-                                            'for network in PRIVATE_NETWORKS):\n'
-                                            "        raise ValueError('host must be a specific private IPv4 "
-                                            "address (not 0.0.0.0 or a public IP)')\n"
+                                            "    if str(address) != '0.0.0.0' and not address.is_loopback "
+                                            'and not any(address in network for network in '
+                                            'PRIVATE_NETWORKS):\n'
+                                            "        raise ValueError('host must be a private IPv4, loopback "
+                                            "or the approved 0.0.0.0 test listener')\n"
                                             '    return str(address)\n'
                                             '\n'
                                             '\n'
@@ -5090,8 +5119,18 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '        self.edit_gate = EditGate(Path(database).parent / '
                                             "'edit-password.json')\n"
                                             '        super().__init__((host, address[1]), Handler)\n'
-                                            "        self.allowed_hosts = {f'{host}:{self.server_port}'}\n"
-                                            '        if not self.lan:\n'
+                                            '        # Wildcard listening does not mean accepting arbitrary '
+                                            'Host headers.\n'
+                                            "        # This test profile exposes only the user's known LAN "
+                                            'URL and loopback.\n'
+                                            "        access_host = '10.1.121.135' if host == '0.0.0.0' else "
+                                            'host\n'
+                                            '        self.allowed_hosts = '
+                                            "{f'{access_host}:{self.server_port}'}\n"
+                                            "        if host == '0.0.0.0':\n"
+                                            '            '
+                                            "self.allowed_hosts.add(f'127.0.0.1:{self.server_port}')\n"
+                                            "        if not self.lan or host == '0.0.0.0':\n"
                                             '            '
                                             "self.allowed_hosts.add(f'localhost:{self.server_port}')\n"
                                             '        if tls_context:\n'
@@ -5429,9 +5468,9 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             'def startup_options(argv=None):\n'
                                             '    parser = argparse.ArgumentParser(description=__doc__)\n'
                                             '    parser.add_argument("--port", type=int, default=8082)\n'
-                                            "    parser.add_argument('--host', help='Specific private IPv4 "
-                                            'address; omitted uses approved 10.1.121.135 LAN profile; use '
-                                            "127.0.0.1 for local-only access')\n"
+                                            "    parser.add_argument('--host', help='IPv4 bind address; "
+                                            'default uses approved 0.0.0.0 test listener; use 10.1.121.135 '
+                                            "for one interface or 127.0.0.1 for local-only access')\n"
                                             "    parser.add_argument('--client-subnet', action='append', "
                                             "default=[], help='Allowed IPv4 CIDR; repeat for multiple "
                                             "IT-approved subnets')\n"
@@ -5448,7 +5487,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '    # plaintext acknowledgement or subnet; custom LANs remain '
                                             'explicit.\n'
                                             '    if args.host is None:\n'
-                                            "        args.host = '10.1.121.135'\n"
+                                            "        args.host = '0.0.0.0'\n"
                                             '        if not args.client_subnet:\n'
                                             "            args.client_subnet = ['10.1.121.0/24']\n"
                                             '        if not args.tls_cert and not args.tls_key:\n'
@@ -5489,9 +5528,16 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '    initialize_database(database)\n'
                                             '    with LocalServer((args.host, args.port), database, '
                                             'args.client_subnet, context) as server:\n'
+                                            "        access_host = '10.1.121.135' if args.host == '0.0.0.0' "
+                                            'else args.host\n'
                                             '        print(f"SPMS: '
-                                            '{server.scheme}://{args.host}:{args.port}/repairs/", '
+                                            '{server.scheme}://{access_host}:{args.port}/repairs/", '
                                             'flush=True)\n'
+                                            "        if args.host == '0.0.0.0':\n"
+                                            "            print(f'Listening on all IPv4 interfaces: "
+                                            "0.0.0.0:{args.port}', flush=True)\n"
+                                            "            print(f'Local URL: "
+                                            "{server.scheme}://127.0.0.1:{args.port}/repairs/', flush=True)\n"
                                             '        print(f"SQLite: {database}", flush=True)\n'
                                             '        if args.lan:\n'
                                             "            print('Allowed client subnets: ' + ', "
@@ -5512,7 +5558,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '\n'
                                             'if __name__ == "__main__":\n'
                                             '    main()\n',
-                                 'sha256': 'e34872a1e7b88cf864b9ca42e703462e3837020664e7bf2888aed240314a74e5'},
+                                 'sha256': '5880b70a21de95527b41bfdafd4a728193fea05c4ae40db50ce8def4ae13c85a'},
            'company/test_edit_access.py': {'content': 'import json\n'
                                                       'import tempfile\n'
                                                       'import time\n'
@@ -6728,7 +6774,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                               'class LANOptionsTests(unittest.TestCase):\n'
                                               '    def test_approved_default_and_explicit_lan(self):\n'
                                               '        default = startup_options([])\n'
-                                              "        self.assertEqual(default.host, '10.1.121.135')\n"
+                                              "        self.assertEqual(default.host, '0.0.0.0')\n"
                                               '        self.assertEqual(default.port, 8082)\n'
                                               '        '
                                               "self.assertEqual(startup_options(['--port','3080']).port, "
@@ -6750,6 +6796,9 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                               '        self.assertTrue(args.lan)\n'
                                               '        self.assertEqual(str(args.client_subnet[0]), '
                                               "'192.168.10.0/24')\n"
+                                              '        wildcard = '
+                                              "startup_options(['--host','0.0.0.0','--client-subnet','10.1.121.0/24','--allow-http-lan'])\n"
+                                              "        self.assertEqual(wildcard.host, '0.0.0.0')\n"
                                               '\n'
                                               '    def test_reject_unsafe_or_incomplete_options(self):\n'
                                               "        cases = [ ['--host','0.0.0.0'], ['--host','8.8.8.8'], "
@@ -6787,9 +6836,10 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                               '        configure(self.root / '
                                               "'edit-password.json','test-only')\n"
                                               '\n'
-                                              '    def start(self, context=None):\n'
-                                              "        server = LocalServer(('127.0.0.1',0), self.database, "
-                                              "[client_network('192.168.10.0/24')], context)\n"
+                                              "    def start(self, context=None, host='127.0.0.1', "
+                                              "subnets=('192.168.10.0/24',)):\n"
+                                              '        server = LocalServer((host,0), self.database, '
+                                              '[client_network(value) for value in subnets], context)\n'
                                               '        thread = '
                                               'threading.Thread(target=server.serve_forever, daemon=True)\n'
                                               '        thread.start()\n'
@@ -6797,6 +6847,42 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                               '        self.addCleanup(thread.join,5)\n'
                                               '        self.addCleanup(server.shutdown)\n'
                                               '        return server\n'
+                                              '\n'
+                                              '    def '
+                                              'test_wildcard_listener_keeps_host_subnet_and_edit_guards(self):\n'
+                                              "        server = self.start(host='0.0.0.0', "
+                                              "subnets=('10.1.121.0/24',))\n"
+                                              '        self.assertEqual(server.server_address[0], '
+                                              "'0.0.0.0')\n"
+                                              '        '
+                                              "self.assertEqual(self.request(server,'/api/health')[0], 200)\n"
+                                              "        for host in ('localhost', '10.1.121.135'):\n"
+                                              "            status,_ = self.request(server,'/api/health', "
+                                              "headers={'Host':f'{host}:{server.server_port}'})\n"
+                                              '            self.assertEqual(status,200)\n'
+                                              '        for host in '
+                                              "('0.0.0.0','attacker.example','10.1.121.61'):\n"
+                                              '            '
+                                              "self.assertEqual(self.request(server,'/api/health',headers={'Host':f'{host}:{server.server_port}'})[0],403)\n"
+                                              '        '
+                                              "self.assertTrue(server.verify_request(None,('10.1.121.45',1234)))\n"
+                                              '        '
+                                              "self.assertFalse(server.verify_request(None,('10.1.122.45',1234)))\n"
+                                              '        '
+                                              "self.assertFalse(server.verify_request(None,('8.8.8.8',1234)))\n"
+                                              '        '
+                                              "self.assertEqual(self.request(server,'/api/repairs/records','POST',example())[0],401)\n"
+                                              "        origin = f'http://127.0.0.1:{server.server_port}'\n"
+                                              '        status,data = '
+                                              "self.request(server,'/api/edit/unlock','POST',{'password':'test-only'}, "
+                                              "{'Origin':origin})\n"
+                                              '        self.assertEqual(status,200)\n'
+                                              '        '
+                                              "self.assertEqual(self.request(server,'/api/repairs/records','POST',example(), "
+                                              "{'Origin':origin,'X-SPMS-Edit-Token':data['token']})[0],201)\n"
+                                              '        '
+                                              "self.assertEqual(self.request(server,'/api/edit/unlock','POST',{'password':'test-only'}, "
+                                              "{'Origin':'http://attacker.example'})[0],403)\n"
                                               '\n'
                                               "    def request(self, server, path, method='GET', body=None, "
                                               'headers=None, context=None):\n'
@@ -6915,7 +7001,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                               '\n'
                                               "if __name__ == '__main__':\n"
                                               '    unittest.main()\n',
-                                   'sha256': '700e06bd35a159144522b7c5844e242a5e073ef5190a4ebec811d26ac16c9378'},
+                                   'sha256': 'a922f8803794edce76f1d56cf7fc04dfc0c0786c55d62523a0e64ab1294197ee'},
            'company/test_legacy_import.py': {'content': 'import csv\n'
                                                         'import io\n'
                                                         'import json\n'
@@ -10948,7 +11034,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                 '@media(max-width:600px){main{margin:25px auto;padding:0 '
                                                 '16px}h1{font-size:22px}section{padding:18px}dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:10px}}\n',
                                      'sha256': '064406c8758be5620dfe7440f59d59ec1de5f6307e74f5bad85dd03e018c0769'}},
- 'version': '2026-11-05-port-8082'}
+ 'version': '2026-11-05-wildcard-test'}
 
 
 def check_local_path(path):

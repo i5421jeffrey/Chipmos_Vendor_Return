@@ -12,6 +12,8 @@
 
 ## Company-local staged migration
 
+- Latest listening-test override (2026-11-05): user explicitly selected option 2, wildcard IPv4 listening `0.0.0.0:8082`. This supersedes earlier prohibitions/default-specific-bind wording only for this approved test profile. Retain `10.1.121.0/24` source filtering, exact Host allowlist (`10.1.121.135`, `127.0.0.1`, `localhost` with port), same-origin checks and edit gate. Never expand arbitrary Host/subnet acceptance or alter firewall/Proxy. Browser uses real LAN IP or loopback, never 0.0.0.0. Explicit one-interface and loopback modes remain available. Do not claim this resolves Proxy authentication.
+
 - Latest port override (2026-11-05): user selected default port 8082 on the original host `10.1.121.135`, retaining HTTP and `10.1.121.0/24`. Supersedes historical 8765 wording below. Preserve explicit `--port` overrides; changing the port does not configure firewall/Proxy policy.
 
 - Latest user override (2026-11-05): restore the original SPMS host `10.1.121.135:8765` and `10.1.121.0/24` HTTP profile; the `.61` relocation and port-8085 experiments are withdrawn. Do not merge diverging test databases or claim this fixes Proxy/firewall restrictions. Preserve data/passwords and unrelated user edits.
