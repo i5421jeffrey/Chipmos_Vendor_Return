@@ -12,6 +12,8 @@
 
 ## Company-local staged migration
 
+- Latest port override (2026-11-05): user selected default port 8082 on the original host `10.1.121.135`, retaining HTTP and `10.1.121.0/24`. Supersedes historical 8765 wording below. Preserve explicit `--port` overrides; changing the port does not configure firewall/Proxy policy.
+
 - Latest user override (2026-11-05): restore the original SPMS host `10.1.121.135:8765` and `10.1.121.0/24` HTTP profile; the `.61` relocation and port-8085 experiments are withdrawn. Do not merge diverging test databases or claim this fixes Proxy/firewall restrictions. Preserve data/passwords and unrelated user edits.
 
 - Subsequent explicit user override: no-argument `company/server.py` now uses the approved HTTP host profile `10.1.121.135:8765` and `10.1.121.0/24`. This supersedes older localhost-default wording below. Use `--host 127.0.0.1` for local-only startup. Explicit alternative hosts still require explicit client subnets and TLS or HTTP acknowledgement. Do not silently fall back when the configured IP is unavailable; this does not fix company Proxy/firewall policy.
