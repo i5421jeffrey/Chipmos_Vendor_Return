@@ -18,19 +18,12 @@ from uuid import uuid4
 
 BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管理：本機功能整批對照與交付界線\n'
                                                            '\n'
-                                                           '## 預設連接埠更新\n'
+                                                           '## 返回原主機（2026-11-05）\n'
                                                            '\n'
-                                                           '使用者指定預設連接埠改為 8085，主機維持 `10.1.121.61`、網段 '
-                                                           '`10.1.121.0/24`，採 HTTP。此設定取代下方歷史版本的 8765；支援 '
-                                                           '`--port` 覆蓋，不改資料、密碼、防火牆或 Proxy。\n'
-                                                           '\n'
-                                                           '## 換機測試（2026-11-04）\n'
-                                                           '\n'
-                                                           '使用者要求預設主機由 `10.1.121.135` 改為 `10.1.121.61`，保留 '
-                                                           'HTTP 8765 及 '
-                                                           '`10.1.121.0/24`；此設定取代下方歷史描述。不搬移實際公司資料、不改 Proxy '
-                                                           '或防火牆。搬移須停止服務、完整保留 data、在新主機重建 venv 並先 '
-                                                           'verify，測試副本不自動同步，詳見 LAN_SETUP.md。\n'
+                                                           '依使用者要求撤回換機與 8085 連接埠測試，恢復預設 '
+                                                           '`10.1.121.135:8765`、HTTP 及 '
+                                                           '`10.1.121.0/24`。不變更業務功能、資料庫、密碼、防火牆或 '
+                                                           'Proxy，不合併或覆蓋其他主機的測試資料。\n'
                                                            '\n'
                                                            '## 指定主機預設覆蓋（2026-11-04）\n'
                                                            '\n'
@@ -187,21 +180,15 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                            '`.venv`，也不自動啟動服務、匯入真實舊資料或開放內網。\n'
                                                            '真實來源包與預覽結果只保存在使用者核准的本機資料夾，不放入儲存庫或通用安裝檔；公司正式匯入仍需停止服務、預檢及 '
                                                            '`IMPORT` 確認。\n',
-                                                'sha256': 'c553c421d5f10d7103b087a216d027385c84733105080085ad6737dd180aae63'},
+                                                'sha256': '3a8fa506b1b218bfa3f24be1038092e74377b239738d155b686efa3fff6d4016'},
            'company/LAN_SETUP.md': {'content': '# SPMS：Windows 11 內網共用\n'
-                                               '\n'
-                                               '## 最新預設連接埠：8085\n'
-                                               '\n'
-                                               '依使用者後續要求，預設改為 `http://10.1.121.61:8085/repairs/`；此設定取代下方舊的 '
-                                               '8765 說明及範例。直接執行 `company/server.py` 即採用新埠；仍可用 `--port` '
-                                               '指定其他埠。防火牆／代理規則若仍是舊埠，須由有權限者調整；程式不自動改規則，改埠不保證解決代理限制。資料及編輯密碼不變。\n'
                                                '\n'
                                                '使用者已確認目前電腦作主機、預計 10 人使用、IT '
                                                '允許內網及防火牆設定。本文件是部署步驟，不代表已在公司操作或通過實際負載測試。\n'
                                                '\n'
-                                               '## 指定主機預設（2026-11-04 更新）\n'
+                                               '## 指定主機預設（2026-11-05 恢復原主機）\n'
                                                '\n'
-                                               '使用者已指定換機測試，預設改用 `10.1.121.61`、`10.1.121.0/24`、HTTP '
+                                               '使用者已撤回換機測試，預設恢復 `10.1.121.135`、`10.1.121.0/24`、HTTP '
                                                '8765，並選擇暫不配置 HTTPS。現在無參數啟動即使用此設定：\n'
                                                '\n'
                                                '```powershell\n'
@@ -209,33 +196,17 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                '.\\.venv\\Scripts\\python.exe .\\company\\server.py\n'
                                                '```\n'
                                                '\n'
-                                               '網址為 `http://10.1.121.61:8765/repairs/`。如需只允許主機，明確加 `--host '
+                                               '網址為 `http://10.1.121.135:8765/repairs/`。如需只允許主機，明確加 `--host '
                                                '127.0.0.1`。綁定 IP 不存在時會報錯停止，不會自動退回其他 IP 或公開監聽。請固定 IP；公司 Proxy '
                                                '問題不會因此解決。指定其他 `--host` 時，仍須另指定網段及 TLS 或 '
                                                '`--allow-http-lan`，不沿用此主機的 HTTP 同意。以下範例為其他部署的明確設定方式。\n'
                                                '\n'
-                                               '### 搬到測試電腦（10.1.121.61）\n'
+                                               '### 返回原電腦測試\n'
                                                '\n'
-                                               '1. 舊主機先 Ctrl+C 停止 SPMS，保留原資料夾及備份。停止後複製完整 `SPMS` 程式及 '
-                                               '`company\\data`（包括可能存在的 WAL／SHM、密碼、附件資料庫與備份）；不可在寫入中只複製 '
-                                               'SQLite 主檔。透過公司核准方式傳送，不上傳 GitHub。\n'
-                                               '2. 新主機放到 `D:\\Python\\SPMS`，勿覆蓋新主機上既有的不明資料；若沒有 D '
-                                               '槽可用其他目錄，但須相應更改命令路徑。\n'
-                                               '3. `.venv` 不是可攜式環境。不要刪掉舊主機環境；新主機若複製了 `.venv`，先改名保留為 '
-                                               '`.venv-from-old-host`（若該名稱已存在，先確認再處理），再用已安裝的 Python 3.13 '
-                                               '重建：`py -3.13 -m venv .venv`。沒有 Python 時依公司允許方式安裝，不更改系統政策。不需 '
-                                               'pip 安裝第三方套件。\n'
-                                               '4. 最新 `install_spms.py` 放在新主機 SPMS 根目錄，使用新 venv 執行，確認目標後輸入 '
-                                               'INSTALL；安裝器保留 `company\\data`。\n'
-                                               '5. 先執行 `.\\.venv\\Scripts\\python.exe '
-                                               '.\\company\\maintenance.py '
-                                               'verify`，核對舊主機的案件／附件等筆數；失敗就停下，不重建資料庫、不重匯來源。若路徑放錯，啟動程式可能建立空資料庫，因此必須先 '
-                                               'verify。\n'
-                                               '6. 執行 `.\\.venv\\Scripts\\python.exe '
-                                               '.\\company\\server.py`，網址應顯示 '
-                                               '`http://10.1.121.61:8765/repairs/`。沿用搬來的編輯密碼，不需重設或重匯資料。\n'
-                                               '7. 新主機的防火牆／Proxy 仍須另行確認；換 IP '
-                                               '不代表限制自動解除。測試副本不要與舊主機同時接收正式寫入，兩份資料庫不會同步，也沒有自動合併功能。確定正式主機前保留舊檔，不把測試副本覆蓋回去。\n'
+                                               '停止另一台電腦的 SPMS，保留其測試副本但不要覆蓋回原電腦。原電腦沿用既有 `company\\data` 和 '
+                                               '`.venv`，只更新程式，不重匯或重設密碼。若兩台曾各自修改資料，先人工核對，不自動合併。啟動前可執行 '
+                                               '`.\\.venv\\Scripts\\python.exe .\\company\\maintenance.py '
+                                               'verify`；失敗就停下，不刪除或重建資料庫。此更新不會變更任何實體電腦的 IP、Proxy 或防火牆。\n'
                                                '\n'
                                                '## 架構與限制\n'
                                                '\n'
@@ -366,13 +337,13 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                '停用內網：Ctrl+C 停服務，由 IT 停用 `SPMS TCP 8765` 規則；以現有 venv Python '
                                                '執行 `company/server.py --host '
                                                '127.0.0.1`，即只允許本機。若工作排程器已啟用，須同步停用或修改該工作，避免自動重新開放。\n',
-                                    'sha256': '6b59cc1d930b06ef5b30e176ab110f7c04af8f672f0897011d54fae7d328fa25'},
+                                    'sha256': 'e53d1f610e51d40e97bf2b0809d99e9953f6c9992a5c634661037e1edf97fb85'},
            'company/README.md': {'content': '# SPMS 公司版：SQLite 離線功能驗收\n'
                                             '\n'
-                                            '只使用 Python 與主機 SQLite，不連接或更新 Supabase。依使用者指定，預設改用測試主機 '
-                                            '`10.1.121.61:8085`、允許 `10.1.121.0/24`，採 HTTP；僅本機須加 `--host '
-                                            '127.0.0.1`。搬移及內網步驟見 [LAN_SETUP.md](LAN_SETUP.md)。公司舊資料匯入及 '
-                                            'verify 結果已由使用者回報完成，不需重匯。\n'
+                                            '只使用 Python 與主機 SQLite，不連接或更新 Supabase。依使用者要求恢復原主機 '
+                                            '`10.1.121.135:8765`、允許 `10.1.121.0/24`，採 HTTP；僅本機須加 `--host '
+                                            '127.0.0.1`。內網步驟見 [LAN_SETUP.md](LAN_SETUP.md)。公司舊資料匯入及 verify '
+                                            '結果已由使用者回報完成，不需重匯。\n'
                                             '已提供共用密碼解鎖編輯，以及核准 CSV／附件的離線轉換、來源封存與副本試匯入；不是個人帳號／角色系統。\n'
                                             '不需安裝第三方套件。目標環境：Windows 11、Python 3.13、現代瀏覽器。\n'
                                             '\n'
@@ -519,12 +490,12 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '.\\.venv\\Scripts\\python.exe .\\company\\server.py\n'
                                             '```\n'
                                             '\n'
-                                            '保持此視窗開啟，用瀏覽器開啟 `http://10.1.121.61:8085`。\n'
+                                            '保持此視窗開啟，用瀏覽器開啟 `http://10.1.121.135:8765`。\n'
                                             '應看到「連線正常」。不需啟用 PowerShell 指令碼執行權限。主機必須擁有此 '
                                             'IP，且已設定編輯密碼；Proxy／防火牆可能仍需公司設定。\n'
-                                            '點「進入備品管理」，或開啟 `http://10.1.121.61:8085/repairs/`。\n'
+                                            '點「進入備品管理」，或開啟 `http://10.1.121.135:8765/repairs/`。\n'
                                             '\n'
-                                            '若埠已被使用，可執行以下指令，再開啟 `http://10.1.121.61:8766`（防火牆規則須同步調整）：\n'
+                                            '若埠已被使用，可執行以下指令，再開啟 `http://10.1.121.135:8766`（防火牆規則須同步調整）：\n'
                                             '\n'
                                             '```powershell\n'
                                             '.\\.venv\\Scripts\\python.exe .\\company\\server.py --port '
@@ -571,7 +542,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             'SQLite 使用 WAL 模式；運作中不要只複製主資料庫檔來備份。下列備份工具使用 SQLite backup '
                                             'API；排程、保管及異地副本仍須依公司規範設置。\n'
                                             '\n'
-                                            '預設監聽使用者指定的 `10.1.121.61`，允許 `10.1.121.0/24`；依 `LAN_SETUP.md` '
+                                            '預設監聽使用者指定的 `10.1.121.135`，允許 `10.1.121.0/24`；依 `LAN_SETUP.md` '
                                             '限縮防火牆，不可轉送連接埠或對外公開。HTTP 為使用者明確選擇，仍會明文傳送密碼／資料；推薦 HTTPS。改用 '
                                             '`--host 127.0.0.1` 可限制為僅本機。\n'
                                             '共用密碼解鎖僅防誤觸，不提供個人角色或具名稽核；網段內預設可瀏覽資料。保留版本衝突保護、交易、升級備份及人工備份／復原驗證；實際十人負載與網路連線尚未驗證。\n'
@@ -766,7 +737,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '產生；公司版程式更新後必須重新產生。\n'
                                             '安裝測試：`python -m unittest discover -s scripts -p '
                                             '"test_company_installer.py" -v`。\n',
-                                 'sha256': 'a66ba1ad6dc987b5e27f7b101e624bc6d1a9b2f08157af77fd7548e89f433f93'},
+                                 'sha256': 'cb7ba6a770f08899f70a04826c25a9e688417a1a6f3a63c800580df2ca99d2f2'},
            'company/database.py': {'content': '"""Shared SQLite connections and additive, backed-up module '
                                               'migrations."""\n'
                                               'import json\n'
@@ -5443,9 +5414,9 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '\n'
                                             'def startup_options(argv=None):\n'
                                             '    parser = argparse.ArgumentParser(description=__doc__)\n'
-                                            '    parser.add_argument("--port", type=int, default=8085)\n'
+                                            '    parser.add_argument("--port", type=int, default=8765)\n'
                                             "    parser.add_argument('--host', help='Specific private IPv4 "
-                                            'address; omitted uses approved 10.1.121.61 LAN profile; use '
+                                            'address; omitted uses approved 10.1.121.135 LAN profile; use '
                                             "127.0.0.1 for local-only access')\n"
                                             "    parser.add_argument('--client-subnet', action='append', "
                                             "default=[], help='Allowed IPv4 CIDR; repeat for multiple "
@@ -5463,7 +5434,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '    # plaintext acknowledgement or subnet; custom LANs remain '
                                             'explicit.\n'
                                             '    if args.host is None:\n'
-                                            "        args.host = '10.1.121.61'\n"
+                                            "        args.host = '10.1.121.135'\n"
                                             '        if not args.client_subnet:\n'
                                             "            args.client_subnet = ['10.1.121.0/24']\n"
                                             '        if not args.tls_cert and not args.tls_key:\n'
@@ -5527,7 +5498,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '\n'
                                             'if __name__ == "__main__":\n'
                                             '    main()\n',
-                                 'sha256': '26a37e9f4429772598f315ac99336740b03f087083a69ca41708cd4bcd5e1916'},
+                                 'sha256': 'a92e18bcac3bffc26994507a626b1fd49abcd66c0a45a0627ba26aa3e3b1b202'},
            'company/test_edit_access.py': {'content': 'import json\n'
                                                       'import tempfile\n'
                                                       'import time\n'
@@ -6743,8 +6714,8 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                               'class LANOptionsTests(unittest.TestCase):\n'
                                               '    def test_approved_default_and_explicit_lan(self):\n'
                                               '        default = startup_options([])\n'
-                                              "        self.assertEqual(default.host, '10.1.121.61')\n"
-                                              '        self.assertEqual(default.port, 8085)\n'
+                                              "        self.assertEqual(default.host, '10.1.121.135')\n"
+                                              '        self.assertEqual(default.port, 8765)\n'
                                               '        '
                                               "self.assertEqual(startup_options(['--port','3080']).port, "
                                               '3080)\n'
@@ -6930,7 +6901,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                               '\n'
                                               "if __name__ == '__main__':\n"
                                               '    unittest.main()\n',
-                                   'sha256': 'ecb465ae4f78bab90c5c28f3a54c92d3bf7434125598b1d76871f67c8d66243e'},
+                                   'sha256': '8337eeb261872d8b48557f6b219cac768dd99d01b944f15a4f112b19293151a0'},
            'company/test_legacy_import.py': {'content': 'import csv\n'
                                                         'import io\n'
                                                         'import json\n'
@@ -10963,7 +10934,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                 '@media(max-width:600px){main{margin:25px auto;padding:0 '
                                                 '16px}h1{font-size:22px}section{padding:18px}dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:10px}}\n',
                                      'sha256': '064406c8758be5620dfe7440f59d59ec1de5f6307e74f5bad85dd03e018c0769'}},
- 'version': '2026-11-04-port-8085'}
+ 'version': '2026-11-05-restore-host-135'}
 
 
 def check_local_path(path):
