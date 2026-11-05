@@ -105,7 +105,8 @@ class InstallerTests(unittest.TestCase):
     def test_protected_and_traversal_paths_rejected(self):
         entry = self.module.BUNDLE["files"]["company/server.py"]
         for name in ("company/data/spms.sqlite3", "company/DATA/file.py", ".venv/file.py", "company/../file.py",
-                     "/company/file.py", "company\\server.py", "company/file.py:stream", "company/.hidden.py"):
+                     "/company/file.py", "company\\server.py", "company/file.py:stream", "company/.hidden.py",
+                     "company/arbitrary.cmd", "company/nested/start_flask_test.cmd"):
             self.module.BUNDLE["files"][name] = entry
             with self.subTest(name=name), self.assertRaises(ValueError):
                 self.module.validate_bundle(self.base)

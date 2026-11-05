@@ -36,7 +36,8 @@ def program_target(base, name):
             or not path.parts or path.parts[0] != "company" or str(path) != name
             or any(part in (".", "..") or part.lower() in ("data", ".venv", "backups", "spms-code-backups")
                    or part.startswith(".") or part.endswith((" ", ".")) for part in path.parts)
-            or path.suffix not in (".py", ".html", ".css", ".js", ".json", ".sql", ".md")):
+            or (path.suffix not in (".py", ".html", ".css", ".js", ".json", ".sql", ".md")
+                and name != 'company/start_flask_test.cmd')):
         raise ValueError(f"Invalid program path: {name}")
     target = base.joinpath(*path.parts)
     check_local_path(target)

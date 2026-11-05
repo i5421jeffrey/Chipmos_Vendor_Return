@@ -16,7 +16,114 @@ from pathlib import Path, PurePosixPath
 from uuid import uuid4
 
 
-BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管理：本機功能整批對照與交付界線\n'
+BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連線對照測試\n'
+                                                '\n'
+                                                '這是可退回的 HTTP 測試入口，不替換 `server.py`、不將正式資料搬到另一套架構。\n'
+                                                'Flask＋Waitress 負責 HTTP／WSGI，透過傳輸介面呼叫既有 `Handler` '
+                                                '的路由、欄位驗證與業務函式；不是在背後另啟一個原 HTTP server，也不額外使用 Proxy '
+                                                '轉接。介面、API、SQLite 與交易規則不重寫。\n'
+                                                '\n'
+                                                '## 公司端\n'
+                                                '\n'
+                                                '1. 先用 `install_spms_dependencies.py` 完成 Windows x64 CPython '
+                                                '3.13 的離線依賴安裝（Flask 3.1.3／Waitress 3.0.2），使用的 Python 必須是 '
+                                                'SPMS `.venv`。只有測試版需要這些套件，原服務不需要。\n'
+                                                '2. 停止 SPMS，確認沒有另一個服務使用 8082。把最新 `install_spms.py` 放到 '
+                                                '`D:\\Python\\SPMS`，以現有 venv 執行、確認目標並輸入 '
+                                                '`INSTALL`。安裝器只更新程式，不啟動網站、不改 data／密碼／venv，也不安裝第三方套件。\n'
+                                                '3. 在 CMD：\n'
+                                                '\n'
+                                                '```cmd\n'
+                                                'cd /d D:\\Python\\SPMS\n'
+                                                '.\\.venv\\Scripts\\python.exe .\\company\\flask_server.py\n'
+                                                '```\n'
+                                                '\n'
+                                                '或雙擊 `company\\start_flask_test.cmd`。此 CMD '
+                                                '不會自動關閉其他程序／視窗或調整系統設定。\n'
+                                                '\n'
+                                                '4. 保持視窗開啟，用**同一個瀏覽器**分別比較：\n'
+                                                '\n'
+                                                '```text\n'
+                                                '主機：http://127.0.0.1:8082/repairs/\n'
+                                                '內網：http://10.1.121.135:8082/repairs/\n'
+                                                '```\n'
+                                                '\n'
+                                                '預設監聽 `0.0.0.0:8082`；0.0.0.0 不是瀏覽器網址。支援原本的 '
+                                                '`--host`、`--port`、`--client-subnet` 與 HTTP 同意規則；本版只測 '
+                                                'HTTP，若填 TLS 憑證會停止並提示使用原服務，不會假裝使用 HTTPS。\n'
+                                                '\n'
+                                                '## 資料隔離\n'
+                                                '\n'
+                                                '- 每次啟動都以 SQLite backup API 從既有 '
+                                                '`company\\data\\spms.sqlite3` 建立全新 '
+                                                '`company\\data\\flask-tests\\<隨機ID>\\spms.sqlite3`，包含附件與已提交 '
+                                                'WAL，並驗證完整性；不執行原始來源匯入。\n'
+                                                '- 編輯密碼設定複製到同一測試資料夾，因此密碼沿用，但 token '
+                                                '與工作階段獨立。測試目錄含真實資料與密碼雜湊，依正式資料的保管規則處理，絕不可上傳 GitHub。\n'
+                                                '- '
+                                                '所有測試寫入只發生在副本，**不回寫、不合併正式資料**。重新啟動會建立另一個新副本，前次測試內容保留在舊副本但不再載入。\n'
+                                                '- '
+                                                '原資料庫缺失、未設定密碼或副本驗證失敗時停止，不偷偷建立空白正式資料庫。若原結構需要升級，只對副本執行備份式新增遷移。\n'
+                                                '- 正式服務與測試版不應同時開啟；保持相同 port '
+                                                '可避免不小心連錯。測試副本不作正式主資料庫，不得拿它覆蓋原資料庫。測試檔不自動刪除，可由維護人員在停止服務後依公司保管規則處理指定的測試目錄。\n'
+                                                '\n'
+                                                '## 保留的限制與診斷\n'
+                                                '\n'
+                                                '- 來源仍只允許 loopback 及核准網段，預設 `10.1.121.0/24`。不因使用 Waitress '
+                                                '就取消來源檢查。非核准來源會收到 403 並記錄 `SOURCE_DENIED`。\n'
+                                                '- Host 只允許 '
+                                                '`10.1.121.135:<port>`、`127.0.0.1:<port>`、`localhost:<port>`；其他 '
+                                                'Host 收到 403 並記錄 `HOST_DENIED`。指定單一 IP 監聽則沿用該 IP 的規則。\n'
+                                                '- 同源、編輯 token、大小限制、附件格式、版本衝突、交易與倒序刪除保護均沿用既有程式。沒有跨域全開或接受任意 '
+                                                'Host。\n'
+                                                '- 不信任 '
+                                                '`X-Forwarded-For`／`X-Forwarded-Host`／`X-Forwarded-Proto`，Waitress '
+                                                '清除未信任的代理標頭，不使用 ProxyFix。伺服器看到的來源可能是公司 Proxy 的 '
+                                                'IP，拒絕原因必須據此核對，不自行將未知來源加入白名單。\n'
+                                                '- CMD 與副本旁的 `connections.jsonl` 記錄時間、事件、來源 '
+                                                'IP、Host、方法、路徑、狀態碼。`WRITE_REJECTED` '
+                                                '表示寫入驗證或業務拒絕，畫面回應提供錯誤；不記錄請求 '
+                                                'body、query、密碼、token、cookie、附件內容。\n'
+                                                '- 日誌可能含案件 ID／公司 IP，分享前審核，不上傳公開儲存庫。每次啟動會列出測試副本、筆數與日誌路徑。\n'
+                                                '- Waitress 以 10 個工作執行緒提供 HTTP，仍只適用核准內網；未實作長期服務管理或高可用。HTTP '
+                                                '仍是明文，不改 Proxy／防火牆、不保證解除 Proxy 登入。\n'
+                                                '\n'
+                                                '若仍出現 Proxy 視窗，請一起提供該時刻的 CMD 訊息：`SOURCE_DENIED` '
+                                                '表示來源限制，`HOST_DENIED` 表示網址 Host '
+                                                '不符；若沒有任何新紀錄，只能表示此應用尚未記錄到請求，還可能是 Proxy 驗證、TCP／HTTP '
+                                                '解析前拒絕或其他網路問題，不能直接認定某一原因。\n'
+                                                '\n'
+                                                '## 回到原服務\n'
+                                                '\n'
+                                                'Ctrl+C 停止測試版後：\n'
+                                                '\n'
+                                                '```cmd\n'
+                                                '.\\.venv\\Scripts\\python.exe .\\company\\server.py\n'
+                                                '```\n'
+                                                '\n'
+                                                '原服務使用原資料及原密碼，沒有需要反向匯入的步驟。\n'
+                                                '\n'
+                                                '## 自動測試界線\n'
+                                                '\n'
+                                                '`test_flask_server.py` '
+                                                '包含副本隔離、API／頁面／HEAD、附件位元組、來源／Host／Origin、編輯鎖、日誌去敏及真實 '
+                                                'Waitress loopback 十個並發修改測試。安裝 Flask／Waitress 的開發 venv 才能執行 '
+                                                'Flask 測試；無依賴時只執行副本測試並明確 skip Flask 部分。macOS loopback／Flask '
+                                                'test client 不等於公司 Windows 瀏覽器、Proxy、防火牆或真實使用驗收。\n',
+                                     'sha256': 'df923fa18bd29ac0211c324738e22fa0a755c90a84a6051afe6317a7148d467d'},
+           'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管理：本機功能整批對照與交付界線\n'
+                                                           '\n'
+                                                           '## Flask／Waitress 隔離測試版（2026-11-05）\n'
+                                                           '\n'
+                                                           '新增 '
+                                                           '`flask_server.py`、`start_flask_test.cmd`，不替換標準庫服務。HTTP／WSGI '
+                                                           '以 Flask＋Waitress 提供、直接共用既有 Handler '
+                                                           '的路由及業務規則，不另開標準庫 HTTP listener。每次啟動使用正式庫的全新 '
+                                                           'SQLite backup '
+                                                           '副本，密碼雜湊亦複製到測試目錄，寫入不回正式庫。保留網段／Host／同源／編輯保護，新增來源與拒絕分類日誌且不記 '
+                                                           'body／query／token。依賴安裝已由使用者回報成功；Windows／Proxy '
+                                                           '實際效果仍待比較，不宣稱更換框架可繞過 Proxy。步驟與回退方式見 '
+                                                           'FLASK_TEST.md。\n'
                                                            '\n'
                                                            '## 所有 IPv4 網卡監聽對照測試（2026-11-05）\n'
                                                            '\n'
@@ -196,7 +303,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                            '`.venv`，也不自動啟動服務、匯入真實舊資料或開放內網。\n'
                                                            '真實來源包與預覽結果只保存在使用者核准的本機資料夾，不放入儲存庫或通用安裝檔；公司正式匯入仍需停止服務、預檢及 '
                                                            '`IMPORT` 確認。\n',
-                                                'sha256': 'e431297543ddc94d9f7c2b620a034e1ff5e6002947578deed74f33c588faac56'},
+                                                'sha256': 'f344e79570cf4ef40f0d7e22ad9a4a951953c6eb287fe9129ddfbe7d67719f95'},
            'company/LAN_SETUP.md': {'content': '# SPMS：Windows 11 內網共用\n'
                                                '\n'
                                                '## 最新監聽對照測試：0.0.0.0（2026-11-05）\n'
@@ -379,6 +486,9 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                '127.0.0.1`，即只允許本機。若工作排程器已啟用，須同步停用或修改該工作，避免自動重新開放。\n',
                                     'sha256': 'd99160101849a035de939b457adf4455e11b39ada38e7dedbf6334eb7ee7ca28'},
            'company/README.md': {'content': '# SPMS 公司版：SQLite 離線功能驗收\n'
+                                            '\n'
+                                            '可選的 Flask＋Waitress 隔離連線測試版見 [FLASK_TEST.md](FLASK_TEST.md)。原 '
+                                            '`server.py` 不替換；測試寫入只發生於每次新建的資料副本，不能當作正式服務或合併回原資料庫。\n'
                                             '\n'
                                             '只使用 Python 與主機 SQLite，不連接或更新 Supabase。依使用者明確同意，測試預設監聽所有 IPv4 網卡 '
                                             '`0.0.0.0:8082`，內網網址 `http://10.1.121.135:8082/repairs/`，本機亦可用 '
@@ -779,7 +889,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '產生；公司版程式更新後必須重新產生。\n'
                                             '安裝測試：`python -m unittest discover -s scripts -p '
                                             '"test_company_installer.py" -v`。\n',
-                                 'sha256': '5a80b2ad6584e8693d59752bd5cc35f3857c3e90abd9581bc6cb061fac2eabff'},
+                                 'sha256': '9428cf628da8d7cf851a3e3918112f66e6fb49916999c05c0feb9f08b2d7774a'},
            'company/database.py': {'content': '"""Shared SQLite connections and additive, backed-up module '
                                               'migrations."""\n'
                                               'import json\n'
@@ -1075,6 +1185,287 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             '        super().__init__(message)\n'
                                             '        self.status = status\n',
                                  'sha256': '4b8dc74e90c84c42722744db0868f4e29526a4e19a10e992b8560b1c622a782c'},
+           'company/flask_server.py': {'content': '"""Isolated HTTP transport comparison: Flask/Waitress '
+                                                  'plus the existing SPMS routes.\n'
+                                                  '\n'
+                                                  'The normal server.py stays unchanged. Each CLI start '
+                                                  'snapshots production into a\n'
+                                                  'new test directory; writes are local to that copy and are '
+                                                  'never merged back.\n'
+                                                  '"""\n'
+                                                  'import ipaddress\n'
+                                                  'import json\n'
+                                                  'import logging\n'
+                                                  'from email.message import Message\n'
+                                                  'from pathlib import Path\n'
+                                                  'import sqlite3\n'
+                                                  'from types import SimpleNamespace\n'
+                                                  'from uuid import uuid4\n'
+                                                  '\n'
+                                                  'from database import utc_now\n'
+                                                  'from edit_access import EditGate\n'
+                                                  'from errors import APIError\n'
+                                                  'from maintenance import snapshot\n'
+                                                  'from server import Handler, ROOT, bind_address, '
+                                                  'client_network, initialize_database, startup_options\n'
+                                                  '\n'
+                                                  'MAX_BODY = 7 * 1024 * 1024 + 65536\n'
+                                                  '\n'
+                                                  '\n'
+                                                  'def prepare_test_copy(source):\n'
+                                                  '    source = Path(source).resolve()\n'
+                                                  '    if not source.is_file():\n'
+                                                  "        raise ValueError('Source database missing; stop "
+                                                  "and check company/data. No empty database created.')\n"
+                                                  "    password = source.parent / 'edit-password.json'\n"
+                                                  "    if not EditGate(password).status()['configured']:\n"
+                                                  "        raise ValueError('Source edit password is not "
+                                                  "configured. Test copy was not created.')\n"
+                                                  "    folder = source.parent / 'flask-tests' / uuid4().hex\n"
+                                                  '    folder.mkdir(parents=True, mode=0o700)\n'
+                                                  "    target = folder / 'spms.sqlite3'\n"
+                                                  '    counts = snapshot(source, target)\n'
+                                                  '    # All migrations (if needed) apply only to this new '
+                                                  'snapshot.\n'
+                                                  '    initialize_database(target)\n'
+                                                  "    with (folder / 'edit-password.json').open('xb') as "
+                                                  'stream:\n'
+                                                  '        stream.write(password.read_bytes())\n'
+                                                  "    (folder / 'edit-password.json').chmod(0o600)\n"
+                                                  '    return target, counts\n'
+                                                  '\n'
+                                                  '\n'
+                                                  'class _Connection:\n'
+                                                  '    def settimeout(self, seconds):\n'
+                                                  "        # Waitress owns socket timeouts; Handler's HTTP "
+                                                  'framing is already\n'
+                                                  '        # decoded by Waitress into the bounded WSGI input '
+                                                  'stream.\n'
+                                                  '        pass\n'
+                                                  '\n'
+                                                  '\n'
+                                                  "def create_app(database, *, host='0.0.0.0', port=8082, "
+                                                  "client_subnets=('10.1.121.0/24',), diagnostic_log=None):\n"
+                                                  '    from flask import Flask, Response, request\n'
+                                                  '    from werkzeug.exceptions import HTTPException\n'
+                                                  '\n'
+                                                  '    database = Path(database).resolve()\n'
+                                                  '    if not database.is_file():\n'
+                                                  "        raise ValueError('Test database must already "
+                                                  "exist; refusing to create an empty database')\n"
+                                                  '    host = bind_address(host)\n'
+                                                  '    if not 1 <= port <= 65535:\n'
+                                                  "        raise ValueError('Invalid port')\n"
+                                                  '    lan = not ipaddress.ip_address(host).is_loopback\n'
+                                                  '    networks = tuple(client_network(str(value)) for value '
+                                                  'in client_subnets)\n'
+                                                  '    if lan and not networks:\n'
+                                                  "        raise ValueError('LAN test requires a client "
+                                                  "subnet allowlist')\n"
+                                                  "    hosts = {f'{host}:{port}'}\n"
+                                                  "    if host == '0.0.0.0':\n"
+                                                  "        hosts = {f'10.1.121.135:{port}', "
+                                                  "f'127.0.0.1:{port}', f'localhost:{port}'}\n"
+                                                  '    elif not lan:\n'
+                                                  "        hosts.add(f'localhost:{port}')\n"
+                                                  '    state = SimpleNamespace(database=database, '
+                                                  "edit_gate=EditGate(database.parent/'edit-password.json'),\n"
+                                                  '                            allowed_hosts=hosts, lan=lan, '
+                                                  "scheme='http', server_port=port)\n"
+                                                  '    app = Flask(__name__, static_folder=None)\n'
+                                                  '    app.config.update(MAX_CONTENT_LENGTH=MAX_BODY, '
+                                                  'TESTING=False)\n'
+                                                  "    app.extensions['spms_state'] = state\n"
+                                                  "    logger = logging.Logger('spms-flask-' + uuid4().hex, "
+                                                  'level=logging.INFO)\n'
+                                                  '    console = logging.StreamHandler()\n'
+                                                  '    '
+                                                  "console.setFormatter(logging.Formatter('%(message)s'))\n"
+                                                  '    logger.addHandler(console)\n'
+                                                  '    if diagnostic_log:\n'
+                                                  '        file_handler = '
+                                                  "logging.FileHandler(diagnostic_log, encoding='utf-8')\n"
+                                                  '        '
+                                                  "file_handler.setFormatter(logging.Formatter('%(message)s'))\n"
+                                                  '        logger.addHandler(file_handler)\n'
+                                                  "    app.extensions['spms_diagnostics'] = logger\n"
+                                                  '\n'
+                                                  '    def log(event, status):\n'
+                                                  '        # No query strings, request bodies, passwords, '
+                                                  'tokens, cookies, Origin\n'
+                                                  '        # credentials or attachment bytes. JSON escaping '
+                                                  'prevents log injection.\n'
+                                                  '        logger.info(json.dumps(dict(time=utc_now(), '
+                                                  'event=event, status=status,\n'
+                                                  "            source=(request.remote_addr or '')[:64], "
+                                                  "host=request.headers.get('Host','')[:180],\n"
+                                                  '            method=request.method, '
+                                                  'path=request.path[:240]), ensure_ascii=True))\n'
+                                                  '\n'
+                                                  '    class Adapter(Handler):\n'
+                                                  '        """Call the same dispatch/validation code '
+                                                  'directly, without an HTTP hop."""\n'
+                                                  '        def __init__(self):\n'
+                                                  '            self.server = state\n'
+                                                  '            self.command = request.method\n'
+                                                  '            self.path = request.path\n'
+                                                  '            if request.query_string:\n'
+                                                  "                self.path += '?' + "
+                                                  "request.query_string.decode('latin-1')\n"
+                                                  '            self.headers = Message()\n'
+                                                  '            for key, value in request.headers.items():\n'
+                                                  '                self.headers[key] = value\n'
+                                                  '            self.rfile = request.stream\n'
+                                                  '            self.connection = _Connection()\n'
+                                                  '            self.response = None\n'
+                                                  '\n'
+                                                  '        def send_content(self, status, body, '
+                                                  'content_type, head=False, headers=None):\n'
+                                                  "            response = Response(b'' if head else body, "
+                                                  'status=status, content_type=content_type)\n'
+                                                  '            '
+                                                  "response.headers.update({'Content-Length':str(len(body)), "
+                                                  "'Cache-Control':'no-store',\n"
+                                                  '                '
+                                                  "'X-Content-Type-Options':'nosniff','Referrer-Policy':'no-referrer',\n"
+                                                  '                \'Content-Security-Policy\':"default-src '
+                                                  "'self'; connect-src 'self'; object-src 'none'; base-uri "
+                                                  "'none'; frame-ancestors 'none'; form-action "
+                                                  '\'none\'"})\n'
+                                                  '            response.headers.update(headers or {})\n'
+                                                  '            self.response = response\n'
+                                                  '\n'
+                                                  '        def api_error(self, error):\n'
+                                                  "            if self.command in ('POST','PUT','DELETE'):\n"
+                                                  "                log('WRITE_REJECTED', "
+                                                  "getattr(error,'status',503))\n"
+                                                  '            super().api_error(error)\n'
+                                                  '\n'
+                                                  '    @app.before_request\n'
+                                                  '    def guard_source_and_host():\n'
+                                                  '        try:\n'
+                                                  '            address = '
+                                                  "ipaddress.ip_address(request.remote_addr or '')\n"
+                                                  '            allowed = address.version == 4 and '
+                                                  '(address.is_loopback or any(address in network for '
+                                                  'network in networks))\n'
+                                                  '        except ValueError:\n'
+                                                  '            allowed = False\n'
+                                                  '        if not allowed:\n'
+                                                  "            log('SOURCE_DENIED',403)\n"
+                                                  "            return {'error':'不允許此來源位址'},403\n"
+                                                  "        if request.headers.get('Host') not in hosts:\n"
+                                                  "            log('HOST_DENIED',403)\n"
+                                                  "            return {'error':'不允許此主機名稱'},403\n"
+                                                  '\n'
+                                                  '    @app.after_request\n'
+                                                  '    def diagnostic_response(response):\n'
+                                                  "        log('RESPONSE',response.status_code)\n"
+                                                  "        response.headers['Cache-Control'] = 'no-store'\n"
+                                                  "        response.headers['X-Content-Type-Options'] = "
+                                                  "'nosniff'\n"
+                                                  "        response.headers['Referrer-Policy'] = "
+                                                  "'no-referrer'\n"
+                                                  '        '
+                                                  "response.headers.setdefault('Content-Security-Policy', "
+                                                  '"default-src \'self\'; frame-ancestors \'none\'; base-uri '
+                                                  '\'none\'")\n'
+                                                  '        return response\n'
+                                                  '\n'
+                                                  '    @app.errorhandler(HTTPException)\n'
+                                                  '    def http_error(error):\n'
+                                                  "        return {'error': '請求無法處理' if error.code != 413 "
+                                                  "else '內容大小超過限制'}, error.code\n"
+                                                  '\n'
+                                                  "    @app.route('/', defaults={'path':''}, "
+                                                  "methods=['GET','HEAD','POST','PUT','DELETE','PATCH','OPTIONS'], "
+                                                  'provide_automatic_options=False)\n'
+                                                  "    @app.route('/<path:path>', "
+                                                  "methods=['GET','HEAD','POST','PUT','DELETE','PATCH','OPTIONS'], "
+                                                  'provide_automatic_options=False)\n'
+                                                  '    def dispatch(path):\n'
+                                                  '        adapter = Adapter()\n'
+                                                  "        if request.method in ('GET','HEAD'):\n"
+                                                  "            adapter.serve(head=request.method == 'HEAD')\n"
+                                                  "        elif request.method in ('POST','PUT','DELETE'):\n"
+                                                  '            # WSGI supplies decoded entity bytes, not '
+                                                  'chunked wire framing.\n'
+                                                  '            # Reject chunked/unknown-size input rather '
+                                                  'than weakening write rules.\n'
+                                                  '            adapter.write_record()\n'
+                                                  '        else:\n'
+                                                  '            adapter.send_json(405, '
+                                                  "{'error':'此端點不支援此操作'})\n"
+                                                  '        return adapter.response\n'
+                                                  '\n'
+                                                  '    return app\n'
+                                                  '\n'
+                                                  '\n'
+                                                  'def main(argv=None):\n'
+                                                  '    args = startup_options(argv)\n'
+                                                  '    if args.tls_cert:\n'
+                                                  "        raise SystemExit('This comparison server supports "
+                                                  "HTTP only; use server.py for direct TLS.')\n"
+                                                  '    try:\n'
+                                                  '        from waitress import create_server\n'
+                                                  '        from flask import Flask\n'
+                                                  '    except ImportError:\n'
+                                                  "        raise SystemExit('Install Flask/Waitress with "
+                                                  "install_spms_dependencies.py using this venv first.')\n"
+                                                  '    try:\n'
+                                                  '        database, counts = '
+                                                  "prepare_test_copy(ROOT/'data/spms.sqlite3')\n"
+                                                  "        log_file = database.parent/'connections.jsonl'\n"
+                                                  '        app = create_app(database, host=args.host, '
+                                                  'port=args.port, client_subnets=args.client_subnet, '
+                                                  'diagnostic_log=log_file)\n'
+                                                  '        server = create_server(app, host=args.host, '
+                                                  'port=args.port, threads=10,\n'
+                                                  '            connection_limit=100, channel_timeout=15, '
+                                                  'max_request_body_size=MAX_BODY,\n'
+                                                  '            clear_untrusted_proxy_headers=True, '
+                                                  "url_scheme='http')\n"
+                                                  '    except (OSError, ValueError, sqlite3.Error, APIError) '
+                                                  'as error:\n'
+                                                  "        raise SystemExit('Flask test startup failed: ' + "
+                                                  'str(error))\n'
+                                                  "    access_ip = '10.1.121.135' if args.host == '0.0.0.0' "
+                                                  'else args.host\n'
+                                                  "    print(f'Flask + Waitress comparison: "
+                                                  "http://{access_ip}:{args.port}/repairs/', flush=True)\n"
+                                                  "    if args.host == '0.0.0.0':\n"
+                                                  "        print(f'Local: "
+                                                  "http://127.0.0.1:{args.port}/repairs/', flush=True)\n"
+                                                  "    print('Listening:', args.host, args.port, "
+                                                  'flush=True)\n'
+                                                  "    print('TEST COPY ONLY:', database, flush=True)\n"
+                                                  "    print('Source counts:', json.dumps(counts), "
+                                                  'flush=True)\n'
+                                                  "    print('Connections / denied reasons:', log_file, "
+                                                  'flush=True)\n'
+                                                  "    print('Source allowlist:', ', "
+                                                  "'.join(map(str,args.client_subnet)), flush=True)\n"
+                                                  "    print('HTTP is plaintext. No Proxy/firewall changes. "
+                                                  "Stop original server first.', flush=True)\n"
+                                                  "    print('Each restart creates a NEW snapshot. Test "
+                                                  "changes are NOT merged into production.', flush=True)\n"
+                                                  "    print('Ctrl+C to stop. server.py remains the original "
+                                                  "service.', flush=True)\n"
+                                                  '    try:\n'
+                                                  '        server.run()\n'
+                                                  '    except KeyboardInterrupt:\n'
+                                                  '        pass\n'
+                                                  '    finally:\n'
+                                                  '        server.close()\n'
+                                                  '        for handler in '
+                                                  "app.extensions['spms_diagnostics'].handlers:\n"
+                                                  '            handler.close()\n'
+                                                  '    return 0\n'
+                                                  '\n'
+                                                  '\n'
+                                                  "if __name__ == '__main__':\n"
+                                                  '    raise SystemExit(main())\n',
+                                       'sha256': '3bc760ea65779f3e587e6ac4c175d08d134a6d8cd6252b67a5c19e146d4de3c9'},
            'company/import_data.py': {'content': '"""Validate/apply a reviewed offline JSON package, without '
                                                  'connecting to Supabase.\n'
                                                  '\n'
@@ -5559,6 +5950,28 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                             'if __name__ == "__main__":\n'
                                             '    main()\n',
                                  'sha256': '5880b70a21de95527b41bfdafd4a728193fea05c4ae40db50ce8def4ae13c85a'},
+           'company/start_flask_test.cmd': {'content': '@echo off\n'
+                                                       'setlocal\n'
+                                                       'cd /d "%~dp0.."\n'
+                                                       'if not exist ".venv\\Scripts\\python.exe" (\n'
+                                                       '  echo SPMS venv not found. Stop and check the '
+                                                       'installation folder.\n'
+                                                       '  pause\n'
+                                                       '  exit /b 1\n'
+                                                       ')\n'
+                                                       'echo Stop the original SPMS server before running '
+                                                       'this comparison test.\n'
+                                                       'echo Test edits use a new database copy and are NOT '
+                                                       'saved to production.\n'
+                                                       '".venv\\Scripts\\python.exe" '
+                                                       '".\\company\\flask_server.py" %*\n'
+                                                       'set "SPMS_RESULT=%ERRORLEVEL%"\n'
+                                                       'echo.\n'
+                                                       'echo Test server stopped. Keep any error messages '
+                                                       'for diagnosis.\n'
+                                                       'pause\n'
+                                                       'exit /b %SPMS_RESULT%\n',
+                                            'sha256': '18d988b3ce2708deaa2261a1de432e2618be3c14cd2e2f411898660449e5f241'},
            'company/test_edit_access.py': {'content': 'import json\n'
                                                       'import tempfile\n'
                                                       'import time\n'
@@ -6584,6 +6997,290 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                    "if __name__ == '__main__':\n"
                                                    '    unittest.main()\n',
                                         'sha256': 'e3eb5eebb678139b3cb9827759642812dc280fab48de837d455df649e22c53ae'},
+           'company/test_flask_server.py': {'content': '"""Temporary copies only. Flask tests skip when '
+                                                       'optional dependencies are absent."""\n'
+                                                       'import base64\n'
+                                                       'import concurrent.futures\n'
+                                                       'import hashlib\n'
+                                                       'import importlib.util\n'
+                                                       'import json\n'
+                                                       'from pathlib import Path\n'
+                                                       'import tempfile\n'
+                                                       'import threading\n'
+                                                       'import unittest\n'
+                                                       'from urllib.request import Request, urlopen\n'
+                                                       '\n'
+                                                       'from database import connect\n'
+                                                       'from edit_access import configure\n'
+                                                       'from flask_server import create_app, '
+                                                       'prepare_test_copy\n'
+                                                       'from server import initialize_database\n'
+                                                       'from modules.repairs import service\n'
+                                                       'from test_repairs import example\n'
+                                                       '\n'
+                                                       "HAS_FLASK = importlib.util.find_spec('flask') is not "
+                                                       "None and importlib.util.find_spec('waitress') is not "
+                                                       'None\n'
+                                                       '\n'
+                                                       '\n'
+                                                       'class CopyTests(unittest.TestCase):\n'
+                                                       '    def '
+                                                       'test_snapshot_preserves_source_password_and_separates_writes(self):\n'
+                                                       '        with tempfile.TemporaryDirectory() as '
+                                                       'folder:\n'
+                                                       "            source=Path(folder)/'spms.sqlite3'\n"
+                                                       '            initialize_database(source)\n'
+                                                       '            '
+                                                       "configure(source.parent/'edit-password.json','synthetic-only')\n"
+                                                       '            service.save_record(source,example())\n'
+                                                       '            '
+                                                       'digest=hashlib.sha256(source.read_bytes()).hexdigest()\n'
+                                                       '            '
+                                                       "password=(source.parent/'edit-password.json').read_bytes()\n"
+                                                       '            target,counts=prepare_test_copy(source)\n'
+                                                       '            '
+                                                       "self.assertEqual(counts['repair_records'],1)\n"
+                                                       '            self.assertNotEqual(target,source)\n'
+                                                       '            '
+                                                       "self.assertEqual((target.parent/'edit-password.json').read_bytes(),password)\n"
+                                                       '            '
+                                                       "service.save_record(target,example(serial_no='123456789'))\n"
+                                                       '            '
+                                                       "self.assertEqual(service.list_records(source,{})['total'],1)\n"
+                                                       '            '
+                                                       "self.assertEqual(service.list_records(target,{})['total'],2)\n"
+                                                       '            '
+                                                       'self.assertEqual(hashlib.sha256(source.read_bytes()).hexdigest(),digest)\n'
+                                                       '            another,_=prepare_test_copy(source)\n'
+                                                       '            self.assertNotEqual(another,target)\n'
+                                                       '            '
+                                                       "self.assertEqual(service.list_records(another,{})['total'],1)\n"
+                                                       '\n'
+                                                       '    def '
+                                                       'test_missing_source_or_password_does_not_create_empty_database(self):\n'
+                                                       '        with tempfile.TemporaryDirectory() as '
+                                                       'folder:\n'
+                                                       "            source=Path(folder)/'missing.sqlite3'\n"
+                                                       '            with self.assertRaises(ValueError): '
+                                                       'prepare_test_copy(source)\n'
+                                                       '            self.assertFalse(source.exists())\n'
+                                                       '            initialize_database(source)\n'
+                                                       '            with self.assertRaises(ValueError): '
+                                                       'prepare_test_copy(source)\n'
+                                                       '            '
+                                                       "self.assertFalse((source.parent/'flask-tests').exists())\n"
+                                                       '\n'
+                                                       '\n'
+                                                       "@unittest.skipUnless(HAS_FLASK,'Optional "
+                                                       "Flask/Waitress packages not installed')\n"
+                                                       'class FlaskTransportTests(unittest.TestCase):\n'
+                                                       '    def setUp(self):\n'
+                                                       '        folder=tempfile.TemporaryDirectory()\n'
+                                                       '        self.addCleanup(folder.cleanup)\n'
+                                                       "        self.path=Path(folder.name)/'spms.sqlite3'\n"
+                                                       '        initialize_database(self.path)\n'
+                                                       '        '
+                                                       "configure(self.path.parent/'edit-password.json','synthetic-only')\n"
+                                                       '        '
+                                                       "self.log_file=self.path.parent/'connections.jsonl'\n"
+                                                       '        self.app=create_app(self.path, '
+                                                       'diagnostic_log=self.log_file)\n'
+                                                       "        self.app.config['TESTING']=True\n"
+                                                       '        self.client=self.app.test_client()\n'
+                                                       '        self.addCleanup(self.close_logs)\n'
+                                                       '\n'
+                                                       '    def close_logs(self):\n'
+                                                       '        for handler in '
+                                                       "self.app.extensions['spms_diagnostics'].handlers:\n"
+                                                       '            handler.close()\n'
+                                                       '\n'
+                                                       '    def '
+                                                       "call(self,path,method='GET',data=None,token=None,headers=None,source='10.1.121.40'):\n"
+                                                       "        values={'X-SPMS-Request':'1'}\n"
+                                                       "        if token: values['X-SPMS-Edit-Token']=token\n"
+                                                       '        values.update(headers or {})\n'
+                                                       '        return '
+                                                       'self.client.open(path,method=method,json=data,headers=values,\n'
+                                                       '            '
+                                                       "base_url='http://10.1.121.135:8082',environ_overrides={'REMOTE_ADDR':source})\n"
+                                                       '\n'
+                                                       '    def unlock(self):\n'
+                                                       '        '
+                                                       "response=self.call('/api/edit/unlock','POST',{'password':'synthetic-only'})\n"
+                                                       '        '
+                                                       'self.assertEqual(response.status_code,200,response.data)\n'
+                                                       "        return response.json['token']\n"
+                                                       '\n'
+                                                       '    def '
+                                                       'test_assets_reads_head_and_private_paths(self):\n'
+                                                       '        for path in '
+                                                       "('/','/repairs/','/repairs/app.js','/repairs/features.js','/repairs/style.css','/repairs/original.css','/repairs/parity.css','/repairs/ghost-logo.png'):\n"
+                                                       '            response=self.call(path)\n'
+                                                       '            '
+                                                       'self.assertEqual(response.status_code,200,path)\n'
+                                                       '            self.assertTrue(response.data)\n'
+                                                       '            '
+                                                       "self.assertEqual(response.headers['Cache-Control'],'no-store')\n"
+                                                       "            head=self.call(path,'HEAD')\n"
+                                                       "            self.assertEqual(head.data,b'')\n"
+                                                       '            '
+                                                       "self.assertEqual(head.headers['Content-Length'],response.headers['Content-Length'])\n"
+                                                       '        for path in '
+                                                       "('/api/repairs/catalog','/api/repairs/dbn/catalog','/api/repairs/records','/api/repairs/dbn','/api/repairs/mappings','/api/repairs/history','/api/repairs/statistics','/api/repairs/masters','/api/modules'):\n"
+                                                       '            '
+                                                       'self.assertEqual(self.call(path).status_code,200,path)\n'
+                                                       '        for path in '
+                                                       "('/data/spms.sqlite3','/flask_server.py','/static/../data/spms.sqlite3','/api/no-such-route'):\n"
+                                                       '            '
+                                                       'self.assertEqual(self.call(path).status_code,404,path)\n'
+                                                       '\n'
+                                                       '    def '
+                                                       'test_sources_host_forwarded_headers_and_origins_not_relaxed(self):\n'
+                                                       '        for source in '
+                                                       "('10.1.122.20','8.8.8.8','::1'):\n"
+                                                       '            '
+                                                       "self.assertEqual(self.call('/api/health',source=source).status_code,403)\n"
+                                                       '        '
+                                                       "self.assertEqual(self.call('/api/health',source='10.1.122.20',headers={'X-Forwarded-For':'10.1.121.40'}).status_code,403)\n"
+                                                       '        '
+                                                       "self.assertEqual(self.call('/api/health',headers={'Host':'other.example:8082'}).status_code,403)\n"
+                                                       '        for host in '
+                                                       "('localhost:8082','127.0.0.1:8082','10.1.121.135:8082'):\n"
+                                                       '            '
+                                                       "self.assertEqual(self.call('/api/health',headers={'Host':host}).status_code,200)\n"
+                                                       '        for origin in '
+                                                       "('http://evil.example','https://10.1.121.135:8082','null'):\n"
+                                                       '            '
+                                                       "self.assertEqual(self.call('/api/edit/unlock','POST',{'password':'synthetic-only'},headers={'Origin':origin}).status_code,403)\n"
+                                                       '        '
+                                                       "self.assertEqual(self.call('/api/edit/unlock','POST',{'password':'synthetic-only'},headers={'Sec-Fetch-Site':'cross-site'}).status_code,403)\n"
+                                                       '        log=self.log_file.read_text()\n'
+                                                       "        self.assertIn('SOURCE_DENIED',log)\n"
+                                                       "        self.assertIn('HOST_DENIED',log)\n"
+                                                       "        self.assertIn('WRITE_REJECTED',log)\n"
+                                                       "        self.assertNotIn('synthetic-only',log)\n"
+                                                       '\n'
+                                                       '    def '
+                                                       'test_write_validation_conflict_lock_and_redacted_logs(self):\n'
+                                                       '        '
+                                                       "self.assertEqual(self.call('/api/repairs/records','POST',example()).status_code,401)\n"
+                                                       '        token=self.unlock()\n'
+                                                       '        '
+                                                       "row=self.call('/api/repairs/records','POST',example(),token).json['data']\n"
+                                                       '        '
+                                                       "response=self.call('/api/repairs/records/'+row['id'],'PUT',example(expected_version=1,failure_description='test "
+                                                       "edit'),token)\n"
+                                                       '        '
+                                                       'self.assertEqual(response.status_code,200,response.data)\n'
+                                                       '        '
+                                                       "self.assertEqual(self.call('/api/repairs/records/'+row['id'],'PUT',example(expected_version=1),token).status_code,409)\n"
+                                                       '        '
+                                                       "self.assertEqual(self.call('/api/repairs/records/'+row['id']+'/chain').status_code,200)\n"
+                                                       '        '
+                                                       "self.assertEqual(self.call('/api/repairs/records/'+row['id']+'/history').status_code,200)\n"
+                                                       "        self.call('/api/edit/lock','POST',{},token)\n"
+                                                       '        '
+                                                       "self.assertEqual(self.call('/api/repairs/records/'+row['id'],'DELETE',{'expected_version':2},token).status_code,401)\n"
+                                                       '        log=self.log_file.read_text()\n'
+                                                       '        self.assertNotIn(token,log)\n'
+                                                       "        self.assertNotIn('test edit',log)\n"
+                                                       "        self.assertNotIn('synthetic-only',log)\n"
+                                                       '        '
+                                                       "self.call('/api/health?password=DO_NOT_LOG_QUERY')\n"
+                                                       '        '
+                                                       "self.assertNotIn('DO_NOT_LOG_QUERY',self.log_file.read_text())\n"
+                                                       '\n'
+                                                       '    def '
+                                                       'test_bad_json_size_headers_and_unsupported_method(self):\n'
+                                                       '        '
+                                                       "response=self.client.post('/api/repairs/records',base_url='http://127.0.0.1:8082',data='bad',content_type='application/json',headers={'X-SPMS-Request':'1'})\n"
+                                                       '        self.assertEqual(response.status_code,400)\n'
+                                                       '        '
+                                                       "self.assertEqual(self.call('/api/repairs/records','POST',[],self.unlock()).status_code,400)\n"
+                                                       '        '
+                                                       "self.assertEqual(self.call('/api/repairs/records','PATCH',{}).status_code,405)\n"
+                                                       '        '
+                                                       "self.assertEqual(self.call('/api/repairs/records','OPTIONS').status_code,405)\n"
+                                                       '        '
+                                                       "response=self.client.post('/api/repairs/records',base_url='http://127.0.0.1:8082',data='{}',content_type='text/plain',headers={'X-SPMS-Request':'1'})\n"
+                                                       '        self.assertEqual(response.status_code,415)\n'
+                                                       '        '
+                                                       "response=self.client.post('/api/repairs/records',base_url='http://127.0.0.1:8082',data='x'*(8*1024*1024),content_type='application/json',headers={'X-SPMS-Request':'1'})\n"
+                                                       '        self.assertEqual(response.status_code,413)\n'
+                                                       '\n'
+                                                       '    def '
+                                                       'test_attachment_bytes_and_deletion_share_existing_operations(self):\n'
+                                                       '        token=self.unlock()\n'
+                                                       '        '
+                                                       "row=self.call('/api/repairs/records','POST',example(),token).json['data']\n"
+                                                       "        raw=b'original bytes\\r\\n<script>not "
+                                                       "html</script>'\n"
+                                                       '        '
+                                                       "response=self.call('/api/repairs/records/'+row['id']+'/attachment','POST',\n"
+                                                       '            '
+                                                       "dict(expected_version=1,attachment=dict(filename='log.asc',content_base64=base64.b64encode(raw).decode())),token)\n"
+                                                       '        '
+                                                       'self.assertEqual(response.status_code,200,response.data)\n'
+                                                       '        '
+                                                       "meta=self.call('/api/repairs/records/'+row['id']+'/attachment').json['data']\n"
+                                                       '        '
+                                                       "self.assertEqual(self.call('/api/repairs/attachments/'+meta['id']).data,raw)\n"
+                                                       '        '
+                                                       "response=self.call('/api/repairs/records/'+row['id'],'DELETE',{'expected_version':2},token)\n"
+                                                       '        '
+                                                       'self.assertEqual(response.status_code,200,response.data)\n'
+                                                       '        with connect(self.path) as connection:\n'
+                                                       '            '
+                                                       "self.assertEqual(connection.execute('SELECT count(*) "
+                                                       "FROM repair_attachments').fetchone()[0],0)\n"
+                                                       '\n'
+                                                       '    def '
+                                                       'test_waitress_real_http_and_parallel_version_conflict(self):\n'
+                                                       '        from waitress import create_server\n'
+                                                       '        '
+                                                       "server=create_server(self.app,host='127.0.0.1',port=0,threads=10,clear_untrusted_proxy_headers=True)\n"
+                                                       '        stopping=threading.Event()\n'
+                                                       '        def run():\n'
+                                                       '            try:\n'
+                                                       '                server.run()\n'
+                                                       '            except OSError:\n'
+                                                       '                if not stopping.is_set(): raise\n'
+                                                       '        '
+                                                       'thread=threading.Thread(target=run,daemon=True)\n'
+                                                       '        thread.start()\n'
+                                                       '        def cleanup():\n'
+                                                       '            stopping.set()\n'
+                                                       '            server.close()\n'
+                                                       '            thread.join(5)\n'
+                                                       '        self.addCleanup(cleanup)\n'
+                                                       '        '
+                                                       "base=f'http://127.0.0.1:{server.effective_port}'\n"
+                                                       '        token=self.unlock()\n'
+                                                       '        '
+                                                       "row=self.call('/api/repairs/records','POST',example(),token).json['data']\n"
+                                                       '        from urllib.error import HTTPError\n'
+                                                       '        def update(index):\n'
+                                                       '            '
+                                                       "request=Request(base+'/api/repairs/records/'+row['id'],method='PUT',data=json.dumps(example(expected_version=1,failure_description=str(index))).encode(),\n"
+                                                       '                '
+                                                       "headers={'Host':'127.0.0.1:8082','Content-Type':'application/json','X-SPMS-Request':'1','X-SPMS-Edit-Token':token})\n"
+                                                       '            try:\n'
+                                                       '                with urlopen(request,timeout=10) as '
+                                                       'response: return response.status\n'
+                                                       '            except HTTPError as error:\n'
+                                                       '                with error: return error.code\n'
+                                                       '        with '
+                                                       'concurrent.futures.ThreadPoolExecutor(max_workers=10) '
+                                                       'as pool:\n'
+                                                       '            '
+                                                       'statuses=list(pool.map(update,range(10)))\n'
+                                                       '        '
+                                                       'self.assertEqual(sorted(statuses),[200]+[409]*9)\n'
+                                                       '\n'
+                                                       '\n'
+                                                       "if __name__=='__main__':\n"
+                                                       '    unittest.main()\n',
+                                            'sha256': '4a63f895cd2e38667e029ca50c9a00b0e3fce47856a8bc2f81c3b926da1bea63'},
            'company/test_import_data.py': {'content': 'import json\n'
                                                       'import sqlite3\n'
                                                       'import unittest\n'
@@ -11034,7 +11731,7 @@ BUNDLE = {'files': {'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管
                                                 '@media(max-width:600px){main{margin:25px auto;padding:0 '
                                                 '16px}h1{font-size:22px}section{padding:18px}dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:10px}}\n',
                                      'sha256': '064406c8758be5620dfe7440f59d59ec1de5f6307e74f5bad85dd03e018c0769'}},
- 'version': '2026-11-05-wildcard-test'}
+ 'version': '2026-11-05-flask-comparison'}
 
 
 def check_local_path(path):
@@ -11054,7 +11751,8 @@ def program_target(base, name):
             or not path.parts or path.parts[0] != "company" or str(path) != name
             or any(part in (".", "..") or part.lower() in ("data", ".venv", "backups", "spms-code-backups")
                    or part.startswith(".") or part.endswith((" ", ".")) for part in path.parts)
-            or path.suffix not in (".py", ".html", ".css", ".js", ".json", ".sql", ".md")):
+            or (path.suffix not in (".py", ".html", ".css", ".js", ".json", ".sql", ".md")
+                and name != 'company/start_flask_test.cmd')):
         raise ValueError(f"Invalid program path: {name}")
     target = base.joinpath(*path.parts)
     check_local_path(target)

@@ -1,5 +1,9 @@
 # 備品管理：本機功能整批對照與交付界線
 
+## Flask／Waitress 隔離測試版（2026-11-05）
+
+新增 `flask_server.py`、`start_flask_test.cmd`，不替換標準庫服務。HTTP／WSGI 以 Flask＋Waitress 提供、直接共用既有 Handler 的路由及業務規則，不另開標準庫 HTTP listener。每次啟動使用正式庫的全新 SQLite backup 副本，密碼雜湊亦複製到測試目錄，寫入不回正式庫。保留網段／Host／同源／編輯保護，新增來源與拒絕分類日誌且不記 body／query／token。依賴安裝已由使用者回報成功；Windows／Proxy 實際效果仍待比較，不宣稱更換框架可繞過 Proxy。步驟與回退方式見 FLASK_TEST.md。
+
 ## 所有 IPv4 網卡監聽對照測試（2026-11-05）
 
 使用者明確選擇選項 2：預設監聽 `0.0.0.0:8082`，網址仍為 `10.1.121.135:8082`，並可使用 `127.0.0.1:8082`／`localhost:8082`。本節取代下方歷史預設與禁止 wildcard 的描述。來源網段、精確 Host、同源及編輯密碼保護保留；其他網卡／VPN 也會監聽，但不擴大來源白名單。不設定防火牆或 Proxy、不保證解決代理驗證，Windows 實際效果未驗證。

@@ -4,10 +4,10 @@ import pprint
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "2026-11-05-wildcard-test"
+VERSION = "2026-11-05-flask-comparison"
 FILES = (
-    "README.md", "LAN_SETUP.md", "IMPLEMENTATION_STATUS.md", "server.py", "database.py", "errors.py", "maintenance.py", "import_data.py", "edit_access.py", "legacy_import.py",
-    "test_server.py", "test_repairs.py", "test_features.py", "test_import_data.py", "test_edit_access.py", "test_legacy_import.py", "test_lan.py",
+    "README.md", "LAN_SETUP.md", "FLASK_TEST.md", "IMPLEMENTATION_STATUS.md", "server.py", "flask_server.py", "start_flask_test.cmd", "database.py", "errors.py", "maintenance.py", "import_data.py", "edit_access.py", "legacy_import.py",
+    "test_server.py", "test_repairs.py", "test_features.py", "test_import_data.py", "test_edit_access.py", "test_legacy_import.py", "test_lan.py", "test_flask_server.py",
     "modules/__init__.py", "modules/repairs/__init__.py", "modules/repairs/catalog.json",
     "modules/repairs/schema.sql", "modules/repairs/schema_v2.sql", "modules/repairs/schema_legacy.sql", "modules/repairs/service.py",
     "modules/repairs/operations.py", "modules/repairs/attachments.py", "modules/repairs/dbn_catalog.json",
