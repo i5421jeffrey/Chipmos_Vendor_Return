@@ -4,8 +4,9 @@ import pprint
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = "2026-11-05-flask-comparison"
+VERSION = "2026-11-16-flask-production"
 FILES = (
+    "production_server.py", "start_spms.cmd", "PRODUCTION.md", "test_production_server.py",
     "README.md", "LAN_SETUP.md", "FLASK_TEST.md", "IMPLEMENTATION_STATUS.md", "server.py", "flask_server.py", "start_flask_test.cmd", "database.py", "errors.py", "maintenance.py", "import_data.py", "edit_access.py", "legacy_import.py",
     "test_server.py", "test_repairs.py", "test_features.py", "test_import_data.py", "test_edit_access.py", "test_legacy_import.py", "test_lan.py", "test_flask_server.py",
     "modules/__init__.py", "modules/repairs/__init__.py", "modules/repairs/catalog.json",

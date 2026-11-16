@@ -53,14 +53,14 @@ def create_app(database, *, host='0.0.0.0', port=8082, client_subnets=('10.1.121
 
     database = Path(database).resolve()
     if not database.is_file():
-        raise ValueError('Test database must already exist; refusing to create an empty database')
+        raise ValueError('Database must already exist; refusing to create an empty database')
     host = bind_address(host)
     if not 1 <= port <= 65535:
         raise ValueError('Invalid port')
     lan = not ipaddress.ip_address(host).is_loopback
     networks = tuple(client_network(str(value)) for value in client_subnets)
     if lan and not networks:
-        raise ValueError('LAN test requires a client subnet allowlist')
+        raise ValueError('LAN access requires a client subnet allowlist')
     hosts = {f'{host}:{port}'}
     if host == '0.0.0.0':
         hosts = {f'10.1.121.135:{port}', f'127.0.0.1:{port}', f'localhost:{port}'}

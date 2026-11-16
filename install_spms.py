@@ -18,6 +18,10 @@ from uuid import uuid4
 
 BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連線對照測試\n'
                                                 '\n'
+                                                '2026-11-16 已另增正式入口 `production_server.py`，見 '
+                                                '[PRODUCTION.md](PRODUCTION.md)。本文件與 `flask_server.py` '
+                                                '仍只描述隔離副本測試，勿用此入口處理正式寫入。\n'
+                                                '\n'
                                                 '這是可退回的 HTTP 測試入口，不替換 `server.py`、不將正式資料搬到另一套架構。\n'
                                                 'Flask＋Waitress 負責 HTTP／WSGI，透過傳輸介面呼叫既有 `Handler` '
                                                 '的路由、欄位驗證與業務函式；不是在背後另啟一個原 HTTP server，也不額外使用 Proxy '
@@ -110,8 +114,19 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                 'Waitress loopback 十個並發修改測試。安裝 Flask／Waitress 的開發 venv 才能執行 '
                                                 'Flask 測試；無依賴時只執行副本測試並明確 skip Flask 部分。macOS loopback／Flask '
                                                 'test client 不等於公司 Windows 瀏覽器、Proxy、防火牆或真實使用驗收。\n',
-                                     'sha256': 'df923fa18bd29ac0211c324738e22fa0a755c90a84a6051afe6317a7148d467d'},
+                                     'sha256': 'af386ccb01ed85120590d32761bb64f94b8383b3c72a6aa8f019df5fc9df5cad'},
            'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管理：本機功能整批對照與交付界線\n'
+                                                           '\n'
+                                                           '## 正式入口核准（2026-11-16）\n'
+                                                           '\n'
+                                                           '使用者回報加入 `192.168.120.0/24` 後測試成功並核准正式啟動。新增 '
+                                                           '`production_server.py`／`start_spms.cmd`，共用已測的 '
+                                                           'Flask WSGI '
+                                                           'adapter，直接沿用原正式庫及密碼，啟動前建立驗證備份，不合併測試資料。預設來源只限 '
+                                                           '`10.1.121.0/24`、`192.168.120.0/24` 與 '
+                                                           'loopback，Host／同源／編輯限制不變。原標準庫及隔離測試入口保留。見 '
+                                                           'PRODUCTION.md；正式 Windows '
+                                                           '啟動、多人負載、排程備份與常駐管理仍待現場驗證。\n'
                                                            '\n'
                                                            '## Flask／Waitress 隔離測試版（2026-11-05）\n'
                                                            '\n'
@@ -303,7 +318,7 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                            '`.venv`，也不自動啟動服務、匯入真實舊資料或開放內網。\n'
                                                            '真實來源包與預覽結果只保存在使用者核准的本機資料夾，不放入儲存庫或通用安裝檔；公司正式匯入仍需停止服務、預檢及 '
                                                            '`IMPORT` 確認。\n',
-                                                'sha256': 'f344e79570cf4ef40f0d7e22ad9a4a951953c6eb287fe9129ddfbe7d67719f95'},
+                                                'sha256': '13c971c8399a6ecae4c9e07d99732260ac42f6d568d72dc454e39cdb4f53c5a9'},
            'company/LAN_SETUP.md': {'content': '# SPMS：Windows 11 內網共用\n'
                                                '\n'
                                                '## 最新監聽對照測試：0.0.0.0（2026-11-05）\n'
@@ -485,7 +500,79 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                '執行 `company/server.py --host '
                                                '127.0.0.1`，即只允許本機。若工作排程器已啟用，須同步停用或修改該工作，避免自動重新開放。\n',
                                     'sha256': 'd99160101849a035de939b457adf4455e11b39ada38e7dedbf6334eb7ee7ca28'},
+           'company/PRODUCTION.md': {'content': '# SPMS 正式啟動（2026-11-16）\n'
+                                                '\n'
+                                                '使用者在 Flask＋Waitress 測試連線成功後，核准正式使用原 SQLite 資料庫與密碼，允許 '
+                                                '`10.1.121.0/24` 及 `192.168.120.0/24`。預設仍是 '
+                                                'HTTP、`0.0.0.0:8082`，精確 Host 白名單不變，不調整 Proxy／防火牆。若後者包含共用 '
+                                                'Proxy，其他經它轉送的使用者也可能讀取資料；來源白名單不是個人登入。所有修改仍需編輯解鎖及同源驗證。\n'
+                                                '\n'
+                                                '## 更新及啟動\n'
+                                                '\n'
+                                                '1. 在所有 SPMS 視窗按 Ctrl+C 停止服務。原服務和測試版都不能與正式版同時執行。\n'
+                                                '2. 從 GitHub Raw 下載最新 `install_spms.py` 到 '
+                                                '`D:\\Python\\SPMS`，覆蓋舊安裝檔，執行：\n'
+                                                '\n'
+                                                '```cmd\n'
+                                                'cd /d D:\\Python\\SPMS\n'
+                                                '.\\.venv\\Scripts\\python.exe .\\install_spms.py\n'
+                                                '```\n'
+                                                '\n'
+                                                '確認目標並輸入 `INSTALL`。保留 data、密碼與 .venv；不重新匯入資料。已安裝的 Flask '
+                                                '3.1.3／Waitress 3.0.2 繼續使用。\n'
+                                                '\n'
+                                                '3. 正式啟動：\n'
+                                                '\n'
+                                                '```cmd\n'
+                                                '.\\.venv\\Scripts\\python.exe '
+                                                '.\\company\\production_server.py\n'
+                                                '```\n'
+                                                '\n'
+                                                '也可以雙擊 `company\\start_spms.cmd`；它不殺程序、不建立 Windows '
+                                                '服務／排程、不改系統政策。保持視窗開啟，主機不可休眠。\n'
+                                                '\n'
+                                                '4. 開啟 `http://10.1.121.135:8082/repairs/`。啟動畫面必須顯示 `LIVE '
+                                                'DATABASE: '
+                                                'D:\\Python\\SPMS\\company\\data\\spms.sqlite3`，不得是 '
+                                                'flask-tests 路徑。\n'
+                                                '\n'
+                                                '## 資料及備份\n'
+                                                '\n'
+                                                '- `production_server.py` 直接使用既有 `company/data/spms.sqlite3` '
+                                                '與旁邊的 '
+                                                '`edit-password.json`，每次啟動不建立替代主資料庫，不合併任何測試副本。正式寫入會保留到下次啟動。\n'
+                                                '- 缺失資料庫、未配置密碼、備份／完整性檢查失敗時停止，不建立空白庫、不退回其他資料庫。依賴缺失時不切換框架。\n'
+                                                '- 每次啟動先以 SQLite backup API 建立並驗證 '
+                                                '`company/data/backups/flask-startup/<隨機ID>/spms.sqlite3`，完成後才執行既有新增式 '
+                                                'migration（如需要）。備份涵蓋已提交 WAL 與附件，不包含密碼檔；密碼檔須另依公司規則保管。\n'
+                                                '- 這是啟動備份，不代替定期與異機備份；目前不自動刪除備份，請監控磁碟容量。備份／測試檔與正式資料都不得上傳 '
+                                                'GitHub。\n'
+                                                '- 不把舊測試 SQLite 覆蓋正式資料庫。測試中新增的資料不會自動進入正式系統。\n'
+                                                '- 連線來源／Host／狀態及拒絕分類只輸出至 CMD；不額外產生無上限的正式日誌檔，不記 '
+                                                'body、query、密碼與 token。HTTP 仍為明文。\n'
+                                                '\n'
+                                                '## 保留入口及回退\n'
+                                                '\n'
+                                                '- `flask_server.py` 仍是隔離測試版，預設來源網段仍為舊測試設定；不得用它當正式入口。\n'
+                                                '- `server.py` 原標準庫服務保留。如需退回，先 Ctrl+C 停止正式入口，再用同一正式資料庫啟動：\n'
+                                                '\n'
+                                                '```cmd\n'
+                                                '.\\.venv\\Scripts\\python.exe .\\company\\server.py '
+                                                '--client-subnet 10.1.121.0/24 --client-subnet '
+                                                '192.168.120.0/24\n'
+                                                '```\n'
+                                                '\n'
+                                                '回退只切換 HTTP 框架，不還原或搬移資料。兩者不可同時使用。\n'
+                                                '\n'
+                                                '自動測試使用合成暫存資料驗證正式路徑、持續寫入、備份、拒絕規則與不合併測試副本。使用者已回報測試版的內網連線成功；正式 '
+                                                'Windows 啟動／實際多人負載、定期備份與開機常駐仍未驗證，不因新增入口就宣稱已完成。\n',
+                                     'sha256': '67ad0cf7c43f23975106068bccea97134bab74d0c607ce7e1afda50085386d9c'},
            'company/README.md': {'content': '# SPMS 公司版：SQLite 離線功能驗收\n'
+                                            '\n'
+                                            '正式 Flask＋Waitress 啟動入口為 '
+                                            '`production_server.py`／`start_spms.cmd`，使用原資料庫、密碼與兩個核准來源網段；更新、啟動及回退見 '
+                                            '[PRODUCTION.md](PRODUCTION.md)。以下及 FLASK_TEST.md '
+                                            '的副本說明僅適用隔離測試入口。\n'
                                             '\n'
                                             '可選的 Flask＋Waitress 隔離連線測試版見 [FLASK_TEST.md](FLASK_TEST.md)。原 '
                                             '`server.py` 不替換；測試寫入只發生於每次新建的資料副本，不能當作正式服務或合併回原資料庫。\n'
@@ -889,7 +976,7 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                             '產生；公司版程式更新後必須重新產生。\n'
                                             '安裝測試：`python -m unittest discover -s scripts -p '
                                             '"test_company_installer.py" -v`。\n',
-                                 'sha256': '9428cf628da8d7cf851a3e3918112f66e6fb49916999c05c0feb9f08b2d7774a'},
+                                 'sha256': '55bf8df0b44a35a2e3e30e9c833491db4b501893dc75d6349c6d75b03ed2ba5a'},
            'company/database.py': {'content': '"""Shared SQLite connections and additive, backed-up module '
                                               'migrations."""\n'
                                               'import json\n'
@@ -1251,8 +1338,8 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                   '\n'
                                                   '    database = Path(database).resolve()\n'
                                                   '    if not database.is_file():\n'
-                                                  "        raise ValueError('Test database must already "
-                                                  "exist; refusing to create an empty database')\n"
+                                                  "        raise ValueError('Database must already exist; "
+                                                  "refusing to create an empty database')\n"
                                                   '    host = bind_address(host)\n'
                                                   '    if not 1 <= port <= 65535:\n'
                                                   "        raise ValueError('Invalid port')\n"
@@ -1260,7 +1347,7 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                   '    networks = tuple(client_network(str(value)) for value '
                                                   'in client_subnets)\n'
                                                   '    if lan and not networks:\n'
-                                                  "        raise ValueError('LAN test requires a client "
+                                                  "        raise ValueError('LAN access requires a client "
                                                   "subnet allowlist')\n"
                                                   "    hosts = {f'{host}:{port}'}\n"
                                                   "    if host == '0.0.0.0':\n"
@@ -1465,7 +1552,7 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                   '\n'
                                                   "if __name__ == '__main__':\n"
                                                   '    raise SystemExit(main())\n',
-                                       'sha256': '3bc760ea65779f3e587e6ac4c175d08d134a6d8cd6252b67a5c19e146d4de3c9'},
+                                       'sha256': '56b26942a5ddc342e47dad481dc81e36eb4495c2ef5f5d5bb6e8d646a3d57213'},
            'company/import_data.py': {'content': '"""Validate/apply a reviewed offline JSON package, without '
                                                  'connecting to Supabase.\n'
                                                  '\n'
@@ -5384,6 +5471,132 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                              '            result.append(entry)\n'
                                                              '        return {"data": result}\n',
                                                   'sha256': 'bb7d7f9c47c919ca7f98427e96eab9a2b9bbe90281921f86caff5161094c453f'},
+           'company/production_server.py': {'content': '"""Approved Flask/Waitress entry point using the '
+                                                       'existing SPMS database.\n'
+                                                       '\n'
+                                                       'The comparison entry point remains isolated. Never '
+                                                       'import/merge its snapshots.\n'
+                                                       '"""\n'
+                                                       'from pathlib import Path\n'
+                                                       'import sqlite3\n'
+                                                       'import sys\n'
+                                                       'from uuid import uuid4\n'
+                                                       '\n'
+                                                       'from edit_access import EditGate\n'
+                                                       'from errors import APIError\n'
+                                                       'from flask_server import MAX_BODY, create_app\n'
+                                                       'from maintenance import snapshot\n'
+                                                       'from server import ROOT, initialize_database, '
+                                                       'startup_options\n'
+                                                       '\n'
+                                                       "APPROVED_SUBNETS = ('10.1.121.0/24', "
+                                                       "'192.168.120.0/24')\n"
+                                                       '\n'
+                                                       '\n'
+                                                       'def production_options(argv=None):\n'
+                                                       '    values = list(sys.argv[1:] if argv is None else '
+                                                       'argv)\n'
+                                                       '    # Only the approved no-host profile inherits the '
+                                                       'two approved networks.\n'
+                                                       '    # Explicit host/subnet choices retain the '
+                                                       'original CLI acknowledgement rules.\n'
+                                                       "    if not any(value == '--host' or "
+                                                       "value.startswith('--host=') or\n"
+                                                       "               value == '--client-subnet' or "
+                                                       "value.startswith('--client-subnet=') for value in "
+                                                       'values):\n'
+                                                       '        for subnet in APPROVED_SUBNETS:\n'
+                                                       "            values.extend(('--client-subnet', "
+                                                       'subnet))\n'
+                                                       '    return startup_options(values)\n'
+                                                       '\n'
+                                                       '\n'
+                                                       'def prepare_production_database(source):\n'
+                                                       '    source = Path(source).resolve()\n'
+                                                       '    if not source.is_file():\n'
+                                                       "        raise ValueError('Existing SPMS database "
+                                                       "missing; refusing to create an empty database.')\n"
+                                                       '    if not '
+                                                       "EditGate(source.parent/'edit-password.json').status()['configured']:\n"
+                                                       "        raise ValueError('Existing edit password is "
+                                                       "not configured; no database changes made.')\n"
+                                                       '    folder = '
+                                                       "source.parent/'backups'/'flask-startup'/uuid4().hex\n"
+                                                       '    folder.mkdir(parents=True, mode=0o700)\n'
+                                                       "    backup = folder/'spms.sqlite3'\n"
+                                                       '    counts = snapshot(source, backup)\n'
+                                                       '    # Backup must finish and verify before applying '
+                                                       'additive migrations, if any.\n'
+                                                       '    initialize_database(source)\n'
+                                                       '    return source, backup, counts\n'
+                                                       '\n'
+                                                       '\n'
+                                                       'def main(argv=None):\n'
+                                                       '    args = production_options(argv)\n'
+                                                       '    if args.tls_cert:\n'
+                                                       "        raise SystemExit('This entry point supports "
+                                                       "HTTP only; use server.py for direct TLS.')\n"
+                                                       '    try:\n'
+                                                       '        from waitress import create_server\n'
+                                                       '        from flask import Flask\n'
+                                                       '    except ImportError:\n'
+                                                       "        raise SystemExit('Install Flask/Waitress "
+                                                       'into the SPMS venv first; no fallback server '
+                                                       "started.')\n"
+                                                       '    app = None\n'
+                                                       '    server = None\n'
+                                                       '    try:\n'
+                                                       '        database, backup, counts = '
+                                                       "prepare_production_database(ROOT/'data/spms.sqlite3')\n"
+                                                       '        app = create_app(database, host=args.host, '
+                                                       'port=args.port, client_subnets=args.client_subnet)\n'
+                                                       '        server = create_server(app, host=args.host, '
+                                                       'port=args.port, threads=10,\n'
+                                                       '            connection_limit=100, '
+                                                       'channel_timeout=15, max_request_body_size=MAX_BODY,\n'
+                                                       '            clear_untrusted_proxy_headers=True, '
+                                                       "url_scheme='http')\n"
+                                                       "        access_ip = '10.1.121.135' if args.host == "
+                                                       "'0.0.0.0' else args.host\n"
+                                                       "        print(f'SPMS: "
+                                                       "http://{access_ip}:{args.port}/repairs/', "
+                                                       'flush=True)\n'
+                                                       "        print('Listening:', args.host, args.port, "
+                                                       'flush=True)\n'
+                                                       "        print('LIVE DATABASE:', database, "
+                                                       'flush=True)\n'
+                                                       "        print('Verified startup backup:', backup, "
+                                                       'flush=True)\n'
+                                                       "        print('Source allowlist:', ', "
+                                                       "'.join(map(str, args.client_subnet)), flush=True)\n"
+                                                       "        print('Writes are saved to the original "
+                                                       "database. No test data is imported.', flush=True)\n"
+                                                       "        print('HTTP is plaintext. Shared proxies may "
+                                                       'allow additional readers. No Proxy/firewall '
+                                                       "changes.', flush=True)\n"
+                                                       "        print('Keep this window open. Ctrl+C to "
+                                                       "stop. Do not run another SPMS server concurrently.', "
+                                                       'flush=True)\n'
+                                                       '        server.run()\n'
+                                                       '    except KeyboardInterrupt:\n'
+                                                       '        pass\n'
+                                                       '    except (OSError, ValueError, sqlite3.Error, '
+                                                       'APIError) as error:\n'
+                                                       "        raise SystemExit('SPMS startup/server "
+                                                       "failed: ' + str(error))\n"
+                                                       '    finally:\n'
+                                                       '        if server is not None:\n'
+                                                       '            server.close()\n'
+                                                       '        if app is not None:\n'
+                                                       '            for handler in '
+                                                       "app.extensions['spms_diagnostics'].handlers:\n"
+                                                       '                handler.close()\n'
+                                                       '    return 0\n'
+                                                       '\n'
+                                                       '\n'
+                                                       "if __name__ == '__main__':\n"
+                                                       '    raise SystemExit(main())\n',
+                                            'sha256': '812046cfef2932979886f80b253be9a9c6fdb3a0609491e9e9feaef1558802ac'},
            'company/server.py': {'content': '"""Local SPMS service. Python standard library only; no cloud '
                                             'connections."""\n'
                                             '\n'
@@ -5972,6 +6185,25 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                        'pause\n'
                                                        'exit /b %SPMS_RESULT%\n',
                                             'sha256': '18d988b3ce2708deaa2261a1de432e2618be3c14cd2e2f411898660449e5f241'},
+           'company/start_spms.cmd': {'content': '@echo off\n'
+                                                 'setlocal\n'
+                                                 'cd /d "%~dp0.."\n'
+                                                 'if not exist ".venv\\Scripts\\python.exe" (\n'
+                                                 '  echo SPMS venv not found. Stop and check the '
+                                                 'installation folder.\n'
+                                                 '  pause\n'
+                                                 '  exit /b 1\n'
+                                                 ')\n'
+                                                 'echo SPMS uses the ORIGINAL database. Stop all other SPMS '
+                                                 'servers first.\n'
+                                                 '".venv\\Scripts\\python.exe" '
+                                                 '".\\company\\production_server.py" %*\n'
+                                                 'set "SPMS_RESULT=%ERRORLEVEL%"\n'
+                                                 'echo.\n'
+                                                 'echo SPMS stopped. Keep any error messages for diagnosis.\n'
+                                                 'pause\n'
+                                                 'exit /b %SPMS_RESULT%\n',
+                                      'sha256': 'f445c4c53a7e7efde5ef6d27f60ce0456d5b34ebcc3b04a5b06a01f3f045f8d0'},
            'company/test_edit_access.py': {'content': 'import json\n'
                                                       'import tempfile\n'
                                                       'import time\n'
@@ -8036,6 +8268,232 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                         "if __name__ == '__main__':\n"
                                                         '    unittest.main()\n',
                                              'sha256': '13485398962103c61a05c30fea3639d3b6fac1f0a9d129aa293225c3206eb614'},
+           'company/test_production_server.py': {'content': '"""Production-mode regression tests use '
+                                                            'synthetic temporary databases only."""\n'
+                                                            'import importlib.util\n'
+                                                            'from pathlib import Path\n'
+                                                            'import tempfile\n'
+                                                            'import unittest\n'
+                                                            'from unittest.mock import patch\n'
+                                                            '\n'
+                                                            'from edit_access import configure\n'
+                                                            'from flask_server import create_app, '
+                                                            'prepare_test_copy\n'
+                                                            'from modules.repairs import service\n'
+                                                            'from production_server import APPROVED_SUBNETS, '
+                                                            'main, prepare_production_database, '
+                                                            'production_options\n'
+                                                            'from server import initialize_database\n'
+                                                            'from test_repairs import example\n'
+                                                            '\n'
+                                                            '\n'
+                                                            'class ProductionTests(unittest.TestCase):\n'
+                                                            '    '
+                                                            "@unittest.skipUnless(importlib.util.find_spec('flask') "
+                                                            "and importlib.util.find_spec('waitress'),\n"
+                                                            "                         'Optional "
+                                                            "Flask/Waitress not installed')\n"
+                                                            '    def '
+                                                            'test_main_serves_original_database_with_approved_defaults(self):\n'
+                                                            '        with tempfile.TemporaryDirectory() as '
+                                                            'folder:\n'
+                                                            '            root = Path(folder)\n'
+                                                            "            (root/'data').mkdir()\n"
+                                                            "            path = root/'data/spms.sqlite3'\n"
+                                                            '            initialize_database(path)\n'
+                                                            '            '
+                                                            "configure(path.parent/'edit-password.json', "
+                                                            "'synthetic-only')\n"
+                                                            '            with '
+                                                            "patch('production_server.ROOT', root), "
+                                                            "patch('waitress.create_server') as factory:\n"
+                                                            '                self.assertEqual(main([]), 0)\n'
+                                                            '                app = '
+                                                            'factory.call_args.args[0]\n'
+                                                            '                '
+                                                            "self.assertEqual(app.extensions['spms_state'].database, "
+                                                            'path.resolve())\n'
+                                                            '                '
+                                                            "self.assertEqual(factory.call_args.kwargs['host'], "
+                                                            "'0.0.0.0')\n"
+                                                            '                '
+                                                            "self.assertEqual(factory.call_args.kwargs['port'], "
+                                                            '8082)\n'
+                                                            '                '
+                                                            "self.assertTrue(factory.call_args.kwargs['clear_untrusted_proxy_headers'])\n"
+                                                            '                '
+                                                            'factory.return_value.run.assert_called_once()\n'
+                                                            '                '
+                                                            'factory.return_value.close.assert_called_once()\n'
+                                                            '            '
+                                                            "self.assertFalse((path.parent/'flask-tests').exists())\n"
+                                                            '            '
+                                                            "self.assertEqual(len(list((path.parent/'backups/flask-startup').glob('*/spms.sqlite3'))), "
+                                                            '1)\n'
+                                                            '\n'
+                                                            '    def '
+                                                            'test_approved_defaults_and_explicit_overrides(self):\n'
+                                                            '        args = production_options([])\n'
+                                                            "        self.assertEqual(args.host, '0.0.0.0')\n"
+                                                            '        self.assertEqual(args.port, 8082)\n'
+                                                            '        self.assertTrue(args.allow_http_lan)\n'
+                                                            '        self.assertEqual(tuple(map(str, '
+                                                            'args.client_subnet)), APPROVED_SUBNETS)\n'
+                                                            '        '
+                                                            "self.assertEqual(production_options(['--port', "
+                                                            "'8089']).port, 8089)\n"
+                                                            '        '
+                                                            "self.assertEqual(production_options(['--host', "
+                                                            "'127.0.0.1']).client_subnet, [])\n"
+                                                            '        args = '
+                                                            "production_options(['--client-subnet', "
+                                                            "'10.1.121.0/24'])\n"
+                                                            '        self.assertEqual(list(map(str, '
+                                                            "args.client_subnet)), ['10.1.121.0/24'])\n"
+                                                            '        with self.assertRaises(SystemExit):\n'
+                                                            "            production_options(['--host', "
+                                                            "'10.1.121.135'])\n"
+                                                            '\n'
+                                                            '    def '
+                                                            'test_missing_database_password_and_failed_backup_stop_before_migration(self):\n'
+                                                            '        with tempfile.TemporaryDirectory() as '
+                                                            'folder:\n'
+                                                            "            path = Path(folder)/'spms.sqlite3'\n"
+                                                            '            with '
+                                                            'self.assertRaises(ValueError):\n'
+                                                            '                '
+                                                            'prepare_production_database(path)\n'
+                                                            '            self.assertFalse(path.exists())\n'
+                                                            '            initialize_database(path)\n'
+                                                            '            with '
+                                                            'self.assertRaises(ValueError):\n'
+                                                            '                '
+                                                            'prepare_production_database(path)\n'
+                                                            '            '
+                                                            "configure(path.parent/'edit-password.json', "
+                                                            "'synthetic-only')\n"
+                                                            '            with '
+                                                            "patch('production_server.snapshot', "
+                                                            "side_effect=OSError('disk full')), \\\n"
+                                                            '                 '
+                                                            "patch('production_server.initialize_database') "
+                                                            'as migrate:\n'
+                                                            '                with '
+                                                            'self.assertRaises(OSError):\n'
+                                                            '                    '
+                                                            'prepare_production_database(path)\n'
+                                                            '                migrate.assert_not_called()\n'
+                                                            '\n'
+                                                            '    def '
+                                                            'test_original_identity_backups_and_no_test_merge(self):\n'
+                                                            '        with tempfile.TemporaryDirectory() as '
+                                                            'folder:\n'
+                                                            "            path = Path(folder)/'spms.sqlite3'\n"
+                                                            '            initialize_database(path)\n'
+                                                            '            '
+                                                            "configure(path.parent/'edit-password.json', "
+                                                            "'synthetic-only')\n"
+                                                            '            password = '
+                                                            "(path.parent/'edit-password.json').read_bytes()\n"
+                                                            '            service.save_record(path, '
+                                                            'example())\n'
+                                                            '            test_copy, _ = '
+                                                            'prepare_test_copy(path)\n'
+                                                            '            service.save_record(test_copy, '
+                                                            "example(serial_no='123456789'))\n"
+                                                            '            database, backup, counts = '
+                                                            'prepare_production_database(path)\n'
+                                                            '            self.assertEqual(database, '
+                                                            'path.resolve())\n'
+                                                            '            '
+                                                            "self.assertEqual(counts['repair_records'], 1)\n"
+                                                            '            service.save_record(database, '
+                                                            "example(serial_no='987654321'))\n"
+                                                            '            '
+                                                            'self.assertEqual(service.list_records(backup, '
+                                                            "{})['total'], 1)\n"
+                                                            '            database2, backup2, counts2 = '
+                                                            'prepare_production_database(path)\n'
+                                                            '            self.assertEqual(database2, '
+                                                            'database)\n'
+                                                            '            self.assertNotEqual(backup2, '
+                                                            'backup)\n'
+                                                            '            '
+                                                            "self.assertEqual(counts2['repair_records'], 2)\n"
+                                                            '            '
+                                                            "self.assertEqual((path.parent/'edit-password.json').read_bytes(), "
+                                                            'password)\n'
+                                                            '\n'
+                                                            '    '
+                                                            "@unittest.skipUnless(importlib.util.find_spec('flask'), "
+                                                            "'Optional Flask not installed')\n"
+                                                            '    def '
+                                                            'test_approved_networks_edit_gate_and_live_write_persistence(self):\n'
+                                                            '        with tempfile.TemporaryDirectory() as '
+                                                            'folder:\n'
+                                                            "            path = Path(folder)/'spms.sqlite3'\n"
+                                                            '            initialize_database(path)\n'
+                                                            '            '
+                                                            "configure(path.parent/'edit-password.json', "
+                                                            "'synthetic-only')\n"
+                                                            '            database, _, _ = '
+                                                            'prepare_production_database(path)\n'
+                                                            '            app = create_app(database, '
+                                                            'client_subnets=APPROVED_SUBNETS)\n'
+                                                            '            self.addCleanup(lambda: '
+                                                            '[handler.close() for handler in '
+                                                            "app.extensions['spms_diagnostics'].handlers])\n"
+                                                            '            client = app.test_client()\n'
+                                                            '            def call(route, '
+                                                            "source='192.168.120.89', method='GET', "
+                                                            'data=None, headers=None):\n'
+                                                            '                return client.open(route, '
+                                                            'method=method, json=data, headers=headers or '
+                                                            '{},\n'
+                                                            '                    '
+                                                            "base_url='http://10.1.121.135:8082', "
+                                                            "environ_overrides={'REMOTE_ADDR':source})\n"
+                                                            "            for source in ('10.1.121.40', "
+                                                            "'192.168.120.1', '192.168.120.254'):\n"
+                                                            '                '
+                                                            "self.assertEqual(call('/api/health', "
+                                                            'source).status_code, 200)\n'
+                                                            "            for source in ('192.168.121.89', "
+                                                            "'10.1.122.40'):\n"
+                                                            '                '
+                                                            "self.assertEqual(call('/api/health', "
+                                                            'source).status_code, 403)\n'
+                                                            '            '
+                                                            "self.assertEqual(call('/api/health', "
+                                                            "headers={'Host':'evil.example:8082'}).status_code, "
+                                                            '403)\n'
+                                                            "            headers = {'X-SPMS-Request':'1'}\n"
+                                                            '            '
+                                                            "self.assertEqual(call('/api/repairs/records', "
+                                                            "method='POST', data=example(), "
+                                                            'headers=headers).status_code, 401)\n'
+                                                            "            unlock = call('/api/edit/unlock', "
+                                                            "method='POST', "
+                                                            "data={'password':'synthetic-only'}, "
+                                                            'headers=headers)\n'
+                                                            '            '
+                                                            'self.assertEqual(unlock.status_code, 200)\n'
+                                                            "            headers['X-SPMS-Edit-Token'] = "
+                                                            "unlock.json['token']\n"
+                                                            '            '
+                                                            "self.assertEqual(call('/api/repairs/records', "
+                                                            "method='POST', data=example(), "
+                                                            'headers=headers).status_code, 201)\n'
+                                                            '            '
+                                                            'self.assertEqual(service.list_records(path, '
+                                                            "{})['total'], 1)\n"
+                                                            '            '
+                                                            "self.assertFalse((path.parent/'flask-tests').exists())\n"
+                                                            '\n'
+                                                            '\n'
+                                                            "if __name__ == '__main__':\n"
+                                                            '    unittest.main()\n',
+                                                 'sha256': '77db89b50090da985c0dfca012260dddbf7bd5312456498a888ce4c26ce63dbf'},
            'company/test_repairs.py': {'content': 'import concurrent.futures\n'
                                                   'import json\n'
                                                   'import sqlite3\n'
@@ -11731,7 +12189,7 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                 '@media(max-width:600px){main{margin:25px auto;padding:0 '
                                                 '16px}h1{font-size:22px}section{padding:18px}dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:10px}}\n',
                                      'sha256': '064406c8758be5620dfe7440f59d59ec1de5f6307e74f5bad85dd03e018c0769'}},
- 'version': '2026-11-05-flask-comparison'}
+ 'version': '2026-11-16-flask-production'}
 
 
 def check_local_path(path):
@@ -11752,7 +12210,7 @@ def program_target(base, name):
             or any(part in (".", "..") or part.lower() in ("data", ".venv", "backups", "spms-code-backups")
                    or part.startswith(".") or part.endswith((" ", ".")) for part in path.parts)
             or (path.suffix not in (".py", ".html", ".css", ".js", ".json", ".sql", ".md")
-                and name != 'company/start_flask_test.cmd')):
+                and name not in ('company/start_flask_test.cmd', 'company/start_spms.cmd'))):
         raise ValueError(f"Invalid program path: {name}")
     target = base.joinpath(*path.parts)
     check_local_path(target)

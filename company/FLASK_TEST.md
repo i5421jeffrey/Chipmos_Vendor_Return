@@ -1,5 +1,7 @@
 # Flask＋Waitress 連線對照測試
 
+2026-11-16 已另增正式入口 `production_server.py`，見 [PRODUCTION.md](PRODUCTION.md)。本文件與 `flask_server.py` 仍只描述隔離副本測試，勿用此入口處理正式寫入。
+
 這是可退回的 HTTP 測試入口，不替換 `server.py`、不將正式資料搬到另一套架構。
 Flask＋Waitress 負責 HTTP／WSGI，透過傳輸介面呼叫既有 `Handler` 的路由、欄位驗證與業務函式；不是在背後另啟一個原 HTTP server，也不額外使用 Proxy 轉接。介面、API、SQLite 與交易規則不重寫。
 

@@ -1,5 +1,9 @@
 # 備品管理：本機功能整批對照與交付界線
 
+## 正式入口核准（2026-11-16）
+
+使用者回報加入 `192.168.120.0/24` 後測試成功並核准正式啟動。新增 `production_server.py`／`start_spms.cmd`，共用已測的 Flask WSGI adapter，直接沿用原正式庫及密碼，啟動前建立驗證備份，不合併測試資料。預設來源只限 `10.1.121.0/24`、`192.168.120.0/24` 與 loopback，Host／同源／編輯限制不變。原標準庫及隔離測試入口保留。見 PRODUCTION.md；正式 Windows 啟動、多人負載、排程備份與常駐管理仍待現場驗證。
+
 ## Flask／Waitress 隔離測試版（2026-11-05）
 
 新增 `flask_server.py`、`start_flask_test.cmd`，不替換標準庫服務。HTTP／WSGI 以 Flask＋Waitress 提供、直接共用既有 Handler 的路由及業務規則，不另開標準庫 HTTP listener。每次啟動使用正式庫的全新 SQLite backup 副本，密碼雜湊亦複製到測試目錄，寫入不回正式庫。保留網段／Host／同源／編輯保護，新增來源與拒絕分類日誌且不記 body／query／token。依賴安裝已由使用者回報成功；Windows／Proxy 實際效果仍待比較，不宣稱更換框架可繞過 Proxy。步驟與回退方式見 FLASK_TEST.md。
