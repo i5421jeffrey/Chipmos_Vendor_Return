@@ -124,7 +124,10 @@ async function fetch(path, options = {}) {
   else if (String(path).startsWith('/api/repairs/mappings?')) data = {data:[{serial_no:'002850948',board_name:'HVDR PE',board_part_code:'BPR-030837',version:1}],total:1,page:1,page_size:20};
   else if (String(path).startsWith('/api/repairs/statistics?')) data = {frequency:{'2026-11':1},amounts_cents:{'2026-11':{'板修':0,'外修':0,'合約':0,'保固':0}},ranking:[{machine:'F45',count:1}],missing_amounts:0};
   else if (String(path).startsWith('/api/repairs/masters')) data = {machines:[{machine_code:'F45',model:'T5377S'}],boards:[{model:'T5377S',board_name:'HVDR PE',board_part_code:'BPR-030837'}],prices:[{model:'T5377S',board_name:'HVDR PE',board_part_code:'BPR-030837',board_repair_cents:0}],token:'master-token'};
-  else if (String(path).startsWith('/api/repairs/records?')) data = {data:[{...testRecord}], total:1, page:1, page_size:20, status_counts:{'待送修':1}};
+  else if (String(path).startsWith('/api/repairs/records?')) {
+    const rows = String(path).includes('is_opened=false') ? (liveRecord.is_opened ? [] : [{...liveRecord}]) : [{...testRecord}];
+    data = {data:rows, total:rows.length, page:1, page_size:20, status_counts:{'待送修':1}, unopened_count:liveRecord.is_opened ? 0 : 1};
+  }
   else if (String(path).endsWith('/record-1') || String(path).endsWith('/created-1')) {
     if (recordReadGate) await recordReadGate;
     if (recordReadFails) throw Error('模擬讀取失敗');
@@ -150,12 +153,33 @@ function assert(ok, message) {if (!ok) throw Error(message);}
   assert(picker.textContent.includes('<log>.asc · 1 KB') && !picker.children[2].hidden, 'Picker displays untrusted filename as text and file size');
   picker.children[2].listeners.click[0]();
   assert(!selectedFile.files.length && picker.children[2].hidden && picker.textContent.includes('尚未選擇檔案'), 'Clearing selection resets only the local input');
-  assert(navigation.length === 6 && counters.length === 6, 'All status navigation entries exist');
+  assert(navigation.length === 6 && counters.length === 7, 'Status navigation plus independent unopened count exist');
   assert(nodes.records.children.length === 1, 'Original-style list renders');
   assert(nodes.records.children[0].children.length === 6, 'List retains original six-column structure');
   assert(nodes.records.children[0].textContent.includes('開單 X'), 'Serial/open-status subtitle');
   assert(counters.find(node => node.dataset.count === 'all').textContent === '1', 'Navigation counts reflect database');
+  assert(counters.find(node => node.dataset.count === 'unopened').textContent === '1', 'Unopened count does not double-count all repairs');
+  nodes['nav-unopened'].listeners.click[0]();
+  await loadRecords();
+  assert(unopenedOnly && nodes['view-title'].textContent === '未開單', 'Unopened navigation sets the list title');
+  assert(nodes['nav-unopened'].attributes['aria-current'] === 'page' && navigation.every(node => !node.attributes['aria-current']), 'Unopened selection is distinct from all/status lists');
+  assert(requests[requests.length - 1].path.includes('is_opened=false'), 'Unopened filtering is sent to backend');
+  nodes['status-filter'].value = '待送修';
+  nodes['search-form'].listeners.submit[0]({preventDefault(){}});
+  await loadRecords();
+  assert(requests[requests.length - 1].path.includes('is_opened=false') && requests[requests.length - 1].path.includes(encodeURIComponent('待送修')), 'Search/status submission preserves unopened filter');
+  nodes.next.listeners.click[0]();
+  await loadRecords();
+  assert(requests.some(request => request.path.includes('page=2') && request.path.includes('is_opened=false')), 'Pagination retains unopened filter');
+  liveRecord.is_opened = true;
+  await loadRecords();
+  assert(!nodes.records.children.length && counters.find(node => node.dataset.count === 'unopened').textContent === '0', 'Opened record disappears and count refreshes');
+  liveRecord.is_opened = false;
+  setView(true);
+  assert(!unopenedOnly && !nodes['nav-unopened'].attributes['aria-current'], 'Quick search clears unopened navigation');
   setView(false, '待送修');
+  await loadRecords();
+  assert(!requests[requests.length - 1].path.includes('is_opened='), 'Ordinary status navigation clears unopened filter');
   assert(nodes['quick-view'].hidden && !nodes['records-view'].hidden, 'Status view toggles correctly');
   assert(navigation.find(node => node.dataset.status === '待送修').attributes['aria-current'] === 'page', 'Active navigation state');
   nodes['quick-query'].value = '2850948';

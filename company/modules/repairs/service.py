@@ -65,6 +65,12 @@ def list_records(path, query):
     if not 1 <= page <= 1000000:
         raise APIError("頁碼超過可接受範圍")
     where, arguments = [], []
+    opened = query.get('is_opened', [''])[0]
+    if opened not in ('', 'true', 'false'):
+        raise APIError('開單篩選條件無效')
+    if opened:
+        where.append('is_opened=?')
+        arguments.append(int(opened == 'true'))
     serial = query.get("serial", [""])[0].strip()
     if serial:
         where.append("serial_no=?")
@@ -93,6 +99,7 @@ def list_records(path, query):
         total = connection.execute("SELECT count(*) FROM repair_records" + condition, arguments).fetchone()[0]
         counts = {row["current_status"]: row["count"] for row in connection.execute(
             "SELECT current_status, count(*) AS count FROM repair_records GROUP BY current_status")}
+        unopened_count = connection.execute('SELECT count(*) FROM repair_records WHERE is_opened=0').fetchone()[0]
         page = min(page, max(1, (total + 19) // 20))
         rows = connection.execute("SELECT * FROM repair_records" + condition + " ORDER BY occurred_on DESC, " + sql_instant('created_at') + " DESC, id LIMIT 20 OFFSET ?",
                                   [*arguments, (page - 1) * 20]).fetchall()
@@ -101,7 +108,7 @@ def list_records(path, query):
             count = connection.execute('SELECT count(*) FROM all_dbn_records WHERE serial_no=?', (row['serial_no'],)).fetchone()[0]
             data.append({**public_record(row), 'dbn_count': count})
         return {"data": data, "total": total, "page": page, "page_size": 20,
-                "status_counts": counts}
+                "status_counts": counts, "unopened_count": unopened_count}
 
 
 def record_detail(path, record_id):

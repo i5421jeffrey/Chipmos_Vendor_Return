@@ -3,6 +3,7 @@ let catalogs, current = null, mapping = null, mappingRequest = 0, saving = false
 let page = 1, total = 0, listingRequest = 0;
 let quickRequest = 0, detailRequest = 0, selectedRecord = null, serialFilter = '';
 let quickSerial = '';
+let unopenedOnly = false;
 let editorSession = 0, editorReloading = false;
 let catalogsLoading = false;
 let editToken = '', editAccessBusy = false, pendingEdits = 0;
@@ -104,14 +105,19 @@ function statusPill(status) {
   return element('span', 'status-pill tone-' + statusTone(status), status);
 }
 
-function updateCounts(counts) {
+function updateCounts(counts, unopenedCount) {
   for (const node of document.querySelectorAll('[data-count]')) {
+    if (node.dataset.count === 'unopened') {
+      node.textContent = Number.isInteger(unopenedCount) ? unopenedCount : '—';
+      continue;
+    }
     node.textContent = node.dataset.count === 'all'
       ? Object.values(counts).reduce((sum, number) => sum + number, 0) : counts[node.dataset.count] || 0;
   }
 }
 
-function setView(quick, status = '') {
+function setView(quick, status = '', unopened = false) {
+  unopenedOnly = !quick && unopened;
   if (typeof invalidateFeatureRequests === 'function') invalidateFeatureRequests();
   byId('workspace-view').hidden = true;
   for (const button of document.querySelectorAll('[data-workspace]')) button.removeAttribute('aria-current');
@@ -119,13 +125,15 @@ function setView(quick, status = '') {
   byId('records-view').hidden = quick;
   byId('nav-quick').toggleAttribute('aria-current', quick);
   if (quick) byId('nav-quick').setAttribute('aria-current', 'page');
+  byId('nav-unopened').removeAttribute('aria-current');
+  if (unopenedOnly) byId('nav-unopened').setAttribute('aria-current', 'page');
   for (const button of document.querySelectorAll('[data-status]')) {
-    if (!quick && button.dataset.status === status) button.setAttribute('aria-current', 'page');
+    if (!quick && !unopenedOnly && button.dataset.status === status) button.setAttribute('aria-current', 'page');
     else button.removeAttribute('aria-current');
   }
   if (!quick) {
     byId('status-filter').value = status;
-    byId('view-title').textContent = status || '全部送修';
+    byId('view-title').textContent = unopenedOnly ? '未開單' : status || '全部送修';
   }
 }
 
@@ -252,7 +260,7 @@ async function searchSerial() {
       summary.machines = [...new Set(known.map(row => row.machine_code).filter(Boolean))];
     }
     quickSerial = serial;
-    if (!records.error) updateCounts(records.status_counts);
+    if (!records.error) updateCounts(records.status_counts, records.unopened_count);
     renderQuickResults(summary, records, dbn, byId('quick-results'));
     if (records.total > 20) {
       const all = element('button', 'quick-card', '目前顯示前 20 筆，前往送修清單查看全部');
@@ -274,6 +282,9 @@ byId('quick-query').addEventListener('input', () => {
   byId('quick-message').textContent = '輸入 S/N 後按 Search 查詢。';
 });
 byId('nav-quick').addEventListener('click', () => {setView(true); byId('quick-query').focus();});
+byId('nav-unopened').addEventListener('click', () => {
+  serialFilter = ''; byId('query').value = ''; setView(false, '', true); page = 1; loadRecords();
+});
 for (const button of document.querySelectorAll('[data-status]')) button.addEventListener('click', () => {
   serialFilter = ''; byId('query').value = ''; setView(false, button.dataset.status); page = 1; loadRecords();
 });
@@ -490,11 +501,12 @@ async function loadRecords() {
     if (byId('tag-filter').value) query.set('failure_tag', byId('tag-filter').value);
     if (byId('type-filter').value) query.set('repair_type', byId('type-filter').value);
     if (serialFilter) query.set('serial', serialFilter);
+    if (unopenedOnly) query.set('is_opened', 'false');
     const result = await api('/api/repairs/records?' + query);
     if (request !== listingRequest) return;
     page = result.page;
     total = result.total;
-    updateCounts(result.status_counts);
+    updateCounts(result.status_counts, result.unopened_count);
     byId('date-heading').textContent = {'已送修':'送修日期','取回驗證':'回修日期','結案（PASS）':'回修日期','結案（FAIL）':'回修日期'}[byId('status-filter').value] || '損壞日期';
     byId('records').replaceChildren();
     for (const record of result.data) byId('records').append(renderRecord(record));
@@ -510,7 +522,7 @@ async function loadRecords() {
   }
 }
 
-byId('search-form').addEventListener('submit', event => {event.preventDefault(); serialFilter = ''; setView(false, byId('status-filter').value); page = 1; loadRecords();});
+byId('search-form').addEventListener('submit', event => {event.preventDefault(); serialFilter = ''; setView(false, byId('status-filter').value, unopenedOnly); page = 1; loadRecords();});
 byId('previous').addEventListener('click', () => {page--; loadRecords();});
 byId('next').addEventListener('click', () => {page++; loadRecords();});
 for (const id of ['tag-filter', 'type-filter']) byId(id).addEventListener('change', () => {page = 1; loadRecords();});

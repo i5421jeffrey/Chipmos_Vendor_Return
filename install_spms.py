@@ -117,6 +117,12 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                      'sha256': 'af386ccb01ed85120590d32761bb64f94b8383b3c72a6aa8f019df5fc9df5cad'},
            'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管理：本機功能整批對照與交付界線\n'
                                                            '\n'
+                                                           '## 未開單清單（2026-11-17）\n'
+                                                           '\n'
+                                                           '左側新增「未開單」與全站筆數，依既有 `is_opened=false` '
+                                                           '篩選所有送修紀錄（包含已結案與歷次送修，不等同待送修或僅最後一輪）。伺服器執行篩選及分頁，可合併搜尋、狀態、維修分類與異常類別；開單後重新載入會移出清單。沿用原詳情／編輯與權限保護，無 '
+                                                           'schema migration 或歷史資料更動。一般狀態入口及快速搜尋不帶入未開單篩選。\n'
+                                                           '\n'
                                                            '## 正式入口核准（2026-11-16）\n'
                                                            '\n'
                                                            '使用者回報加入 `192.168.120.0/24` 後測試成功並核准正式啟動。新增 '
@@ -318,7 +324,7 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                            '`.venv`，也不自動啟動服務、匯入真實舊資料或開放內網。\n'
                                                            '真實來源包與預覽結果只保存在使用者核准的本機資料夾，不放入儲存庫或通用安裝檔；公司正式匯入仍需停止服務、預檢及 '
                                                            '`IMPORT` 確認。\n',
-                                                'sha256': '13c971c8399a6ecae4c9e07d99732260ac42f6d568d72dc454e39cdb4f53c5a9'},
+                                                'sha256': '8fa9e32c22dbc6e51fa0b05802230303f7d5cf05b4237f96053b44e7cb6c203a'},
            'company/LAN_SETUP.md': {'content': '# SPMS：Windows 11 內網共用\n'
                                                '\n'
                                                '## 最新監聽對照測試：0.0.0.0（2026-11-05）\n'
@@ -5136,6 +5142,13 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                              '    if not 1 <= page <= 1000000:\n'
                                                              '        raise APIError("頁碼超過可接受範圍")\n'
                                                              '    where, arguments = [], []\n'
+                                                             "    opened = query.get('is_opened', [''])[0]\n"
+                                                             "    if opened not in ('', 'true', 'false'):\n"
+                                                             "        raise APIError('開單篩選條件無效')\n"
+                                                             '    if opened:\n'
+                                                             "        where.append('is_opened=?')\n"
+                                                             '        arguments.append(int(opened == '
+                                                             "'true'))\n"
                                                              '    serial = query.get("serial", '
                                                              '[""])[0].strip()\n'
                                                              '    if serial:\n'
@@ -5184,6 +5197,10 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                              '            "SELECT current_status, count(*) '
                                                              'AS count FROM repair_records GROUP BY '
                                                              'current_status")}\n'
+                                                             '        unopened_count = '
+                                                             "connection.execute('SELECT count(*) FROM "
+                                                             'repair_records WHERE '
+                                                             "is_opened=0').fetchone()[0]\n"
                                                              '        page = min(page, max(1, (total + 19) '
                                                              '// 20))\n'
                                                              '        rows = connection.execute("SELECT * '
@@ -5203,7 +5220,8 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                              "'dbn_count': count})\n"
                                                              '        return {"data": data, "total": total, '
                                                              '"page": page, "page_size": 20,\n'
-                                                             '                "status_counts": counts}\n'
+                                                             '                "status_counts": counts, '
+                                                             '"unopened_count": unopened_count}\n'
                                                              '\n'
                                                              '\n'
                                                              'def record_detail(path, record_id):\n'
@@ -5470,7 +5488,7 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                              'json.loads(entry["changes"])\n'
                                                              '            result.append(entry)\n'
                                                              '        return {"data": result}\n',
-                                                  'sha256': 'bb7d7f9c47c919ca7f98427e96eab9a2b9bbe90281921f86caff5161094c453f'},
+                                                  'sha256': '666f5a13a20bd3c5bb829e75bae3ca9dcee3efb1fdac22b8526362bc83b1a73e'},
            'company/production_server.py': {'content': '"""Approved Flask/Waitress entry point using the '
                                                        'existing SPMS database.\n'
                                                        '\n'
@@ -7393,6 +7411,24 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                        "        self.assertNotIn('synthetic-only',log)\n"
                                                        '\n'
                                                        '    def '
+                                                       'test_unopened_query_and_count_use_existing_http_route(self):\n'
+                                                       '        service.save_record(self.path, example())\n'
+                                                       '        service.save_record(self.path, '
+                                                       "example(serial_no='123456789', is_opened=True))\n"
+                                                       '        response = '
+                                                       "self.call('/api/repairs/records?is_opened=false')\n"
+                                                       '        self.assertEqual(response.status_code, 200)\n'
+                                                       "        self.assertEqual(response.json['total'], 1)\n"
+                                                       '        '
+                                                       "self.assertEqual(response.json['unopened_count'], "
+                                                       '1)\n'
+                                                       '        '
+                                                       "self.assertFalse(response.json['data'][0]['is_opened'])\n"
+                                                       '        '
+                                                       "self.assertEqual(self.call('/api/repairs/records?is_opened=invalid').status_code, "
+                                                       '400)\n'
+                                                       '\n'
+                                                       '    def '
                                                        'test_write_validation_conflict_lock_and_redacted_logs(self):\n'
                                                        '        '
                                                        "self.assertEqual(self.call('/api/repairs/records','POST',example()).status_code,401)\n"
@@ -7512,7 +7548,7 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                        '\n'
                                                        "if __name__=='__main__':\n"
                                                        '    unittest.main()\n',
-                                            'sha256': '4a63f895cd2e38667e029ca50c9a00b0e3fce47856a8bc2f81c3b926da1bea63'},
+                                            'sha256': '615f61222959aad1380d30c334d3a120a9fc0a24a310022002d98a9a948666b7'},
            'company/test_import_data.py': {'content': 'import json\n'
                                                       'import sqlite3\n'
                                                       'import unittest\n'
@@ -8616,6 +8652,64 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                   '            self.assertEqual(sorted(pool.map(edit, '
                                                   'range(2))), [200, 409])\n'
                                                   '\n'
+                                                  '    def '
+                                                  'test_unopened_filter_includes_closed_and_combines_with_search(self):\n'
+                                                  '        row = service.save_record(self.path, '
+                                                  "example())['data']\n"
+                                                  '        service.save_record(self.path, '
+                                                  "example(serial_no='123456789', is_opened=True))\n"
+                                                  '        closed = service.save_record(self.path, '
+                                                  "example(serial_no='987654321'))['data']\n"
+                                                  '        with connect(self.path) as connection:\n'
+                                                  '            connection.execute("UPDATE repair_records SET '
+                                                  "current_status='結案（PASS）',sent_on='2026-11-02',returned_on='2026-11-03',closed_on='2026-11-03' "
+                                                  'WHERE id=?", (closed[\'id\'],))\n'
+                                                  '        result = service.list_records(self.path, '
+                                                  "{'is_opened':['false']})\n"
+                                                  "        self.assertEqual(result['total'], 2)\n"
+                                                  "        self.assertEqual(result['unopened_count'], 2)\n"
+                                                  "        self.assertTrue(all(not item['is_opened'] for "
+                                                  "item in result['data']))\n"
+                                                  '        '
+                                                  "self.assertEqual(sum(result['status_counts'].values()), "
+                                                  '3)\n'
+                                                  '        self.assertEqual(service.list_records(self.path, '
+                                                  "{'is_opened':['true']})['total'], 1)\n"
+                                                  '        self.assertEqual(service.list_records(self.path, '
+                                                  "{'is_opened':['false'], 'status':['結案（PASS）']})['total'], "
+                                                  '1)\n'
+                                                  '        self.assertEqual(service.list_records(self.path, '
+                                                  "{'is_opened':['false'], 'q':['123456789']})['total'], 0)\n"
+                                                  '        scoped = service.list_records(self.path, '
+                                                  "{'is_opened':['false'], 'serial':[row['serial_no']], "
+                                                  "'repair_type':['板修'], 'failure_tag':['RTE']})\n"
+                                                  "        self.assertEqual(scoped['total'], 1)\n"
+                                                  "        self.assertEqual(scoped['unopened_count'], 2)\n"
+                                                  '        service.save_record(self.path, '
+                                                  "example(expected_version=1, is_opened=True), row['id'])\n"
+                                                  '        self.assertEqual(service.list_records(self.path, '
+                                                  "{'is_opened':['false']})['unopened_count'], 1)\n"
+                                                  "        for value in ('0', 'FALSE', 'false OR 1=1'):\n"
+                                                  '            with self.assertRaises(APIError):\n'
+                                                  '                service.list_records(self.path, '
+                                                  "{'is_opened':[value]})\n"
+                                                  '\n'
+                                                  '    def test_unopened_filter_paginates_on_server(self):\n'
+                                                  '        for index in range(23):\n'
+                                                  '            service.save_record(self.path, '
+                                                  "example(serial_no=f'{index:09d}'))\n"
+                                                  '        service.save_record(self.path, '
+                                                  "example(serial_no='999999999', is_opened=True))\n"
+                                                  '        first = service.list_records(self.path, '
+                                                  "{'is_opened':['false']})\n"
+                                                  '        second = service.list_records(self.path, '
+                                                  "{'is_opened':['false'], 'page':['2']})\n"
+                                                  "        self.assertEqual(first['total'], 23)\n"
+                                                  "        self.assertEqual(len(first['data']), 20)\n"
+                                                  "        self.assertEqual(len(second['data']), 3)\n"
+                                                  "        self.assertFalse({row['id'] for row in "
+                                                  "first['data']} & {row['id'] for row in second['data']})\n"
+                                                  '\n'
                                                   '    def test_serial_conflict_does_not_overwrite(self):\n'
                                                   '        record = service.save_record(self.path, '
                                                   'example())["data"]\n'
@@ -8843,7 +8937,7 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                   '\n'
                                                   'if __name__ == "__main__":\n'
                                                   '    unittest.main()\n',
-                                       'sha256': '9e6920a9091de9a160de9a4142162060793042c1fc121026d1eaafb1b2bf80dd'},
+                                       'sha256': '0878f4f9414ad4f06d990b2ccaf133141fb4dd7c4e8e78978fac6c6314695225'},
            'company/test_server.py': {'content': 'import concurrent.futures\n'
                                                  'import json\n'
                                                  'import sqlite3\n'
@@ -11083,6 +11177,9 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                    '      <button class="nav-item" data-status="" '
                                                    'type="button"><span aria-hidden="true">☷</span>全部送修<span '
                                                    'class="count" data-count="all">0</span></button>\n'
+                                                   '      <button class="nav-item" id="nav-unopened" '
+                                                   'type="button"><span aria-hidden="true">☐</span>未開單<span '
+                                                   'class="count" data-count="unopened">—</span></button>\n'
                                                    '      <button class="nav-item" data-status="待送修" '
                                                    'type="button"><span aria-hidden="true">○</span>待送修<span '
                                                    'class="count" data-count="待送修">0</span></button>\n'
@@ -11330,7 +11427,7 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                    'type="submit">開啟編輯</button></div></form></dialog>\n'
                                                    '</body>\n'
                                                    '</html>\n',
-                                        'sha256': '61e4e04f3132c060334a1f7cb4bc28cd42d3294bed4ca8933fec4bb144a3703e'},
+                                        'sha256': '8a203aad3cf595bab33401b2337c564acf32e1cf34277739d100118374cdcc45'},
            'company/web/repairs.js': {'content': 'const byId = id => document.getElementById(id);\n'
                                                  'let catalogs, current = null, mapping = null, '
                                                  'mappingRequest = 0, saving = false;\n'
@@ -11338,6 +11435,7 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                  'let quickRequest = 0, detailRequest = 0, selectedRecord = '
                                                  "null, serialFilter = '';\n"
                                                  "let quickSerial = '';\n"
+                                                 'let unopenedOnly = false;\n'
                                                  'let editorSession = 0, editorReloading = false;\n'
                                                  'let catalogsLoading = false;\n'
                                                  "let editToken = '', editAccessBusy = false, pendingEdits = "
@@ -11492,16 +11590,22 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                  'statusTone(status), status);\n'
                                                  '}\n'
                                                  '\n'
-                                                 'function updateCounts(counts) {\n'
+                                                 'function updateCounts(counts, unopenedCount) {\n'
                                                  '  for (const node of '
                                                  "document.querySelectorAll('[data-count]')) {\n"
+                                                 "    if (node.dataset.count === 'unopened') {\n"
+                                                 '      node.textContent = Number.isInteger(unopenedCount) ? '
+                                                 "unopenedCount : '—';\n"
+                                                 '      continue;\n'
+                                                 '    }\n'
                                                  "    node.textContent = node.dataset.count === 'all'\n"
                                                  '      ? Object.values(counts).reduce((sum, number) => sum '
                                                  '+ number, 0) : counts[node.dataset.count] || 0;\n'
                                                  '  }\n'
                                                  '}\n'
                                                  '\n'
-                                                 "function setView(quick, status = '') {\n"
+                                                 "function setView(quick, status = '', unopened = false) {\n"
+                                                 '  unopenedOnly = !quick && unopened;\n'
                                                  "  if (typeof invalidateFeatureRequests === 'function') "
                                                  'invalidateFeatureRequests();\n'
                                                  "  byId('workspace-view').hidden = true;\n"
@@ -11514,15 +11618,20 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                  'quick);\n'
                                                  '  if (quick) '
                                                  "byId('nav-quick').setAttribute('aria-current', 'page');\n"
+                                                 "  byId('nav-unopened').removeAttribute('aria-current');\n"
+                                                 '  if (unopenedOnly) '
+                                                 "byId('nav-unopened').setAttribute('aria-current', "
+                                                 "'page');\n"
                                                  '  for (const button of '
                                                  "document.querySelectorAll('[data-status]')) {\n"
-                                                 '    if (!quick && button.dataset.status === status) '
-                                                 "button.setAttribute('aria-current', 'page');\n"
+                                                 '    if (!quick && !unopenedOnly && button.dataset.status '
+                                                 "=== status) button.setAttribute('aria-current', 'page');\n"
                                                  "    else button.removeAttribute('aria-current');\n"
                                                  '  }\n'
                                                  '  if (!quick) {\n'
                                                  "    byId('status-filter').value = status;\n"
-                                                 "    byId('view-title').textContent = status || '全部送修';\n"
+                                                 "    byId('view-title').textContent = unopenedOnly ? '未開單' "
+                                                 ": status || '全部送修';\n"
                                                  '  }\n'
                                                  '}\n'
                                                  '\n'
@@ -11711,7 +11820,8 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                  '    }\n'
                                                  '    quickSerial = serial;\n'
                                                  '    if (!records.error) '
-                                                 'updateCounts(records.status_counts);\n'
+                                                 'updateCounts(records.status_counts, '
+                                                 'records.unopened_count);\n'
                                                  '    renderQuickResults(summary, records, dbn, '
                                                  "byId('quick-results'));\n"
                                                  '    if (records.total > 20) {\n'
@@ -11749,6 +11859,10 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                  '});\n'
                                                  "byId('nav-quick').addEventListener('click', () => "
                                                  "{setView(true); byId('quick-query').focus();});\n"
+                                                 "byId('nav-unopened').addEventListener('click', () => {\n"
+                                                 "  serialFilter = ''; byId('query').value = ''; "
+                                                 "setView(false, '', true); page = 1; loadRecords();\n"
+                                                 '});\n'
                                                  'for (const button of '
                                                  "document.querySelectorAll('[data-status]')) "
                                                  "button.addEventListener('click', () => {\n"
@@ -12093,12 +12207,14 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                  "    if (byId('type-filter').value) "
                                                  "query.set('repair_type', byId('type-filter').value);\n"
                                                  "    if (serialFilter) query.set('serial', serialFilter);\n"
+                                                 "    if (unopenedOnly) query.set('is_opened', 'false');\n"
                                                  "    const result = await api('/api/repairs/records?' + "
                                                  'query);\n'
                                                  '    if (request !== listingRequest) return;\n'
                                                  '    page = result.page;\n'
                                                  '    total = result.total;\n'
-                                                 '    updateCounts(result.status_counts);\n'
+                                                 '    updateCounts(result.status_counts, '
+                                                 'result.unopened_count);\n'
                                                  "    byId('date-heading').textContent = "
                                                  "{'已送修':'送修日期','取回驗證':'回修日期','結案（PASS）':'回修日期','結案（FAIL）':'回修日期'}[byId('status-filter').value] "
                                                  "|| '損壞日期';\n"
@@ -12122,7 +12238,8 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                  '\n'
                                                  "byId('search-form').addEventListener('submit', event => "
                                                  "{event.preventDefault(); serialFilter = ''; setView(false, "
-                                                 "byId('status-filter').value); page = 1; loadRecords();});\n"
+                                                 "byId('status-filter').value, unopenedOnly); page = 1; "
+                                                 'loadRecords();});\n'
                                                  "byId('previous').addEventListener('click', () => {page--; "
                                                  'loadRecords();});\n'
                                                  "byId('next').addEventListener('click', () => {page++; "
@@ -12168,7 +12285,7 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                  "byId('reload-catalogs').addEventListener('click', "
                                                  'initializeApp);\n'
                                                  'initializeApp();\n',
-                                      'sha256': '1e9f6518845ba8897119ad69851bda5d7b419287cb73b9b940459c2c92099a84'},
+                                      'sha256': '541e14616254069a44438c6b8359d2693f3c58a2e6b3319df88ff99ef4ff8f10'},
            'company/web/style.css': {'content': ':root{color-scheme:dark;font-family:"Segoe '
                                                 'UI",sans-serif;background:#101113;color:#e7e7e8}\n'
                                                 '*{box-sizing:border-box}body{margin:0}main{max-width:850px;margin:60px '
@@ -12189,7 +12306,7 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                 '@media(max-width:600px){main{margin:25px auto;padding:0 '
                                                 '16px}h1{font-size:22px}section{padding:18px}dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:10px}}\n',
                                      'sha256': '064406c8758be5620dfe7440f59d59ec1de5f6307e74f5bad85dd03e018c0769'}},
- 'version': '2026-11-16-flask-production'}
+ 'version': '2026-11-17-unopened-list'}
 
 
 def check_local_path(path):

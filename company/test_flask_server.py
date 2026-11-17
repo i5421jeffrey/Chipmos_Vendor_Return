@@ -111,6 +111,16 @@ class FlaskTransportTests(unittest.TestCase):
         self.assertIn('WRITE_REJECTED',log)
         self.assertNotIn('synthetic-only',log)
 
+    def test_unopened_query_and_count_use_existing_http_route(self):
+        service.save_record(self.path, example())
+        service.save_record(self.path, example(serial_no='123456789', is_opened=True))
+        response = self.call('/api/repairs/records?is_opened=false')
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json['total'], 1)
+        self.assertEqual(response.json['unopened_count'], 1)
+        self.assertFalse(response.json['data'][0]['is_opened'])
+        self.assertEqual(self.call('/api/repairs/records?is_opened=invalid').status_code, 400)
+
     def test_write_validation_conflict_lock_and_redacted_logs(self):
         self.assertEqual(self.call('/api/repairs/records','POST',example()).status_code,401)
         token=self.unlock()

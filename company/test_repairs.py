@@ -81,6 +81,40 @@ class RepairTests(unittest.TestCase):
         with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
             self.assertEqual(sorted(pool.map(edit, range(2))), [200, 409])
 
+    def test_unopened_filter_includes_closed_and_combines_with_search(self):
+        row = service.save_record(self.path, example())['data']
+        service.save_record(self.path, example(serial_no='123456789', is_opened=True))
+        closed = service.save_record(self.path, example(serial_no='987654321'))['data']
+        with connect(self.path) as connection:
+            connection.execute("UPDATE repair_records SET current_status='結案（PASS）',sent_on='2026-11-02',returned_on='2026-11-03',closed_on='2026-11-03' WHERE id=?", (closed['id'],))
+        result = service.list_records(self.path, {'is_opened':['false']})
+        self.assertEqual(result['total'], 2)
+        self.assertEqual(result['unopened_count'], 2)
+        self.assertTrue(all(not item['is_opened'] for item in result['data']))
+        self.assertEqual(sum(result['status_counts'].values()), 3)
+        self.assertEqual(service.list_records(self.path, {'is_opened':['true']})['total'], 1)
+        self.assertEqual(service.list_records(self.path, {'is_opened':['false'], 'status':['結案（PASS）']})['total'], 1)
+        self.assertEqual(service.list_records(self.path, {'is_opened':['false'], 'q':['123456789']})['total'], 0)
+        scoped = service.list_records(self.path, {'is_opened':['false'], 'serial':[row['serial_no']], 'repair_type':['板修'], 'failure_tag':['RTE']})
+        self.assertEqual(scoped['total'], 1)
+        self.assertEqual(scoped['unopened_count'], 2)
+        service.save_record(self.path, example(expected_version=1, is_opened=True), row['id'])
+        self.assertEqual(service.list_records(self.path, {'is_opened':['false']})['unopened_count'], 1)
+        for value in ('0', 'FALSE', 'false OR 1=1'):
+            with self.assertRaises(APIError):
+                service.list_records(self.path, {'is_opened':[value]})
+
+    def test_unopened_filter_paginates_on_server(self):
+        for index in range(23):
+            service.save_record(self.path, example(serial_no=f'{index:09d}'))
+        service.save_record(self.path, example(serial_no='999999999', is_opened=True))
+        first = service.list_records(self.path, {'is_opened':['false']})
+        second = service.list_records(self.path, {'is_opened':['false'], 'page':['2']})
+        self.assertEqual(first['total'], 23)
+        self.assertEqual(len(first['data']), 20)
+        self.assertEqual(len(second['data']), 3)
+        self.assertFalse({row['id'] for row in first['data']} & {row['id'] for row in second['data']})
+
     def test_serial_conflict_does_not_overwrite(self):
         record = service.save_record(self.path, example())["data"]
         with self.assertRaises(APIError) as caught:
