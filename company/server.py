@@ -177,7 +177,8 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/health":
             try:
                 payload = database_status(self.server.database)
-                payload['access'] = 'lan-allowlist' if self.server.lan else 'localhost-only'
+                payload['access'] = ('all-ipv4-sources' if getattr(self.server, 'allow_all_sources', False)
+                                     else 'lan-allowlist' if self.server.lan else 'localhost-only')
                 payload['transport'] = self.server.scheme
                 status = 200
             except (sqlite3.Error, TypeError, ValueError, OSError):
@@ -338,7 +339,7 @@ class Handler(BaseHTTPRequestHandler):
             self.api_error(error)
 
 
-def startup_options(argv=None):
+def startup_options(argv=None, *, source_modes=False, default_subnets=('10.1.121.0/24',), default_all_sources=False):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--port", type=int, default=8082)
     parser.add_argument('--host', help='IPv4 bind address; default uses approved 0.0.0.0 test listener; use 10.1.121.135 for one interface or 127.0.0.1 for local-only access')
@@ -346,13 +347,25 @@ def startup_options(argv=None):
     parser.add_argument('--tls-cert', type=Path, help='IT-issued PEM certificate with IP subjectAltName')
     parser.add_argument('--tls-key', type=Path, help='Protected PEM private key; never package or commit')
     parser.add_argument('--allow-http-lan', action='store_true', help='Explicitly accept plaintext transport on the trusted LAN')
+    if source_modes:
+        sources = parser.add_mutually_exclusive_group()
+        sources.add_argument('--allow-all-sources', dest='allow_all_sources', action='store_true', default=None,
+                             help='Allow every IPv4 source that can reach the listener; Host/origin/edit checks still apply')
+        sources.add_argument('--restrict-sources', dest='allow_all_sources', action='store_false',
+                             help='Use the approved subnet allowlist instead of allowing all sources')
+    else:
+        parser.set_defaults(allow_all_sources=False)
     args = parser.parse_args(argv)
+    if args.allow_all_sources is None:
+        args.allow_all_sources = default_all_sources and args.host is None and not args.client_subnet
+    if args.allow_all_sources and args.client_subnet:
+        parser.error('--allow-all-sources cannot be combined with --client-subnet')
     # User-approved host profile. An explicit --host does not inherit its
     # plaintext acknowledgement or subnet; custom LANs remain explicit.
     if args.host is None:
         args.host = '0.0.0.0'
-        if not args.client_subnet:
-            args.client_subnet = ['10.1.121.0/24']
+        if not args.client_subnet and not args.allow_all_sources:
+            args.client_subnet = list(default_subnets)
         if not args.tls_cert and not args.tls_key:
             args.allow_http_lan = True
     if not 1 <= args.port <= 65535:
@@ -365,7 +378,7 @@ def startup_options(argv=None):
     if bool(args.tls_cert) != bool(args.tls_key):
         parser.error('--tls-cert and --tls-key must be used together')
     args.lan = not ipaddress.ip_address(args.host).is_loopback
-    if args.lan and not args.client_subnet:
+    if args.lan and not args.client_subnet and not args.allow_all_sources:
         parser.error('LAN access requires --client-subnet')
     if args.lan and not args.tls_cert and not args.allow_http_lan:
         parser.error('LAN access requires TLS or explicit --allow-http-lan acknowledgement of plaintext passwords/data')

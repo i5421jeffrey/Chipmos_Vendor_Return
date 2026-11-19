@@ -47,7 +47,8 @@ class _Connection:
         pass
 
 
-def create_app(database, *, host='0.0.0.0', port=8082, client_subnets=('10.1.121.0/24',), diagnostic_log=None):
+def create_app(database, *, host='0.0.0.0', port=8082, client_subnets=('10.1.121.0/24',), diagnostic_log=None,
+               allow_all_sources=False):
     from flask import Flask, Response, request
     from werkzeug.exceptions import HTTPException
 
@@ -59,7 +60,9 @@ def create_app(database, *, host='0.0.0.0', port=8082, client_subnets=('10.1.121
         raise ValueError('Invalid port')
     lan = not ipaddress.ip_address(host).is_loopback
     networks = tuple(client_network(str(value)) for value in client_subnets)
-    if lan and not networks:
+    if allow_all_sources and networks:
+        raise ValueError('All-source mode cannot be combined with a client subnet allowlist')
+    if lan and not networks and not allow_all_sources:
         raise ValueError('LAN access requires a client subnet allowlist')
     hosts = {f'{host}:{port}'}
     if host == '0.0.0.0':
@@ -67,7 +70,8 @@ def create_app(database, *, host='0.0.0.0', port=8082, client_subnets=('10.1.121
     elif not lan:
         hosts.add(f'localhost:{port}')
     state = SimpleNamespace(database=database, edit_gate=EditGate(database.parent/'edit-password.json'),
-                            allowed_hosts=hosts, lan=lan, scheme='http', server_port=port)
+                            allowed_hosts=hosts, lan=lan, scheme='http', server_port=port,
+                            allow_all_sources=allow_all_sources)
     app = Flask(__name__, static_folder=None)
     app.config.update(MAX_CONTENT_LENGTH=MAX_BODY, TESTING=False)
     app.extensions['spms_state'] = state
@@ -120,7 +124,7 @@ def create_app(database, *, host='0.0.0.0', port=8082, client_subnets=('10.1.121
     def guard_source_and_host():
         try:
             address = ipaddress.ip_address(request.remote_addr or '')
-            allowed = address.version == 4 and (address.is_loopback or any(address in network for network in networks))
+            allowed = address.version == 4 and (allow_all_sources or address.is_loopback or any(address in network for network in networks))
         except ValueError:
             allowed = False
         if not allowed:

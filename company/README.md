@@ -1,5 +1,7 @@
 # SPMS 公司版：SQLite 離線功能驗收
 
+2026-11-19 最新核准：正式入口無參數啟動允許所有可連入的 IPv4 來源，保留 Host／同源／編輯保護。任何能連到服務者都可能讀取資料；可用 `--restrict-sources` 回到兩個網段限制，見 [PRODUCTION.md](PRODUCTION.md) 頂端最新設定。以下兩個網段說明是前一版歷史設定。
+
 正式 Flask＋Waitress 啟動入口為 `production_server.py`／`start_spms.cmd`，使用原資料庫、密碼與兩個核准來源網段；更新、啟動及回退見 [PRODUCTION.md](PRODUCTION.md)。以下及 FLASK_TEST.md 的副本說明僅適用隔離測試入口。
 
 可選的 Flask＋Waitress 隔離連線測試版見 [FLASK_TEST.md](FLASK_TEST.md)。原 `server.py` 不替換；測試寫入只發生於每次新建的資料副本，不能當作正式服務或合併回原資料庫。

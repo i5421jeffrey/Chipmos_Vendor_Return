@@ -1,5 +1,25 @@
 # SPMS 正式啟動（2026-11-16）
 
+## 最新來源設定（2026-11-19，優先於下方歷史說明）
+
+使用者明確核准開放所有連入網段。`production_server.py`／`start_spms.cmd` 無參數啟動現在預設允許**所有能到達現有 IPv4 listener 的來源**，不再檢查來源網段；Host 白名單、同源檢查、編輯密碼／token、資料與啟動備份不變。Host 仍限 `10.1.121.135:<port>`、`127.0.0.1:<port>`、`localhost:<port>`，不是任意網址皆可使用。
+
+**任何可連到此服務且使用允許 Host 的人都可以讀取 SPMS 資料；共用編輯密碼只保護修改，不保護讀取。** 包括透過共用 Proxy 轉送的使用者。HTTP 仍明文，不代表已增加個人認證、HTTPS 或解除 Proxy 登入；不調整公司防火牆／Proxy，不開 IPv6 listener、不建立對外轉發。若公司已有其他轉發規則，也可能影響實際可達範圍，需由 IT 管理。
+
+啟動時會顯示 `SOURCE ACCESS: ALL IPv4 sources (no source-IP allowlist).` 與讀取風險提示。健康檢查的 access 為 `all-ipv4-sources`，不再誤標為 allowlist。可明確指定同一模式：
+
+```cmd
+.\.venv\Scripts\python.exe .\company\production_server.py --allow-all-sources
+```
+
+退回先前兩個核准網段（加 loopback）：
+
+```cmd
+.\.venv\Scripts\python.exe .\company\production_server.py --restrict-sources
+```
+
+也可用重複 `--client-subnet` 指定限制清單，這會停用預設全來源模式。`--allow-all-sources` 不可與 `--client-subnet` 或 `--restrict-sources` 混用。明確指定 `--host` 不自動繼承全來源模式／HTTP 同意：自訂 LAN bind 仍需指定來源模式及 `--allow-http-lan`。`--host 127.0.0.1` 仍維持僅 loopback 綁定。`server.py` 與隔離測試入口不提供此全來源選項、預設行為不變。
+
 使用者在 Flask＋Waitress 測試連線成功後，核准正式使用原 SQLite 資料庫與密碼，允許 `10.1.121.0/24` 及 `192.168.120.0/24`。預設仍是 HTTP、`0.0.0.0:8082`，精確 Host 白名單不變，不調整 Proxy／防火牆。若後者包含共用 Proxy，其他經它轉送的使用者也可能讀取資料；來源白名單不是個人登入。所有修改仍需編輯解鎖及同源驗證。
 
 ## 更新及啟動

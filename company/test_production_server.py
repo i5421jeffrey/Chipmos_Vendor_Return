@@ -27,6 +27,7 @@ class ProductionTests(unittest.TestCase):
                 self.assertEqual(main([]), 0)
                 app = factory.call_args.args[0]
                 self.assertEqual(app.extensions['spms_state'].database, path.resolve())
+                self.assertTrue(app.extensions['spms_state'].allow_all_sources)
                 self.assertEqual(factory.call_args.kwargs['host'], '0.0.0.0')
                 self.assertEqual(factory.call_args.kwargs['port'], 8082)
                 self.assertTrue(factory.call_args.kwargs['clear_untrusted_proxy_headers'])
@@ -40,13 +41,68 @@ class ProductionTests(unittest.TestCase):
         self.assertEqual(args.host, '0.0.0.0')
         self.assertEqual(args.port, 8082)
         self.assertTrue(args.allow_http_lan)
-        self.assertEqual(tuple(map(str, args.client_subnet)), APPROVED_SUBNETS)
+        self.assertTrue(args.allow_all_sources)
+        self.assertEqual(args.client_subnet, [])
+        restricted = production_options(['--restrict-sources'])
+        self.assertFalse(restricted.allow_all_sources)
+        self.assertEqual(tuple(map(str, restricted.client_subnet)), APPROVED_SUBNETS)
+        self.assertTrue(production_options(['--allow-all-sources']).allow_all_sources)
         self.assertEqual(production_options(['--port', '8089']).port, 8089)
         self.assertEqual(production_options(['--host', '127.0.0.1']).client_subnet, [])
+        self.assertFalse(production_options(['--host', '127.0.0.1']).allow_all_sources)
         args = production_options(['--client-subnet', '10.1.121.0/24'])
         self.assertEqual(list(map(str, args.client_subnet)), ['10.1.121.0/24'])
+        self.assertFalse(args.allow_all_sources)
+        self.assertFalse(production_options(['--client-subnet=192.168.120.0/24']).allow_all_sources)
+        explicit = production_options(['--host', '10.1.121.135', '--allow-all-sources', '--allow-http-lan'])
+        self.assertTrue(explicit.allow_all_sources)
         with self.assertRaises(SystemExit):
             production_options(['--host', '10.1.121.135'])
+        for values in (['--allow-all-sources', '--restrict-sources'],
+                       ['--allow-all-sources', '--client-subnet', '10.1.121.0/24'],
+                       ['--host', '10.1.121.135', '--allow-all-sources']):
+            with self.assertRaises(SystemExit):
+                production_options(values)
+
+    @unittest.skipUnless(importlib.util.find_spec('flask'), 'Optional Flask not installed')
+    def test_all_sources_keep_host_origin_edit_and_proxy_guards(self):
+        with tempfile.TemporaryDirectory() as folder:
+            path = Path(folder)/'spms.sqlite3'
+            initialize_database(path)
+            configure(path.parent/'edit-password.json', 'synthetic-only')
+            app = create_app(path, client_subnets=(), allow_all_sources=True)
+            self.addCleanup(lambda: [handler.close() for handler in app.extensions['spms_diagnostics'].handlers])
+            client = app.test_client()
+            def call(route, source='172.16.5.40', method='GET', data=None, headers=None):
+                return client.open(route, method=method, json=data, headers=headers or {},
+                    base_url='http://10.1.121.135:8082', environ_overrides={'REMOTE_ADDR':source})
+            for source in ('10.1.121.40', '192.168.120.89', '172.16.5.40', '203.0.113.40', '127.0.0.1'):
+                health = call('/api/health', source)
+                self.assertEqual(health.status_code, 200)
+                self.assertEqual(health.json['access'], 'all-ipv4-sources')
+                self.assertEqual(call('/repairs/', source).status_code, 200)
+                self.assertEqual(call('/api/repairs/records', source).status_code, 200)
+            for source in ('::1', '', 'not-an-address'):
+                self.assertEqual(call('/api/health', source).status_code, 403)
+            self.assertEqual(call('/api/health', headers={'Host':'evil.example:8082',
+                'X-Forwarded-Host':'10.1.121.135:8082'}).status_code, 403)
+            for host in ('10.1.121.135:8082', 'localhost:8082', '127.0.0.1:8082'):
+                self.assertEqual(call('/api/health', headers={'Host':host}).status_code, 200)
+            headers = {'X-SPMS-Request':'1'}
+            self.assertEqual(call('/api/repairs/records', method='POST', data=example(), headers=headers).status_code, 401)
+            self.assertEqual(call('/api/edit/unlock', method='POST', data={'password':'synthetic-only'},
+                headers={**headers, 'Origin':'http://evil.example', 'X-Forwarded-Host':'evil.example'}).status_code, 403)
+            self.assertEqual(call('/api/edit/unlock', method='POST', data={'password':'synthetic-only'},
+                headers={**headers, 'Sec-Fetch-Site':'cross-site'}).status_code, 403)
+            unlock = call('/api/edit/unlock', method='POST', data={'password':'synthetic-only'}, headers=headers)
+            self.assertEqual(unlock.status_code, 200)
+            headers['X-SPMS-Edit-Token'] = unlock.json['token']
+            self.assertEqual(call('/api/repairs/records', method='POST', data=example(), headers=headers).status_code, 201)
+            call('/api/edit/lock', method='POST', data={}, headers=headers)
+            self.assertEqual(call('/api/repairs/records', method='POST', data=example(serial_no='123456789'), headers=headers).status_code, 401)
+            self.assertEqual(service.list_records(path, {})['total'], 1)
+            with self.assertRaises(ValueError):
+                create_app(path, allow_all_sources=True, client_subnets=APPROVED_SUBNETS)
 
     def test_missing_database_password_and_failed_backup_stop_before_migration(self):
         with tempfile.TemporaryDirectory() as folder:

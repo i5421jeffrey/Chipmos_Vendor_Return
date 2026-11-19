@@ -7,6 +7,7 @@ if not exist ".venv\Scripts\python.exe" (
   exit /b 1
 )
 echo SPMS uses the ORIGINAL database. Stop all other SPMS servers first.
+echo Default: all reachable IPv4 sources may read SPMS. Use --restrict-sources for the approved subnet allowlist.
 ".venv\Scripts\python.exe" ".\company\production_server.py" %*
 set "SPMS_RESULT=%ERRORLEVEL%"
 echo.

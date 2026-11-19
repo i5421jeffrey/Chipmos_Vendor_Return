@@ -4,7 +4,6 @@ The comparison entry point remains isolated. Never import/merge its snapshots.
 """
 from pathlib import Path
 import sqlite3
-import sys
 from uuid import uuid4
 
 from edit_access import EditGate
@@ -17,14 +16,10 @@ APPROVED_SUBNETS = ('10.1.121.0/24', '192.168.120.0/24')
 
 
 def production_options(argv=None):
-    values = list(sys.argv[1:] if argv is None else argv)
-    # Only the approved no-host profile inherits the two approved networks.
-    # Explicit host/subnet choices retain the original CLI acknowledgement rules.
-    if not any(value == '--host' or value.startswith('--host=') or
-               value == '--client-subnet' or value.startswith('--client-subnet=') for value in values):
-        for subnet in APPROVED_SUBNETS:
-            values.extend(('--client-subnet', subnet))
-    return startup_options(values)
+    # Latest approved default: all sources on the existing IPv4 listener.
+    # Explicit host/subnet choices do not silently inherit this wider access.
+    return startup_options(argv, source_modes=True, default_subnets=APPROVED_SUBNETS,
+                           default_all_sources=True)
 
 
 def prepare_production_database(source):
@@ -55,7 +50,8 @@ def main(argv=None):
     server = None
     try:
         database, backup, counts = prepare_production_database(ROOT/'data/spms.sqlite3')
-        app = create_app(database, host=args.host, port=args.port, client_subnets=args.client_subnet)
+        app = create_app(database, host=args.host, port=args.port, client_subnets=args.client_subnet,
+                         allow_all_sources=args.allow_all_sources)
         server = create_server(app, host=args.host, port=args.port, threads=10,
             connection_limit=100, channel_timeout=15, max_request_body_size=MAX_BODY,
             clear_untrusted_proxy_headers=True, url_scheme='http')
@@ -64,7 +60,11 @@ def main(argv=None):
         print('Listening:', args.host, args.port, flush=True)
         print('LIVE DATABASE:', database, flush=True)
         print('Verified startup backup:', backup, flush=True)
-        print('Source allowlist:', ', '.join(map(str, args.client_subnet)), flush=True)
+        if args.allow_all_sources:
+            print('SOURCE ACCESS: ALL IPv4 sources (no source-IP allowlist).', flush=True)
+            print('WARNING: Anyone who can reach this service with an allowed Host can read SPMS data.', flush=True)
+        else:
+            print('Source allowlist:', ', '.join(map(str, args.client_subnet)) or 'loopback only', flush=True)
         print('Writes are saved to the original database. No test data is imported.', flush=True)
         print('HTTP is plaintext. Shared proxies may allow additional readers. No Proxy/firewall changes.', flush=True)
         print('Keep this window open. Ctrl+C to stop. Do not run another SPMS server concurrently.', flush=True)

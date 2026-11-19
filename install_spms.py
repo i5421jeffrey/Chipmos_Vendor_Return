@@ -117,6 +117,16 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                      'sha256': 'af386ccb01ed85120590d32761bb64f94b8383b3c72a6aa8f019df5fc9df5cad'},
            'company/IMPLEMENTATION_STATUS.md': {'content': '# 備品管理：本機功能整批對照與交付界線\n'
                                                            '\n'
+                                                           '## 全來源設定（2026-11-19）\n'
+                                                           '\n'
+                                                           '依使用者明確授權，正式入口預設接受所有可達的 IPv4 來源，提供 '
+                                                           '`--allow-all-sources` 與回退用 '
+                                                           '`--restrict-sources`，也保留指定網段模式。只取消此模式的來源 IP '
+                                                           '白名單；精確 Host／同源／密碼 token、原庫／備份、附件與業務規則不變。健康檢查明確區別 '
+                                                           '`all-ipv4-sources`。標準庫與測試版 CLI 的來源限制不變。不修改 '
+                                                           'Proxy／防火牆；開放讀取範圍的風險及選項見 PRODUCTION.md。新的全來源模式仍需 '
+                                                           'Windows 現場驗證。\n'
+                                                           '\n'
                                                            '## 未開單清單（2026-11-17）\n'
                                                            '\n'
                                                            '左側新增「未開單」與全站筆數，依既有 `is_opened=false` '
@@ -324,7 +334,7 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                            '`.venv`，也不自動啟動服務、匯入真實舊資料或開放內網。\n'
                                                            '真實來源包與預覽結果只保存在使用者核准的本機資料夾，不放入儲存庫或通用安裝檔；公司正式匯入仍需停止服務、預檢及 '
                                                            '`IMPORT` 確認。\n',
-                                                'sha256': '8fa9e32c22dbc6e51fa0b05802230303f7d5cf05b4237f96053b44e7cb6c203a'},
+                                                'sha256': '38ee5b89ffb1fd703b5f13194a32f69c07fd733d32d83b25ea30886a7ec31c9b'},
            'company/LAN_SETUP.md': {'content': '# SPMS：Windows 11 內網共用\n'
                                                '\n'
                                                '## 最新監聽對照測試：0.0.0.0（2026-11-05）\n'
@@ -508,6 +518,41 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                     'sha256': 'd99160101849a035de939b457adf4455e11b39ada38e7dedbf6334eb7ee7ca28'},
            'company/PRODUCTION.md': {'content': '# SPMS 正式啟動（2026-11-16）\n'
                                                 '\n'
+                                                '## 最新來源設定（2026-11-19，優先於下方歷史說明）\n'
+                                                '\n'
+                                                '使用者明確核准開放所有連入網段。`production_server.py`／`start_spms.cmd` '
+                                                '無參數啟動現在預設允許**所有能到達現有 IPv4 listener 的來源**，不再檢查來源網段；Host '
+                                                '白名單、同源檢查、編輯密碼／token、資料與啟動備份不變。Host 仍限 '
+                                                '`10.1.121.135:<port>`、`127.0.0.1:<port>`、`localhost:<port>`，不是任意網址皆可使用。\n'
+                                                '\n'
+                                                '**任何可連到此服務且使用允許 Host 的人都可以讀取 SPMS 資料；共用編輯密碼只保護修改，不保護讀取。** '
+                                                '包括透過共用 Proxy 轉送的使用者。HTTP 仍明文，不代表已增加個人認證、HTTPS 或解除 Proxy '
+                                                '登入；不調整公司防火牆／Proxy，不開 IPv6 '
+                                                'listener、不建立對外轉發。若公司已有其他轉發規則，也可能影響實際可達範圍，需由 IT 管理。\n'
+                                                '\n'
+                                                '啟動時會顯示 `SOURCE ACCESS: ALL IPv4 sources (no source-IP '
+                                                'allowlist).` 與讀取風險提示。健康檢查的 access 為 '
+                                                '`all-ipv4-sources`，不再誤標為 allowlist。可明確指定同一模式：\n'
+                                                '\n'
+                                                '```cmd\n'
+                                                '.\\.venv\\Scripts\\python.exe '
+                                                '.\\company\\production_server.py --allow-all-sources\n'
+                                                '```\n'
+                                                '\n'
+                                                '退回先前兩個核准網段（加 loopback）：\n'
+                                                '\n'
+                                                '```cmd\n'
+                                                '.\\.venv\\Scripts\\python.exe '
+                                                '.\\company\\production_server.py --restrict-sources\n'
+                                                '```\n'
+                                                '\n'
+                                                '也可用重複 `--client-subnet` '
+                                                '指定限制清單，這會停用預設全來源模式。`--allow-all-sources` 不可與 '
+                                                '`--client-subnet` 或 `--restrict-sources` 混用。明確指定 `--host` '
+                                                '不自動繼承全來源模式／HTTP 同意：自訂 LAN bind 仍需指定來源模式及 '
+                                                '`--allow-http-lan`。`--host 127.0.0.1` 仍維持僅 loopback '
+                                                '綁定。`server.py` 與隔離測試入口不提供此全來源選項、預設行為不變。\n'
+                                                '\n'
                                                 '使用者在 Flask＋Waitress 測試連線成功後，核准正式使用原 SQLite 資料庫與密碼，允許 '
                                                 '`10.1.121.0/24` 及 `192.168.120.0/24`。預設仍是 '
                                                 'HTTP、`0.0.0.0:8082`，精確 Host 白名單不變，不調整 Proxy／防火牆。若後者包含共用 '
@@ -572,8 +617,12 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                 '\n'
                                                 '自動測試使用合成暫存資料驗證正式路徑、持續寫入、備份、拒絕規則與不合併測試副本。使用者已回報測試版的內網連線成功；正式 '
                                                 'Windows 啟動／實際多人負載、定期備份與開機常駐仍未驗證，不因新增入口就宣稱已完成。\n',
-                                     'sha256': '67ad0cf7c43f23975106068bccea97134bab74d0c607ce7e1afda50085386d9c'},
+                                     'sha256': 'f09c810955b1ad3eeed47407ab3fa39c7b372d5def15960451cfb173ca9b03a7'},
            'company/README.md': {'content': '# SPMS 公司版：SQLite 離線功能驗收\n'
+                                            '\n'
+                                            '2026-11-19 最新核准：正式入口無參數啟動允許所有可連入的 IPv4 來源，保留 '
+                                            'Host／同源／編輯保護。任何能連到服務者都可能讀取資料；可用 `--restrict-sources` 回到兩個網段限制，見 '
+                                            '[PRODUCTION.md](PRODUCTION.md) 頂端最新設定。以下兩個網段說明是前一版歷史設定。\n'
                                             '\n'
                                             '正式 Flask＋Waitress 啟動入口為 '
                                             '`production_server.py`／`start_spms.cmd`，使用原資料庫、密碼與兩個核准來源網段；更新、啟動及回退見 '
@@ -982,7 +1031,7 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                             '產生；公司版程式更新後必須重新產生。\n'
                                             '安裝測試：`python -m unittest discover -s scripts -p '
                                             '"test_company_installer.py" -v`。\n',
-                                 'sha256': '55bf8df0b44a35a2e3e30e9c833491db4b501893dc75d6349c6d75b03ed2ba5a'},
+                                 'sha256': 'afafd29536408c91a1c78b6b8466528ef572faaa05065845445025737e947272'},
            'company/database.py': {'content': '"""Shared SQLite connections and additive, backed-up module '
                                               'migrations."""\n'
                                               'import json\n'
@@ -1338,7 +1387,8 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                   '\n'
                                                   '\n'
                                                   "def create_app(database, *, host='0.0.0.0', port=8082, "
-                                                  "client_subnets=('10.1.121.0/24',), diagnostic_log=None):\n"
+                                                  "client_subnets=('10.1.121.0/24',), diagnostic_log=None,\n"
+                                                  '               allow_all_sources=False):\n'
                                                   '    from flask import Flask, Response, request\n'
                                                   '    from werkzeug.exceptions import HTTPException\n'
                                                   '\n'
@@ -1352,7 +1402,10 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                   '    lan = not ipaddress.ip_address(host).is_loopback\n'
                                                   '    networks = tuple(client_network(str(value)) for value '
                                                   'in client_subnets)\n'
-                                                  '    if lan and not networks:\n'
+                                                  '    if allow_all_sources and networks:\n'
+                                                  "        raise ValueError('All-source mode cannot be "
+                                                  "combined with a client subnet allowlist')\n"
+                                                  '    if lan and not networks and not allow_all_sources:\n'
                                                   "        raise ValueError('LAN access requires a client "
                                                   "subnet allowlist')\n"
                                                   "    hosts = {f'{host}:{port}'}\n"
@@ -1364,7 +1417,9 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                   '    state = SimpleNamespace(database=database, '
                                                   "edit_gate=EditGate(database.parent/'edit-password.json'),\n"
                                                   '                            allowed_hosts=hosts, lan=lan, '
-                                                  "scheme='http', server_port=port)\n"
+                                                  "scheme='http', server_port=port,\n"
+                                                  '                            '
+                                                  'allow_all_sources=allow_all_sources)\n'
                                                   '    app = Flask(__name__, static_folder=None)\n'
                                                   '    app.config.update(MAX_CONTENT_LENGTH=MAX_BODY, '
                                                   'TESTING=False)\n'
@@ -1440,8 +1495,8 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                   '            address = '
                                                   "ipaddress.ip_address(request.remote_addr or '')\n"
                                                   '            allowed = address.version == 4 and '
-                                                  '(address.is_loopback or any(address in network for '
-                                                  'network in networks))\n'
+                                                  '(allow_all_sources or address.is_loopback or any(address '
+                                                  'in network for network in networks))\n'
                                                   '        except ValueError:\n'
                                                   '            allowed = False\n'
                                                   '        if not allowed:\n'
@@ -1558,7 +1613,7 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                   '\n'
                                                   "if __name__ == '__main__':\n"
                                                   '    raise SystemExit(main())\n',
-                                       'sha256': '56b26942a5ddc342e47dad481dc81e36eb4495c2ef5f5d5bb6e8d646a3d57213'},
+                                       'sha256': '7cb55d1e8be0f6518c3f578790e3035fcfc00778ef4ebb659a089e65c4e9fa4f'},
            'company/import_data.py': {'content': '"""Validate/apply a reviewed offline JSON package, without '
                                                  'connecting to Supabase.\n'
                                                  '\n'
@@ -5497,7 +5552,6 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                        '"""\n'
                                                        'from pathlib import Path\n'
                                                        'import sqlite3\n'
-                                                       'import sys\n'
                                                        'from uuid import uuid4\n'
                                                        '\n'
                                                        'from edit_access import EditGate\n'
@@ -5512,21 +5566,14 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                        '\n'
                                                        '\n'
                                                        'def production_options(argv=None):\n'
-                                                       '    values = list(sys.argv[1:] if argv is None else '
-                                                       'argv)\n'
-                                                       '    # Only the approved no-host profile inherits the '
-                                                       'two approved networks.\n'
-                                                       '    # Explicit host/subnet choices retain the '
-                                                       'original CLI acknowledgement rules.\n'
-                                                       "    if not any(value == '--host' or "
-                                                       "value.startswith('--host=') or\n"
-                                                       "               value == '--client-subnet' or "
-                                                       "value.startswith('--client-subnet=') for value in "
-                                                       'values):\n'
-                                                       '        for subnet in APPROVED_SUBNETS:\n'
-                                                       "            values.extend(('--client-subnet', "
-                                                       'subnet))\n'
-                                                       '    return startup_options(values)\n'
+                                                       '    # Latest approved default: all sources on the '
+                                                       'existing IPv4 listener.\n'
+                                                       '    # Explicit host/subnet choices do not silently '
+                                                       'inherit this wider access.\n'
+                                                       '    return startup_options(argv, source_modes=True, '
+                                                       'default_subnets=APPROVED_SUBNETS,\n'
+                                                       '                           '
+                                                       'default_all_sources=True)\n'
                                                        '\n'
                                                        '\n'
                                                        'def prepare_production_database(source):\n'
@@ -5567,7 +5614,9 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                        '        database, backup, counts = '
                                                        "prepare_production_database(ROOT/'data/spms.sqlite3')\n"
                                                        '        app = create_app(database, host=args.host, '
-                                                       'port=args.port, client_subnets=args.client_subnet)\n'
+                                                       'port=args.port, client_subnets=args.client_subnet,\n'
+                                                       '                         '
+                                                       'allow_all_sources=args.allow_all_sources)\n'
                                                        '        server = create_server(app, host=args.host, '
                                                        'port=args.port, threads=10,\n'
                                                        '            connection_limit=100, '
@@ -5585,8 +5634,16 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                        'flush=True)\n'
                                                        "        print('Verified startup backup:', backup, "
                                                        'flush=True)\n'
-                                                       "        print('Source allowlist:', ', "
-                                                       "'.join(map(str, args.client_subnet)), flush=True)\n"
+                                                       '        if args.allow_all_sources:\n'
+                                                       "            print('SOURCE ACCESS: ALL IPv4 sources "
+                                                       "(no source-IP allowlist).', flush=True)\n"
+                                                       "            print('WARNING: Anyone who can reach "
+                                                       'this service with an allowed Host can read SPMS '
+                                                       "data.', flush=True)\n"
+                                                       '        else:\n'
+                                                       "            print('Source allowlist:', ', "
+                                                       "'.join(map(str, args.client_subnet)) or 'loopback "
+                                                       "only', flush=True)\n"
                                                        "        print('Writes are saved to the original "
                                                        "database. No test data is imported.', flush=True)\n"
                                                        "        print('HTTP is plaintext. Shared proxies may "
@@ -5614,7 +5671,7 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                        '\n'
                                                        "if __name__ == '__main__':\n"
                                                        '    raise SystemExit(main())\n',
-                                            'sha256': '812046cfef2932979886f80b253be9a9c6fdb3a0609491e9e9feaef1558802ac'},
+                                            'sha256': 'afdaa856a2c8252fe2eb82bf24dbcc012649de05473b425353d8ea29acbbbd52'},
            'company/server.py': {'content': '"""Local SPMS service. Python standard library only; no cloud '
                                             'connections."""\n'
                                             '\n'
@@ -5839,8 +5896,10 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                             '            try:\n'
                                             '                payload = '
                                             'database_status(self.server.database)\n'
-                                            "                payload['access'] = 'lan-allowlist' if "
-                                            "self.server.lan else 'localhost-only'\n"
+                                            "                payload['access'] = ('all-ipv4-sources' if "
+                                            "getattr(self.server, 'allow_all_sources', False)\n"
+                                            "                                     else 'lan-allowlist' if "
+                                            "self.server.lan else 'localhost-only')\n"
                                             "                payload['transport'] = self.server.scheme\n"
                                             '                status = 200\n'
                                             '            except (sqlite3.Error, TypeError, ValueError, '
@@ -6087,7 +6146,9 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                             '            self.api_error(error)\n'
                                             '\n'
                                             '\n'
-                                            'def startup_options(argv=None):\n'
+                                            'def startup_options(argv=None, *, source_modes=False, '
+                                            "default_subnets=('10.1.121.0/24',), "
+                                            'default_all_sources=False):\n'
                                             '    parser = argparse.ArgumentParser(description=__doc__)\n'
                                             '    parser.add_argument("--port", type=int, default=8082)\n'
                                             "    parser.add_argument('--host', help='IPv4 bind address; "
@@ -6103,15 +6164,34 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                             "    parser.add_argument('--allow-http-lan', "
                                             "action='store_true', help='Explicitly accept plaintext "
                                             "transport on the trusted LAN')\n"
+                                            '    if source_modes:\n'
+                                            '        sources = parser.add_mutually_exclusive_group()\n'
+                                            "        sources.add_argument('--allow-all-sources', "
+                                            "dest='allow_all_sources', action='store_true', default=None,\n"
+                                            "                             help='Allow every IPv4 source that "
+                                            "can reach the listener; Host/origin/edit checks still apply')\n"
+                                            "        sources.add_argument('--restrict-sources', "
+                                            "dest='allow_all_sources', action='store_false',\n"
+                                            "                             help='Use the approved subnet "
+                                            "allowlist instead of allowing all sources')\n"
+                                            '    else:\n'
+                                            '        parser.set_defaults(allow_all_sources=False)\n'
                                             '    args = parser.parse_args(argv)\n'
+                                            '    if args.allow_all_sources is None:\n'
+                                            '        args.allow_all_sources = default_all_sources and '
+                                            'args.host is None and not args.client_subnet\n'
+                                            '    if args.allow_all_sources and args.client_subnet:\n'
+                                            "        parser.error('--allow-all-sources cannot be combined "
+                                            "with --client-subnet')\n"
                                             '    # User-approved host profile. An explicit --host does not '
                                             'inherit its\n'
                                             '    # plaintext acknowledgement or subnet; custom LANs remain '
                                             'explicit.\n'
                                             '    if args.host is None:\n'
                                             "        args.host = '0.0.0.0'\n"
-                                            '        if not args.client_subnet:\n'
-                                            "            args.client_subnet = ['10.1.121.0/24']\n"
+                                            '        if not args.client_subnet and not '
+                                            'args.allow_all_sources:\n'
+                                            '            args.client_subnet = list(default_subnets)\n'
                                             '        if not args.tls_cert and not args.tls_key:\n'
                                             '            args.allow_http_lan = True\n'
                                             '    if not 1 <= args.port <= 65535:\n'
@@ -6126,7 +6206,8 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                             "        parser.error('--tls-cert and --tls-key must be used "
                                             "together')\n"
                                             '    args.lan = not ipaddress.ip_address(args.host).is_loopback\n'
-                                            '    if args.lan and not args.client_subnet:\n'
+                                            '    if args.lan and not args.client_subnet and not '
+                                            'args.allow_all_sources:\n'
                                             "        parser.error('LAN access requires --client-subnet')\n"
                                             '    if args.lan and not args.tls_cert and not '
                                             'args.allow_http_lan:\n'
@@ -6180,7 +6261,7 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                             '\n'
                                             'if __name__ == "__main__":\n'
                                             '    main()\n',
-                                 'sha256': '5880b70a21de95527b41bfdafd4a728193fea05c4ae40db50ce8def4ae13c85a'},
+                                 'sha256': '81380c7e9f4ce36de3e41c575c7e648f490ba49cb4019680a37fd394e3ce17c4'},
            'company/start_flask_test.cmd': {'content': '@echo off\n'
                                                        'setlocal\n'
                                                        'cd /d "%~dp0.."\n'
@@ -6214,6 +6295,8 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                  ')\n'
                                                  'echo SPMS uses the ORIGINAL database. Stop all other SPMS '
                                                  'servers first.\n'
+                                                 'echo Default: all reachable IPv4 sources may read SPMS. '
+                                                 'Use --restrict-sources for the approved subnet allowlist.\n'
                                                  '".venv\\Scripts\\python.exe" '
                                                  '".\\company\\production_server.py" %*\n'
                                                  'set "SPMS_RESULT=%ERRORLEVEL%"\n'
@@ -6221,7 +6304,7 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                  'echo SPMS stopped. Keep any error messages for diagnosis.\n'
                                                  'pause\n'
                                                  'exit /b %SPMS_RESULT%\n',
-                                      'sha256': 'f445c4c53a7e7efde5ef6d27f60ce0456d5b34ebcc3b04a5b06a01f3f045f8d0'},
+                                      'sha256': '8e499afdb2defce922b161ec263010184ca7d075d9d333dd5869b4651b172b04'},
            'company/test_edit_access.py': {'content': 'import json\n'
                                                       'import tempfile\n'
                                                       'import time\n'
@@ -8350,6 +8433,8 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                             "self.assertEqual(app.extensions['spms_state'].database, "
                                                             'path.resolve())\n'
                                                             '                '
+                                                            "self.assertTrue(app.extensions['spms_state'].allow_all_sources)\n"
+                                                            '                '
                                                             "self.assertEqual(factory.call_args.kwargs['host'], "
                                                             "'0.0.0.0')\n"
                                                             '                '
@@ -8373,22 +8458,160 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                             "        self.assertEqual(args.host, '0.0.0.0')\n"
                                                             '        self.assertEqual(args.port, 8082)\n'
                                                             '        self.assertTrue(args.allow_http_lan)\n'
+                                                            '        '
+                                                            'self.assertTrue(args.allow_all_sources)\n'
+                                                            '        self.assertEqual(args.client_subnet, '
+                                                            '[])\n'
+                                                            '        restricted = '
+                                                            "production_options(['--restrict-sources'])\n"
+                                                            '        '
+                                                            'self.assertFalse(restricted.allow_all_sources)\n'
                                                             '        self.assertEqual(tuple(map(str, '
-                                                            'args.client_subnet)), APPROVED_SUBNETS)\n'
+                                                            'restricted.client_subnet)), APPROVED_SUBNETS)\n'
+                                                            '        '
+                                                            "self.assertTrue(production_options(['--allow-all-sources']).allow_all_sources)\n"
                                                             '        '
                                                             "self.assertEqual(production_options(['--port', "
                                                             "'8089']).port, 8089)\n"
                                                             '        '
                                                             "self.assertEqual(production_options(['--host', "
                                                             "'127.0.0.1']).client_subnet, [])\n"
+                                                            '        '
+                                                            "self.assertFalse(production_options(['--host', "
+                                                            "'127.0.0.1']).allow_all_sources)\n"
                                                             '        args = '
                                                             "production_options(['--client-subnet', "
                                                             "'10.1.121.0/24'])\n"
                                                             '        self.assertEqual(list(map(str, '
                                                             "args.client_subnet)), ['10.1.121.0/24'])\n"
+                                                            '        '
+                                                            'self.assertFalse(args.allow_all_sources)\n'
+                                                            '        '
+                                                            "self.assertFalse(production_options(['--client-subnet=192.168.120.0/24']).allow_all_sources)\n"
+                                                            '        explicit = '
+                                                            "production_options(['--host', '10.1.121.135', "
+                                                            "'--allow-all-sources', '--allow-http-lan'])\n"
+                                                            '        '
+                                                            'self.assertTrue(explicit.allow_all_sources)\n'
                                                             '        with self.assertRaises(SystemExit):\n'
                                                             "            production_options(['--host', "
                                                             "'10.1.121.135'])\n"
+                                                            "        for values in (['--allow-all-sources', "
+                                                            "'--restrict-sources'],\n"
+                                                            "                       ['--allow-all-sources', "
+                                                            "'--client-subnet', '10.1.121.0/24'],\n"
+                                                            "                       ['--host', "
+                                                            "'10.1.121.135', '--allow-all-sources']):\n"
+                                                            '            with '
+                                                            'self.assertRaises(SystemExit):\n'
+                                                            '                production_options(values)\n'
+                                                            '\n'
+                                                            '    '
+                                                            "@unittest.skipUnless(importlib.util.find_spec('flask'), "
+                                                            "'Optional Flask not installed')\n"
+                                                            '    def '
+                                                            'test_all_sources_keep_host_origin_edit_and_proxy_guards(self):\n'
+                                                            '        with tempfile.TemporaryDirectory() as '
+                                                            'folder:\n'
+                                                            "            path = Path(folder)/'spms.sqlite3'\n"
+                                                            '            initialize_database(path)\n'
+                                                            '            '
+                                                            "configure(path.parent/'edit-password.json', "
+                                                            "'synthetic-only')\n"
+                                                            '            app = create_app(path, '
+                                                            'client_subnets=(), allow_all_sources=True)\n'
+                                                            '            self.addCleanup(lambda: '
+                                                            '[handler.close() for handler in '
+                                                            "app.extensions['spms_diagnostics'].handlers])\n"
+                                                            '            client = app.test_client()\n'
+                                                            '            def call(route, '
+                                                            "source='172.16.5.40', method='GET', data=None, "
+                                                            'headers=None):\n'
+                                                            '                return client.open(route, '
+                                                            'method=method, json=data, headers=headers or '
+                                                            '{},\n'
+                                                            '                    '
+                                                            "base_url='http://10.1.121.135:8082', "
+                                                            "environ_overrides={'REMOTE_ADDR':source})\n"
+                                                            "            for source in ('10.1.121.40', "
+                                                            "'192.168.120.89', '172.16.5.40', "
+                                                            "'203.0.113.40', '127.0.0.1'):\n"
+                                                            "                health = call('/api/health', "
+                                                            'source)\n'
+                                                            '                '
+                                                            'self.assertEqual(health.status_code, 200)\n'
+                                                            '                '
+                                                            "self.assertEqual(health.json['access'], "
+                                                            "'all-ipv4-sources')\n"
+                                                            '                '
+                                                            "self.assertEqual(call('/repairs/', "
+                                                            'source).status_code, 200)\n'
+                                                            '                '
+                                                            "self.assertEqual(call('/api/repairs/records', "
+                                                            'source).status_code, 200)\n'
+                                                            "            for source in ('::1', '', "
+                                                            "'not-an-address'):\n"
+                                                            '                '
+                                                            "self.assertEqual(call('/api/health', "
+                                                            'source).status_code, 403)\n'
+                                                            '            '
+                                                            "self.assertEqual(call('/api/health', "
+                                                            "headers={'Host':'evil.example:8082',\n"
+                                                            '                '
+                                                            "'X-Forwarded-Host':'10.1.121.135:8082'}).status_code, "
+                                                            '403)\n'
+                                                            "            for host in ('10.1.121.135:8082', "
+                                                            "'localhost:8082', '127.0.0.1:8082'):\n"
+                                                            '                '
+                                                            "self.assertEqual(call('/api/health', "
+                                                            "headers={'Host':host}).status_code, 200)\n"
+                                                            "            headers = {'X-SPMS-Request':'1'}\n"
+                                                            '            '
+                                                            "self.assertEqual(call('/api/repairs/records', "
+                                                            "method='POST', data=example(), "
+                                                            'headers=headers).status_code, 401)\n'
+                                                            '            '
+                                                            "self.assertEqual(call('/api/edit/unlock', "
+                                                            "method='POST', "
+                                                            "data={'password':'synthetic-only'},\n"
+                                                            '                headers={**headers, '
+                                                            "'Origin':'http://evil.example', "
+                                                            "'X-Forwarded-Host':'evil.example'}).status_code, "
+                                                            '403)\n'
+                                                            '            '
+                                                            "self.assertEqual(call('/api/edit/unlock', "
+                                                            "method='POST', "
+                                                            "data={'password':'synthetic-only'},\n"
+                                                            '                headers={**headers, '
+                                                            "'Sec-Fetch-Site':'cross-site'}).status_code, "
+                                                            '403)\n'
+                                                            "            unlock = call('/api/edit/unlock', "
+                                                            "method='POST', "
+                                                            "data={'password':'synthetic-only'}, "
+                                                            'headers=headers)\n'
+                                                            '            '
+                                                            'self.assertEqual(unlock.status_code, 200)\n'
+                                                            "            headers['X-SPMS-Edit-Token'] = "
+                                                            "unlock.json['token']\n"
+                                                            '            '
+                                                            "self.assertEqual(call('/api/repairs/records', "
+                                                            "method='POST', data=example(), "
+                                                            'headers=headers).status_code, 201)\n'
+                                                            "            call('/api/edit/lock', "
+                                                            "method='POST', data={}, headers=headers)\n"
+                                                            '            '
+                                                            "self.assertEqual(call('/api/repairs/records', "
+                                                            "method='POST', "
+                                                            "data=example(serial_no='123456789'), "
+                                                            'headers=headers).status_code, 401)\n'
+                                                            '            '
+                                                            'self.assertEqual(service.list_records(path, '
+                                                            "{})['total'], 1)\n"
+                                                            '            with '
+                                                            'self.assertRaises(ValueError):\n'
+                                                            '                create_app(path, '
+                                                            'allow_all_sources=True, '
+                                                            'client_subnets=APPROVED_SUBNETS)\n'
                                                             '\n'
                                                             '    def '
                                                             'test_missing_database_password_and_failed_backup_stop_before_migration(self):\n'
@@ -8529,7 +8752,7 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                             '\n'
                                                             "if __name__ == '__main__':\n"
                                                             '    unittest.main()\n',
-                                                 'sha256': '77db89b50090da985c0dfca012260dddbf7bd5312456498a888ce4c26ce63dbf'},
+                                                 'sha256': '1875db33da2de4c210a32a0b084307ea1e2b2acf7abd838c5ef3c1fdff0b7a86'},
            'company/test_repairs.py': {'content': 'import concurrent.futures\n'
                                                   'import json\n'
                                                   'import sqlite3\n'
@@ -12306,7 +12529,7 @@ BUNDLE = {'files': {'company/FLASK_TEST.md': {'content': '# Flask＋Waitress 連
                                                 '@media(max-width:600px){main{margin:25px auto;padding:0 '
                                                 '16px}h1{font-size:22px}section{padding:18px}dl{grid-template-columns:1fr;gap:8px}dd{margin-bottom:10px}}\n',
                                      'sha256': '064406c8758be5620dfe7440f59d59ec1de5f6307e74f5bad85dd03e018c0769'}},
- 'version': '2026-11-17-unopened-list'}
+ 'version': '2026-11-19-all-source-access'}
 
 
 def check_local_path(path):
